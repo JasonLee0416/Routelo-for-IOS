@@ -1,0 +1,37 @@
+{
+  "expo": {
+    "name": "Routelo for IOS",
+    "slug": "routelo-for-ios",
+    "scheme": "routeloforios",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.jasonlee0312.routelo.ios",
+      "buildNumber": "1",
+      "infoPlist": {
+        "NSCameraUsageDescription": "배송 영수증을 촬영하고 주문 정보를 인식하기 위해 카메라를 사용합니다.",
+        "NSPhotoLibraryUsageDescription": "저장된 배송 영수증을 선택하고 주문 정보를 인식하기 위해 사진 보관함을 사용합니다."
+      }
+    },
+    "android": {
+      "package": "com.jasonlee0312.routelo",
+      "adaptiveIcon": {
+        "backgroundColor": "#E6F4FE",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      },
+      "predictiveBackGestureEnabled": false
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      "expo-font",
+      "onnxruntime-react-native"
+    ]
+  }
+}

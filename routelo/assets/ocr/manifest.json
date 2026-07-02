@@ -1,0 +1,27 @@
+{
+  "engine": "ppocrv5",
+  "modelVersion": "rapidocr-v3.8.0-ppocrv5",
+  "runtime": {
+    "mobile": "onnxruntime-react-native:1.24.3",
+    "ci": "onnxruntime-node:1.27.0"
+  },
+  "assets": [
+    {
+      "file": "ch_PP-OCRv5_det_mobile.onnx",
+      "role": "detector",
+      "sha256": "4d97c44a20d30a81aad087d6a396b08f786c4635742afc391f6621f5c6ae78ae"
+    },
+    {
+      "file": "korean_PP-OCRv5_rec_mobile.onnx",
+      "role": "recognizer",
+      "sha256": "cd6e2ea50f6943ca7271eb8c56a877a5a90720b7047fe9c41a2e541a25773c9b"
+    },
+    {
+      "file": "ppocrv5_korean_dict.txt",
+      "role": "dictionary",
+      "sha256": "a88071c68c01707489baa79ebe0405b7beb5cca229f4fc94cc3ef992328802d7"
+    }
+  ],
+  "source": "RapidOCR v3.8.0 model registry",
+  "license": "Apache-2.0"
+}

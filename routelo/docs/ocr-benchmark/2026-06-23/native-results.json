@@ -1,0 +1,2738 @@
+{
+  "schemaVersion": 1,
+  "engine": "com.google.mlkit:text-recognition-korean:16.0.1",
+  "device": {
+    "manufacturer": "Google",
+    "model": "sdk_gphone64_x86_64",
+    "apiLevel": 35,
+    "release": "15"
+  },
+  "sourceDirectory": "repository root copied unchanged into androidTest assets",
+  "results": [
+    {
+      "file": "KakaoTalk_20260621_070828835.jpg",
+      "sha256": "f6a8f334b3a62552b6aafae35bda12237a7d720cfdf86fd706b98015e01ac5c0",
+      "width": 4000,
+      "height": 3000,
+      "processingMs": 1299,
+      "fullText": "o:202606- -260614-wleathdus- 0001\n한국직거래화훼센터\nKDFC KOKEA DIRECT TRADE ROHER CENTER\n주처\n주문자\n품명\n매릴홀시\n리본\n보내는분\n배달장소\n인수하신문\n원산지\n아뜰리에몽들라워\n미입력 -\n축하 - 축하3단\n2026년\n(축화혼)-신부\n메리권 프로트금융3를 투장 김유겸\n받는분 : 신부 선 단비\n가6월 14일(일로 일)(예식: 12420분) E카를요청\n한장사전요청할\n서을 영등포구 공군흐텔 그랜드스를 s종\n반드시 이름으로\n인 수증\n관계\n내로 엉증포구-KDFC전유꽃화원-070-4741-0001\nTE 0ro-AO 1010 \/ FAX:\n니pO70-740 3-877R\n배송하신분은\nTEL\n수량\n스후 바로 해피콜 하세요.\n선\nHP\nTEL\n인수시간\n1\n본부전한:1566-0028\n본부팩스: 1599-0028\n시\n분",
+      "lineCount": 41,
+      "lines": [
+        {
+          "text": "o:202606- -260614-wleathdus- 0001",
+          "boundingBox": {
+            "x": 501,
+            "y": 251,
+            "width": 906,
+            "height": 124
+          }
+        },
+        {
+          "text": "한국직거래화훼센터",
+          "boundingBox": {
+            "x": 729,
+            "y": 384,
+            "width": 746,
+            "height": 125
+          }
+        },
+        {
+          "text": "KDFC KOKEA DIRECT TRADE ROHER CENTER",
+          "boundingBox": {
+            "x": 568,
+            "y": 470,
+            "width": 903,
+            "height": 100
+          }
+        },
+        {
+          "text": "주처",
+          "boundingBox": {
+            "x": 591,
+            "y": 701,
+            "width": 184,
+            "height": 64
+          }
+        },
+        {
+          "text": "주문자",
+          "boundingBox": {
+            "x": 523,
+            "y": 774,
+            "width": 210,
+            "height": 96
+          }
+        },
+        {
+          "text": "품명",
+          "boundingBox": {
+            "x": 553,
+            "y": 893,
+            "width": 130,
+            "height": 74
+          }
+        },
+        {
+          "text": "매릴홀시",
+          "boundingBox": {
+            "x": 465,
+            "y": 1054,
+            "width": 274,
+            "height": 66
+          }
+        },
+        {
+          "text": "리본",
+          "boundingBox": {
+            "x": 515,
+            "y": 1242,
+            "width": 152,
+            "height": 70
+          }
+        },
+        {
+          "text": "보내는분",
+          "boundingBox": {
+            "x": 456,
+            "y": 1393,
+            "width": 270,
+            "height": 74
+          }
+        },
+        {
+          "text": "배달장소",
+          "boundingBox": {
+            "x": 451,
+            "y": 1592,
+            "width": 279,
+            "height": 64
+          }
+        },
+        {
+          "text": "인수하신문",
+          "boundingBox": {
+            "x": 405,
+            "y": 1747,
+            "width": 354,
+            "height": 89
+          }
+        },
+        {
+          "text": "원산지",
+          "boundingBox": {
+            "x": 449,
+            "y": 2066,
+            "width": 247,
+            "height": 102
+          }
+        },
+        {
+          "text": "아뜰리에몽들라워",
+          "boundingBox": {
+            "x": 871,
+            "y": 672,
+            "width": 547,
+            "height": 73
+          }
+        },
+        {
+          "text": "미입력 -",
+          "boundingBox": {
+            "x": 870,
+            "y": 837,
+            "width": 256,
+            "height": 65
+          }
+        },
+        {
+          "text": "축하 - 축하3단",
+          "boundingBox": {
+            "x": 854,
+            "y": 942,
+            "width": 482,
+            "height": 80
+          }
+        },
+        {
+          "text": "2026년",
+          "boundingBox": {
+            "x": 853,
+            "y": 1045,
+            "width": 225,
+            "height": 63
+          }
+        },
+        {
+          "text": "(축화혼)-신부",
+          "boundingBox": {
+            "x": 1136,
+            "y": 1245,
+            "width": 410,
+            "height": 87
+          }
+        },
+        {
+          "text": "메리권 프로트금융3를 투장 김유겸",
+          "boundingBox": {
+            "x": 853,
+            "y": 1365,
+            "width": 1255,
+            "height": 94
+          }
+        },
+        {
+          "text": "받는분 : 신부 선 단비",
+          "boundingBox": {
+            "x": 780,
+            "y": 1542,
+            "width": 611,
+            "height": 122
+          }
+        },
+        {
+          "text": "가6월 14일(일로 일)(예식: 12420분) E카를요청",
+          "boundingBox": {
+            "x": 1139,
+            "y": 1004,
+            "width": 1629,
+            "height": 126
+          }
+        },
+        {
+          "text": "한장사전요청할",
+          "boundingBox": {
+            "x": 862,
+            "y": 1107,
+            "width": 602,
+            "height": 113
+          }
+        },
+        {
+          "text": "서을 영등포구 공군흐텔 그랜드스를 s종",
+          "boundingBox": {
+            "x": 782,
+            "y": 1416,
+            "width": 1148,
+            "height": 199
+          }
+        },
+        {
+          "text": "반드시 이름으로",
+          "boundingBox": {
+            "x": 809,
+            "y": 1612,
+            "width": 407,
+            "height": 133
+          }
+        },
+        {
+          "text": "인 수증",
+          "boundingBox": {
+            "x": 1741,
+            "y": 402,
+            "width": 593,
+            "height": 171
+          }
+        },
+        {
+          "text": "관계",
+          "boundingBox": {
+            "x": 1576,
+            "y": 1658,
+            "width": 101,
+            "height": 41
+          }
+        },
+        {
+          "text": "내로 엉증포구-KDFC전유꽃화원-070-4741-0001",
+          "boundingBox": {
+            "x": 2252,
+            "y": 345,
+            "width": 1172,
+            "height": 63
+          }
+        },
+        {
+          "text": "TE 0ro-AO 1010 \/ FAX:",
+          "boundingBox": {
+            "x": 1920,
+            "y": 632,
+            "width": 716,
+            "height": 127
+          }
+        },
+        {
+          "text": "니pO70-740 3-877R",
+          "boundingBox": {
+            "x": 1878,
+            "y": 698,
+            "width": 555,
+            "height": 95
+          }
+        },
+        {
+          "text": "배송하신분은",
+          "boundingBox": {
+            "x": 1371,
+            "y": 1703,
+            "width": 309,
+            "height": 99
+          }
+        },
+        {
+          "text": "TEL",
+          "boundingBox": {
+            "x": 2429,
+            "y": 870,
+            "width": 102,
+            "height": 50
+          }
+        },
+        {
+          "text": "수량",
+          "boundingBox": {
+            "x": 2421,
+            "y": 968,
+            "width": 120,
+            "height": 52
+          }
+        },
+        {
+          "text": "스후 바로 해피콜 하세요.",
+          "boundingBox": {
+            "x": 1749,
+            "y": 1743,
+            "width": 596,
+            "height": 83
+          }
+        },
+        {
+          "text": "선",
+          "boundingBox": {
+            "x": 2175,
+            "y": 1851,
+            "width": 94,
+            "height": 63
+          }
+        },
+        {
+          "text": "HP",
+          "boundingBox": {
+            "x": 2380,
+            "y": 1509,
+            "width": 81,
+            "height": 47
+          }
+        },
+        {
+          "text": "TEL",
+          "boundingBox": {
+            "x": 2357,
+            "y": 1588,
+            "width": 105,
+            "height": 60
+          }
+        },
+        {
+          "text": "인수시간",
+          "boundingBox": {
+            "x": 2295,
+            "y": 1683,
+            "width": 242,
+            "height": 84
+          }
+        },
+        {
+          "text": "1",
+          "boundingBox": {
+            "x": 2726,
+            "y": 966,
+            "width": 12,
+            "height": 38
+          }
+        },
+        {
+          "text": "본부전한:1566-0028",
+          "boundingBox": {
+            "x": 2815,
+            "y": 457,
+            "width": 542,
+            "height": 61
+          }
+        },
+        {
+          "text": "본부팩스: 1599-0028",
+          "boundingBox": {
+            "x": 2789,
+            "y": 521,
+            "width": 571,
+            "height": 78
+          }
+        },
+        {
+          "text": "시",
+          "boundingBox": {
+            "x": 2785,
+            "y": 1737,
+            "width": 47,
+            "height": 52
+          }
+        },
+        {
+          "text": "분",
+          "boundingBox": {
+            "x": 2972,
+            "y": 1749,
+            "width": 49,
+            "height": 51
+          }
+        }
+      ]
+    },
+    {
+      "file": "KakaoTalk_20260621_070828835_01.jpg",
+      "sha256": "3f9a4c2906a9628d857eefde18c220733f679bff5b0c371e749f35b864d94617",
+      "width": 4000,
+      "height": 3000,
+      "processingMs": 521,
+      "fullText": "99FLOWER\n발주화원\n배송화원\n상품명\n배달일사\n배달장소\n리본에세지\n주문자\n요구사항\n인수자\n99플라워\n선유꽃화원\n인수증\n[축하화환 FA248] 축하화환 3단\n전화\n전화\n070-8277-1211\n070-4741-0001\n영등포구 가마산로 538 해군호텔 W웨딩홀\n*받는분: 신랑 최성인\n[ST-FA248 경조사어] 하(축화훈)\n06월 14일(일)당일 배송 11:00~12:30 (1시 20분 식)\n[V디카요청]\n[보내는분] 성공글로벌 (주) 대표이사 이기동\n전화\n핸드폰\n취\n*정자로 이름을 적어주세요.\n선\n관계\n인증번흐 : 539\n절\n배송 기사님께서는 배송완료 후 즉시 [3070-4741-0001 ]로 전화주세요",
+      "lineCount": 33,
+      "lines": [
+        {
+          "text": "99FLOWER",
+          "boundingBox": {
+            "x": 390,
+            "y": 493,
+            "width": 340,
+            "height": 151
+          }
+        },
+        {
+          "text": "발주화원",
+          "boundingBox": {
+            "x": 473,
+            "y": 673,
+            "width": 182,
+            "height": 81
+          }
+        },
+        {
+          "text": "배송화원",
+          "boundingBox": {
+            "x": 485,
+            "y": 794,
+            "width": 185,
+            "height": 81
+          }
+        },
+        {
+          "text": "상품명",
+          "boundingBox": {
+            "x": 508,
+            "y": 911,
+            "width": 170,
+            "height": 79
+          }
+        },
+        {
+          "text": "배달일사",
+          "boundingBox": {
+            "x": 519,
+            "y": 1082,
+            "width": 184,
+            "height": 84
+          }
+        },
+        {
+          "text": "배달장소",
+          "boundingBox": {
+            "x": 537,
+            "y": 1296,
+            "width": 190,
+            "height": 87
+          }
+        },
+        {
+          "text": "리본에세지",
+          "boundingBox": {
+            "x": 530,
+            "y": 1473,
+            "width": 237,
+            "height": 99
+          }
+        },
+        {
+          "text": "주문자",
+          "boundingBox": {
+            "x": 589,
+            "y": 1608,
+            "width": 143,
+            "height": 77
+          }
+        },
+        {
+          "text": "요구사항",
+          "boundingBox": {
+            "x": 567,
+            "y": 1662,
+            "width": 199,
+            "height": 91
+          }
+        },
+        {
+          "text": "인수자",
+          "boundingBox": {
+            "x": 580,
+            "y": 1779,
+            "width": 189,
+            "height": 93
+          }
+        },
+        {
+          "text": "99플라워",
+          "boundingBox": {
+            "x": 1051,
+            "y": 485,
+            "width": 289,
+            "height": 131
+          }
+        },
+        {
+          "text": "선유꽃화원",
+          "boundingBox": {
+            "x": 1078,
+            "y": 606,
+            "width": 274,
+            "height": 122
+          }
+        },
+        {
+          "text": "인수증",
+          "boundingBox": {
+            "x": 1385,
+            "y": 158,
+            "width": 442,
+            "height": 220
+          }
+        },
+        {
+          "text": "[축하화환 FA248] 축하화환 3단",
+          "boundingBox": {
+            "x": 792,
+            "y": 668,
+            "width": 785,
+            "height": 257
+          }
+        },
+        {
+          "text": "전화",
+          "boundingBox": {
+            "x": 1723,
+            "y": 356,
+            "width": 114,
+            "height": 68
+          }
+        },
+        {
+          "text": "전화",
+          "boundingBox": {
+            "x": 1749,
+            "y": 474,
+            "width": 119,
+            "height": 77
+          }
+        },
+        {
+          "text": "070-8277-1211",
+          "boundingBox": {
+            "x": 1911,
+            "y": 188,
+            "width": 458,
+            "height": 180
+          }
+        },
+        {
+          "text": "070-4741-0001",
+          "boundingBox": {
+            "x": 1942,
+            "y": 314,
+            "width": 461,
+            "height": 177
+          }
+        },
+        {
+          "text": "영등포구 가마산로 538 해군호텔 W웨딩홀",
+          "boundingBox": {
+            "x": 824,
+            "y": 952,
+            "width": 1138,
+            "height": 327
+          }
+        },
+        {
+          "text": "*받는분: 신랑 최성인",
+          "boundingBox": {
+            "x": 835,
+            "y": 1187,
+            "width": 499,
+            "height": 172
+          }
+        },
+        {
+          "text": "[ST-FA248 경조사어] 하(축화훈)",
+          "boundingBox": {
+            "x": 863,
+            "y": 1175,
+            "width": 1043,
+            "height": 293
+          }
+        },
+        {
+          "text": "06월 14일(일)당일 배송 11:00~12:30 (1시 20분 식)",
+          "boundingBox": {
+            "x": 810,
+            "y": 577,
+            "width": 1657,
+            "height": 492
+          }
+        },
+        {
+          "text": "[V디카요청]",
+          "boundingBox": {
+            "x": 817,
+            "y": 1000,
+            "width": 333,
+            "height": 147
+          }
+        },
+        {
+          "text": "[보내는분] 성공글로벌 (주) 대표이사 이기동",
+          "boundingBox": {
+            "x": 851,
+            "y": 1191,
+            "width": 1303,
+            "height": 361
+          }
+        },
+        {
+          "text": "전화",
+          "boundingBox": {
+            "x": 2356,
+            "y": 801,
+            "width": 114,
+            "height": 78
+          }
+        },
+        {
+          "text": "핸드폰",
+          "boundingBox": {
+            "x": 2354,
+            "y": 900,
+            "width": 171,
+            "height": 84
+          }
+        },
+        {
+          "text": "취",
+          "boundingBox": {
+            "x": 1857,
+            "y": 1766,
+            "width": 112,
+            "height": 81
+          }
+        },
+        {
+          "text": "*정자로 이름을 적어주세요.",
+          "boundingBox": {
+            "x": 1501,
+            "y": 1476,
+            "width": 849,
+            "height": 243
+          }
+        },
+        {
+          "text": "선",
+          "boundingBox": {
+            "x": 2376,
+            "y": 1671,
+            "width": 66,
+            "height": 70
+          }
+        },
+        {
+          "text": "관계",
+          "boundingBox": {
+            "x": 2457,
+            "y": 1365,
+            "width": 184,
+            "height": 91
+          }
+        },
+        {
+          "text": "인증번흐 : 539",
+          "boundingBox": {
+            "x": 2640,
+            "y": 536,
+            "width": 449,
+            "height": 174
+          }
+        },
+        {
+          "text": "절",
+          "boundingBox": {
+            "x": 1384,
+            "y": 1857,
+            "width": 114,
+            "height": 88
+          }
+        },
+        {
+          "text": "배송 기사님께서는 배송완료 후 즉시 [3070-4741-0001 ]로 전화주세요",
+          "boundingBox": {
+            "x": 691,
+            "y": 1477,
+            "width": 2151,
+            "height": 524
+          }
+        }
+      ]
+    },
+    {
+      "file": "KakaoTalk_20260621_070828835_02.jpg",
+      "sha256": "de997ebb1591f894e8dff95e4885f112873275611a0e1bf8e05ac493d5761f0b",
+      "width": 4000,
+      "height": 3000,
+      "processingMs": 440,
+      "fullText": "주문서 No : 202606-260614-best2308-0003\nBESTFLOWER\n발주화원\n상품명\n배달일시\n배달장소\n리본\n인수자\n(분시 이름)\n청사항\n인수증\n경기 의정부사경기의정21호(임플라워)-010-5898-9543\n착한근조-\n주소 서울 동작구 중앙대병원 장례식장 5호\n받는분 고 박희순\n경조사어: 삼가 A의 롯을 빕니다\n주문일시: 06월 14일 11시 36분\nTEL\n관계\nFAX\n|2026년 06월 14일 (일요일) 지금즉시배송 디카촬영요청 해피\n보내는 분 : (주)제이콘솔라인 [대표이사]김장호\nhttp:\/\/www.bestflower.co. kr\n서울영등화전유원)\nTEL\nHP\n수량 |1\nO-5893-954\n인수시간\n031-841-9861\n07041 001\n필수항목-수주접수시 *부*발주처와 통화후 리본글씨 확인요망**부*\n노란포인트로 꼭 부탁드립니다. 현장디카 010-5898-9543 곡꼭 부탁드립니다.\n시 분",
+      "lineCount": 34,
+      "lines": [
+        {
+          "text": "주문서 No : 202606-260614-best2308-0003",
+          "boundingBox": {
+            "x": 406,
+            "y": 151,
+            "width": 1034,
+            "height": 72
+          }
+        },
+        {
+          "text": "BESTFLOWER",
+          "boundingBox": {
+            "x": 412,
+            "y": 326,
+            "width": 908,
+            "height": 136
+          }
+        },
+        {
+          "text": "발주화원",
+          "boundingBox": {
+            "x": 523,
+            "y": 577,
+            "width": 283,
+            "height": 100
+          }
+        },
+        {
+          "text": "상품명",
+          "boundingBox": {
+            "x": 523,
+            "y": 738,
+            "width": 277,
+            "height": 90
+          }
+        },
+        {
+          "text": "배달일시",
+          "boundingBox": {
+            "x": 523,
+            "y": 866,
+            "width": 285,
+            "height": 82
+          }
+        },
+        {
+          "text": "배달장소",
+          "boundingBox": {
+            "x": 516,
+            "y": 1099,
+            "width": 287,
+            "height": 93
+          }
+        },
+        {
+          "text": "리본",
+          "boundingBox": {
+            "x": 596,
+            "y": 1432,
+            "width": 142,
+            "height": 81
+          }
+        },
+        {
+          "text": "인수자",
+          "boundingBox": {
+            "x": 570,
+            "y": 1643,
+            "width": 183,
+            "height": 67
+          }
+        },
+        {
+          "text": "(분시 이름)",
+          "boundingBox": {
+            "x": 490,
+            "y": 1723,
+            "width": 312,
+            "height": 70
+          }
+        },
+        {
+          "text": "청사항",
+          "boundingBox": {
+            "x": 479,
+            "y": 1854,
+            "width": 293,
+            "height": 150
+          }
+        },
+        {
+          "text": "인수증",
+          "boundingBox": {
+            "x": 1733,
+            "y": 301,
+            "width": 600,
+            "height": 178
+          }
+        },
+        {
+          "text": "경기 의정부사경기의정21호(임플라워)-010-5898-9543",
+          "boundingBox": {
+            "x": 960,
+            "y": 585,
+            "width": 1514,
+            "height": 82
+          }
+        },
+        {
+          "text": "착한근조-",
+          "boundingBox": {
+            "x": 914,
+            "y": 726,
+            "width": 540,
+            "height": 105
+          }
+        },
+        {
+          "text": "주소 서울 동작구 중앙대병원 장례식장 5호",
+          "boundingBox": {
+            "x": 957,
+            "y": 1005,
+            "width": 1310,
+            "height": 81
+          }
+        },
+        {
+          "text": "받는분 고 박희순",
+          "boundingBox": {
+            "x": 960,
+            "y": 1175,
+            "width": 550,
+            "height": 85
+          }
+        },
+        {
+          "text": "경조사어: 삼가 A의 롯을 빕니다",
+          "boundingBox": {
+            "x": 925,
+            "y": 1351,
+            "width": 1480,
+            "height": 113
+          }
+        },
+        {
+          "text": "주문일시: 06월 14일 11시 36분",
+          "boundingBox": {
+            "x": 2779,
+            "y": 126,
+            "width": 789,
+            "height": 89
+          }
+        },
+        {
+          "text": "TEL",
+          "boundingBox": {
+            "x": 2678,
+            "y": 537,
+            "width": 110,
+            "height": 50
+          }
+        },
+        {
+          "text": "관계",
+          "boundingBox": {
+            "x": 1658,
+            "y": 1675,
+            "width": 159,
+            "height": 82
+          }
+        },
+        {
+          "text": "FAX",
+          "boundingBox": {
+            "x": 2667,
+            "y": 627,
+            "width": 131,
+            "height": 61
+          }
+        },
+        {
+          "text": "|2026년 06월 14일 (일요일) 지금즉시배송 디카촬영요청 해피",
+          "boundingBox": {
+            "x": 937,
+            "y": 859,
+            "width": 2129,
+            "height": 86
+          }
+        },
+        {
+          "text": "보내는 분 : (주)제이콘솔라인 [대표이사]김장호",
+          "boundingBox": {
+            "x": 913,
+            "y": 1472,
+            "width": 1856,
+            "height": 110
+          }
+        },
+        {
+          "text": "http:\/\/www.bestflower.co. kr",
+          "boundingBox": {
+            "x": 2836,
+            "y": 249,
+            "width": 723,
+            "height": 85
+          }
+        },
+        {
+          "text": "서울영등화전유원)",
+          "boundingBox": {
+            "x": 2897,
+            "y": 312,
+            "width": 660,
+            "height": 106
+          }
+        },
+        {
+          "text": "TEL",
+          "boundingBox": {
+            "x": 2663,
+            "y": 1132,
+            "width": 138,
+            "height": 63
+          }
+        },
+        {
+          "text": "HP",
+          "boundingBox": {
+            "x": 2679,
+            "y": 1235,
+            "width": 118,
+            "height": 61
+          }
+        },
+        {
+          "text": "수량 |1",
+          "boundingBox": {
+            "x": 2659,
+            "y": 730,
+            "width": 269,
+            "height": 85
+          }
+        },
+        {
+          "text": "O-5893-954",
+          "boundingBox": {
+            "x": 2912,
+            "y": 523,
+            "width": 396,
+            "height": 68
+          }
+        },
+        {
+          "text": "인수시간",
+          "boundingBox": {
+            "x": 2636,
+            "y": 1682,
+            "width": 215,
+            "height": 67
+          }
+        },
+        {
+          "text": "031-841-9861",
+          "boundingBox": {
+            "x": 2916,
+            "y": 631,
+            "width": 386,
+            "height": 57
+          }
+        },
+        {
+          "text": "07041 001",
+          "boundingBox": {
+            "x": 3204,
+            "y": 400,
+            "width": 365,
+            "height": 74
+          }
+        },
+        {
+          "text": "필수항목-수주접수시 *부*발주처와 통화후 리본글씨 확인요망**부*",
+          "boundingBox": {
+            "x": 938,
+            "y": 1847,
+            "width": 2183,
+            "height": 79
+          }
+        },
+        {
+          "text": "노란포인트로 꼭 부탁드립니다. 현장디카 010-5898-9543 곡꼭 부탁드립니다.",
+          "boundingBox": {
+            "x": 926,
+            "y": 1939,
+            "width": 2008,
+            "height": 74
+          }
+        },
+        {
+          "text": "시 분",
+          "boundingBox": {
+            "x": 3055,
+            "y": 1683,
+            "width": 266,
+            "height": 66
+          }
+        }
+      ]
+    },
+    {
+      "file": "KakaoTalk_20260621_070828835_03.jpg",
+      "sha256": "7acb9bdb1f2e770b6c766ee83b2f18b64dbcf77329b84f5f9ca5452c9fce4872",
+      "width": 4000,
+      "height": 3000,
+      "processingMs": 465,
+      "fullText": "주문서 No : 202606-260614-best5 402-0001\nBESTFLOWER\n발주화원\n상품명\n배달일시\n배달장소\n리본\n인수자\n(반드시 이)\n요청사항\n경기 용인시-경기용인45호(용인세브란스화원)-010-3348-\n8403\n근조3단 -\n인수종\n받는분 |고인 심명철\n경조사어 : 부활\nhttp:\/\/www.bestilower.co.kr\nTEL\nFAX\n관계\n서울영등9호(선유화원)\nT.070-4741-0001\n2026년 06월 14일 (일요일) 지금족시배송 디카촬영요청 해피를\n보내는 분 : 생명샘교회 <위임목사> 김병진\n주소 |서울 영등포구 선유로 101 교원예욱 서서울 장례식장 201호\n010-8348-8403\n수량 |1\n031-282-8403\nTEL\nHP\n인수시간 시 분\n필수항목-수주접수시 **발주처와 통화후 리본글씨 인으망***부\n현장사진 부탁드립니다.\n1My이",
+      "lineCount": 34,
+      "lines": [
+        {
+          "text": "주문서 No : 202606-260614-best5 402-0001",
+          "boundingBox": {
+            "x": 716,
+            "y": 2,
+            "width": 983,
+            "height": 109
+          }
+        },
+        {
+          "text": "BESTFLOWER",
+          "boundingBox": {
+            "x": 726,
+            "y": 153,
+            "width": 853,
+            "height": 149
+          }
+        },
+        {
+          "text": "발주화원",
+          "boundingBox": {
+            "x": 800,
+            "y": 377,
+            "width": 301,
+            "height": 130
+          }
+        },
+        {
+          "text": "상품명",
+          "boundingBox": {
+            "x": 848,
+            "y": 536,
+            "width": 218,
+            "height": 97
+          }
+        },
+        {
+          "text": "배달일시",
+          "boundingBox": {
+            "x": 773,
+            "y": 629,
+            "width": 376,
+            "height": 104
+          }
+        },
+        {
+          "text": "배달장소",
+          "boundingBox": {
+            "x": 796,
+            "y": 863,
+            "width": 312,
+            "height": 101
+          }
+        },
+        {
+          "text": "리본",
+          "boundingBox": {
+            "x": 870,
+            "y": 1191,
+            "width": 154,
+            "height": 87
+          }
+        },
+        {
+          "text": "인수자",
+          "boundingBox": {
+            "x": 835,
+            "y": 1400,
+            "width": 216,
+            "height": 87
+          }
+        },
+        {
+          "text": "(반드시 이)",
+          "boundingBox": {
+            "x": 773,
+            "y": 1484,
+            "width": 321,
+            "height": 81
+          }
+        },
+        {
+          "text": "요청사항",
+          "boundingBox": {
+            "x": 753,
+            "y": 1653,
+            "width": 349,
+            "height": 110
+          }
+        },
+        {
+          "text": "경기 용인시-경기용인45호(용인세브란스화원)-010-3348-",
+          "boundingBox": {
+            "x": 1218,
+            "y": 286,
+            "width": 1529,
+            "height": 140
+          }
+        },
+        {
+          "text": "8403",
+          "boundingBox": {
+            "x": 1199,
+            "y": 433,
+            "width": 117,
+            "height": 47
+          }
+        },
+        {
+          "text": "근조3단 -",
+          "boundingBox": {
+            "x": 1222,
+            "y": 515,
+            "width": 279,
+            "height": 83
+          }
+        },
+        {
+          "text": "인수종",
+          "boundingBox": {
+            "x": 1979,
+            "y": 100,
+            "width": 488,
+            "height": 146
+          }
+        },
+        {
+          "text": "받는분 |고인 심명철",
+          "boundingBox": {
+            "x": 1257,
+            "y": 888,
+            "width": 637,
+            "height": 126
+          }
+        },
+        {
+          "text": "경조사어 : 부활",
+          "boundingBox": {
+            "x": 1202,
+            "y": 1064,
+            "width": 652,
+            "height": 141
+          }
+        },
+        {
+          "text": "http:\/\/www.bestilower.co.kr",
+          "boundingBox": {
+            "x": 2996,
+            "y": 3,
+            "width": 657,
+            "height": 90
+          }
+        },
+        {
+          "text": "TEL",
+          "boundingBox": {
+            "x": 2912,
+            "y": 241,
+            "width": 91,
+            "height": 55
+          }
+        },
+        {
+          "text": "FAX",
+          "boundingBox": {
+            "x": 2909,
+            "y": 338,
+            "width": 117,
+            "height": 46
+          }
+        },
+        {
+          "text": "관계",
+          "boundingBox": {
+            "x": 2019,
+            "y": 1364,
+            "width": 164,
+            "height": 84
+          }
+        },
+        {
+          "text": "서울영등9호(선유화원)",
+          "boundingBox": {
+            "x": 3074,
+            "y": 57,
+            "width": 598,
+            "height": 90
+          }
+        },
+        {
+          "text": "T.070-4741-0001",
+          "boundingBox": {
+            "x": 3286,
+            "y": 125,
+            "width": 391,
+            "height": 64
+          }
+        },
+        {
+          "text": "2026년 06월 14일 (일요일) 지금족시배송 디카촬영요청 해피를",
+          "boundingBox": {
+            "x": 1196,
+            "y": 507,
+            "width": 2116,
+            "height": 203
+          }
+        },
+        {
+          "text": "보내는 분 : 생명샘교회 <위임목사> 김병진",
+          "boundingBox": {
+            "x": 1214,
+            "y": 1113,
+            "width": 1736,
+            "height": 215
+          }
+        },
+        {
+          "text": "주소 |서울 영등포구 선유로 101 교원예욱 서서울 장례식장 201호",
+          "boundingBox": {
+            "x": 1255,
+            "y": 660,
+            "width": 1912,
+            "height": 180
+          }
+        },
+        {
+          "text": "010-8348-8403",
+          "boundingBox": {
+            "x": 3120,
+            "y": 223,
+            "width": 387,
+            "height": 64
+          }
+        },
+        {
+          "text": "수량 |1",
+          "boundingBox": {
+            "x": 2913,
+            "y": 417,
+            "width": 269,
+            "height": 82
+          }
+        },
+        {
+          "text": "031-282-8403",
+          "boundingBox": {
+            "x": 3133,
+            "y": 306,
+            "width": 363,
+            "height": 74
+          }
+        },
+        {
+          "text": "TEL",
+          "boundingBox": {
+            "x": 2972,
+            "y": 779,
+            "width": 144,
+            "height": 59
+          }
+        },
+        {
+          "text": "HP",
+          "boundingBox": {
+            "x": 3003,
+            "y": 870,
+            "width": 117,
+            "height": 63
+          }
+        },
+        {
+          "text": "인수시간 시 분",
+          "boundingBox": {
+            "x": 3037,
+            "y": 1275,
+            "width": 691,
+            "height": 109
+          }
+        },
+        {
+          "text": "필수항목-수주접수시 **발주처와 통화후 리본글씨 인으망***부",
+          "boundingBox": {
+            "x": 1241,
+            "y": 1454,
+            "width": 2331,
+            "height": 233
+          }
+        },
+        {
+          "text": "현장사진 부탁드립니다.",
+          "boundingBox": {
+            "x": 1362,
+            "y": 1644,
+            "width": 661,
+            "height": 127
+          }
+        },
+        {
+          "text": "1My이",
+          "boundingBox": {
+            "x": 1466,
+            "y": 1935,
+            "width": 1723,
+            "height": 560
+          }
+        }
+      ]
+    },
+    {
+      "file": "KakaoTalk_20260621_070828835_04.jpg",
+      "sha256": "8d6ba35bb97b418e0556cbb8d8ada6ba3ce10dea00f170133aeb7522e0c7ef78",
+      "width": 4000,
+      "height": 3000,
+      "processingMs": 553,
+      "fullText": "네이버에서꽃사자들 검색하네요! 4\nNAVER\n발주회원\n수주회원\n상품코드\n| [서울 마포구] 가든스로세블리 (HP:010-4482-9 119)\n[서울 영등포구] 선유꽃화는\n배송상품\nTFP-NO 100 OPT\n옵선상물\n리\n요구사항\n|근조화환 1개 (새꽃정 풀화환 )\n리본\n배송일시\n경조사어\n중요 거래처인니다. 좋은상품 부 탁드 립L니다.\n배송장소\n보내는분\n의수승\n받으실분\n인수자명\n증급주문번호: 260614-0371>\n주문일시\n디카사지\n|삼가 A의 못을 빕니다\n해피콜\n고대구로 병원 장례식창 105.호실\n유기열 부친상\n02 363 0582\n74-0001\n3기규 정참조)\nt요창\n|2026년 06월 14일 요일 17시 00분 까지 배송 ()\n2대 강서구청 동기생 일동\n| 2026년 06월 14일 일요일 14시 43분 주문합니다.\n핸드프\n관계\n자()",
+      "lineCount": 39,
+      "lines": [
+        {
+          "text": "네이버에서꽃사자들 검색하네요! 4",
+          "boundingBox": {
+            "x": 9,
+            "y": 1033,
+            "width": 374,
+            "height": 285
+          }
+        },
+        {
+          "text": "NAVER",
+          "boundingBox": {
+            "x": 4,
+            "y": 1275,
+            "width": 151,
+            "height": 121
+          }
+        },
+        {
+          "text": "발주회원",
+          "boundingBox": {
+            "x": 65,
+            "y": 1346,
+            "width": 135,
+            "height": 110
+          }
+        },
+        {
+          "text": "수주회원",
+          "boundingBox": {
+            "x": 90,
+            "y": 1415,
+            "width": 140,
+            "height": 114
+          }
+        },
+        {
+          "text": "상품코드",
+          "boundingBox": {
+            "x": 122,
+            "y": 1486,
+            "width": 140,
+            "height": 115
+          }
+        },
+        {
+          "text": "| [서울 마포구] 가든스로세블리 (HP:010-4482-9 119)",
+          "boundingBox": {
+            "x": 243,
+            "y": 711,
+            "width": 966,
+            "height": 633
+          }
+        },
+        {
+          "text": "[서울 영등포구] 선유꽃화는",
+          "boundingBox": {
+            "x": 277,
+            "y": 1080,
+            "width": 482,
+            "height": 336
+          }
+        },
+        {
+          "text": "배송상품",
+          "boundingBox": {
+            "x": 155,
+            "y": 1573,
+            "width": 140,
+            "height": 109
+          }
+        },
+        {
+          "text": "TFP-NO 100 OPT",
+          "boundingBox": {
+            "x": 306,
+            "y": 1278,
+            "width": 299,
+            "height": 207
+          }
+        },
+        {
+          "text": "옵선상물",
+          "boundingBox": {
+            "x": 189,
+            "y": 1654,
+            "width": 144,
+            "height": 117
+          }
+        },
+        {
+          "text": "리",
+          "boundingBox": {
+            "x": 276,
+            "y": 1868,
+            "width": 39,
+            "height": 41
+          }
+        },
+        {
+          "text": "요구사항",
+          "boundingBox": {
+            "x": 219,
+            "y": 1737,
+            "width": 140,
+            "height": 103
+          }
+        },
+        {
+          "text": "|근조화환 1개 (새꽃정 풀화환 )",
+          "boundingBox": {
+            "x": 352,
+            "y": 1024,
+            "width": 849,
+            "height": 549
+          }
+        },
+        {
+          "text": "리본",
+          "boundingBox": {
+            "x": 317,
+            "y": 1937,
+            "width": 106,
+            "height": 78
+          }
+        },
+        {
+          "text": "배송일시",
+          "boundingBox": {
+            "x": 338,
+            "y": 2023,
+            "width": 140,
+            "height": 112
+          }
+        },
+        {
+          "text": "경조사어",
+          "boundingBox": {
+            "x": 507,
+            "y": 1668,
+            "width": 155,
+            "height": 115
+          }
+        },
+        {
+          "text": "중요 거래처인니다. 좋은상품 부 탁드 립L니다.",
+          "boundingBox": {
+            "x": 424,
+            "y": 1249,
+            "width": 787,
+            "height": 474
+          }
+        },
+        {
+          "text": "배송장소",
+          "boundingBox": {
+            "x": 363,
+            "y": 2116,
+            "width": 173,
+            "height": 122
+          }
+        },
+        {
+          "text": "보내는분",
+          "boundingBox": {
+            "x": 548,
+            "y": 1778,
+            "width": 157,
+            "height": 112
+          }
+        },
+        {
+          "text": "의수승",
+          "boundingBox": {
+            "x": 782,
+            "y": 707,
+            "width": 205,
+            "height": 148
+          }
+        },
+        {
+          "text": "받으실분",
+          "boundingBox": {
+            "x": 396,
+            "y": 2218,
+            "width": 177,
+            "height": 125
+          }
+        },
+        {
+          "text": "인수자명",
+          "boundingBox": {
+            "x": 449,
+            "y": 2331,
+            "width": 142,
+            "height": 94
+          }
+        },
+        {
+          "text": "증급주문번호: 260614-0371>",
+          "boundingBox": {
+            "x": 865,
+            "y": 71,
+            "width": 1037,
+            "height": 731
+          }
+        },
+        {
+          "text": "주문일시",
+          "boundingBox": {
+            "x": 468,
+            "y": 2407,
+            "width": 155,
+            "height": 105
+          }
+        },
+        {
+          "text": "디카사지",
+          "boundingBox": {
+            "x": 1387,
+            "y": 670,
+            "width": 195,
+            "height": 145
+          }
+        },
+        {
+          "text": "|삼가 A의 못을 빕니다",
+          "boundingBox": {
+            "x": 713,
+            "y": 1197,
+            "width": 786,
+            "height": 484
+          }
+        },
+        {
+          "text": "해피콜",
+          "boundingBox": {
+            "x": 1455,
+            "y": 774,
+            "width": 150,
+            "height": 120
+          }
+        },
+        {
+          "text": "고대구로 병원 장례식창 105.호실",
+          "boundingBox": {
+            "x": 562,
+            "y": 1649,
+            "width": 907,
+            "height": 501
+          }
+        },
+        {
+          "text": "유기열 부친상",
+          "boundingBox": {
+            "x": 623,
+            "y": 2009,
+            "width": 379,
+            "height": 235
+          }
+        },
+        {
+          "text": "02 363 0582",
+          "boundingBox": {
+            "x": 1613,
+            "y": 219,
+            "width": 331,
+            "height": 247
+          }
+        },
+        {
+          "text": "74-0001",
+          "boundingBox": {
+            "x": 1795,
+            "y": 269,
+            "width": 242,
+            "height": 193
+          }
+        },
+        {
+          "text": "3기규 정참조)",
+          "boundingBox": {
+            "x": 1947,
+            "y": 187,
+            "width": 400,
+            "height": 276
+          }
+        },
+        {
+          "text": "t요창",
+          "boundingBox": {
+            "x": 1735,
+            "y": 597,
+            "width": 176,
+            "height": 137
+          }
+        },
+        {
+          "text": "|2026년 06월 14일 요일 17시 00분 까지 배송 ()",
+          "boundingBox": {
+            "x": 535,
+            "y": 1228,
+            "width": 1459,
+            "height": 813
+          }
+        },
+        {
+          "text": "2대 강서구청 동기생 일동",
+          "boundingBox": {
+            "x": 730,
+            "y": 1125,
+            "width": 1135,
+            "height": 691
+          }
+        },
+        {
+          "text": "| 2026년 06월 14일 일요일 14시 43분 주문합니다.",
+          "boundingBox": {
+            "x": 677,
+            "y": 1954,
+            "width": 960,
+            "height": 475
+          }
+        },
+        {
+          "text": "핸드프",
+          "boundingBox": {
+            "x": 1806,
+            "y": 1549,
+            "width": 161,
+            "height": 108
+          }
+        },
+        {
+          "text": "관계",
+          "boundingBox": {
+            "x": 1881,
+            "y": 1674,
+            "width": 111,
+            "height": 87
+          }
+        },
+        {
+          "text": "자()",
+          "boundingBox": {
+            "x": 2207,
+            "y": 1384,
+            "width": 377,
+            "height": 258
+          }
+        }
+      ]
+    },
+    {
+      "file": "KakaoTalk_20260621_070828835_05.jpg",
+      "sha256": "ca5029ba62b77cdcd72d655be7f96d13f8752f678b73b24aba65076ee2156d30",
+      "width": 4000,
+      "height": 3000,
+      "processingMs": 456,
+      "fullText": "NO : 202606-260614-ran318-0001\n현한국직거라화훼젠터\nKDFC\nSOREA DIRECTTRADE FLOWER CENTÉR\n해피콜\n-발 주 처\n주문자\n품명\n배달일시\n리본\n보내는분\nKDFC한길화원\n배달장소\n원산지\n미입력\n근조 -\n2026년\n인수하신분\n인 수 증\n삼가 빠스의 못 을 빕니다.\n본부전화'\\566-02&\n서울 열등포구-KOFC유꽃화원-070-AT-000\\\n본부팩스\\59-0028\n그2-408-7737 -\nHP: 010-9276-4225\n06월 14일(일요일) (즉시배술) J카졸영요형o 현장사진 요청합\n1이 대특동병원 장례식장 7횟\n발는분 : 고인 구본순\n(반드시,의용우트\n시이에프건설(주) 대프이사 안장열\nFX02-4097796\n관계\n수량\nHP\nTEL\n인수 시간\n배송하신분은 인수후 바로 하피글 하시요,",
+      "lineCount": 37,
+      "lines": [
+        {
+          "text": "NO : 202606-260614-ran318-0001",
+          "boundingBox": {
+            "x": 425,
+            "y": 494,
+            "width": 877,
+            "height": 192
+          }
+        },
+        {
+          "text": "현한국직거라화훼젠터",
+          "boundingBox": {
+            "x": 521,
+            "y": 555,
+            "width": 946,
+            "height": 224
+          }
+        },
+        {
+          "text": "KDFC",
+          "boundingBox": {
+            "x": 534,
+            "y": 756,
+            "width": 156,
+            "height": 70
+          }
+        },
+        {
+          "text": "SOREA DIRECTTRADE FLOWER CENTÉR",
+          "boundingBox": {
+            "x": 742,
+            "y": 617,
+            "width": 730,
+            "height": 163
+          }
+        },
+        {
+          "text": "해피콜",
+          "boundingBox": {
+            "x": 514,
+            "y": 855,
+            "width": 252,
+            "height": 87
+          }
+        },
+        {
+          "text": "-발 주 처",
+          "boundingBox": {
+            "x": 462,
+            "y": 911,
+            "width": 306,
+            "height": 99
+          }
+        },
+        {
+          "text": "주문자",
+          "boundingBox": {
+            "x": 544,
+            "y": 1016,
+            "width": 215,
+            "height": 94
+          }
+        },
+        {
+          "text": "품명",
+          "boundingBox": {
+            "x": 589,
+            "y": 1118,
+            "width": 135,
+            "height": 76
+          }
+        },
+        {
+          "text": "배달일시",
+          "boundingBox": {
+            "x": 515,
+            "y": 1216,
+            "width": 293,
+            "height": 111
+          }
+        },
+        {
+          "text": "리본",
+          "boundingBox": {
+            "x": 584,
+            "y": 1359,
+            "width": 178,
+            "height": 89
+          }
+        },
+        {
+          "text": "보내는분",
+          "boundingBox": {
+            "x": 520,
+            "y": 1480,
+            "width": 322,
+            "height": 129
+          }
+        },
+        {
+          "text": "KDFC한길화원",
+          "boundingBox": {
+            "x": 857,
+            "y": 760,
+            "width": 529,
+            "height": 161
+          }
+        },
+        {
+          "text": "배달장소",
+          "boundingBox": {
+            "x": 492,
+            "y": 1642,
+            "width": 389,
+            "height": 163
+          }
+        },
+        {
+          "text": "원산지",
+          "boundingBox": {
+            "x": 561,
+            "y": 2413,
+            "width": 291,
+            "height": 143
+          }
+        },
+        {
+          "text": "미입력",
+          "boundingBox": {
+            "x": 880,
+            "y": 935,
+            "width": 259,
+            "height": 109
+          }
+        },
+        {
+          "text": "근조 -",
+          "boundingBox": {
+            "x": 890,
+            "y": 1031,
+            "width": 243,
+            "height": 111
+          }
+        },
+        {
+          "text": "2026년",
+          "boundingBox": {
+            "x": 915,
+            "y": 1133,
+            "width": 254,
+            "height": 103
+          }
+        },
+        {
+          "text": "인수하신분",
+          "boundingBox": {
+            "x": 489,
+            "y": 1853,
+            "width": 434,
+            "height": 160
+          }
+        },
+        {
+          "text": "인 수 증",
+          "boundingBox": {
+            "x": 1730,
+            "y": 441,
+            "width": 537,
+            "height": 159
+          }
+        },
+        {
+          "text": "삼가 빠스의 못 을 빕니다.",
+          "boundingBox": {
+            "x": 951,
+            "y": 1088,
+            "width": 1030,
+            "height": 284
+          }
+        },
+        {
+          "text": "본부전화'\\566-02&",
+          "boundingBox": {
+            "x": 2770,
+            "y": 249,
+            "width": 451,
+            "height": 122
+          }
+        },
+        {
+          "text": "서울 열등포구-KOFC유꽃화원-070-AT-000\\",
+          "boundingBox": {
+            "x": 2167,
+            "y": 175,
+            "width": 1055,
+            "height": 251
+          }
+        },
+        {
+          "text": "본부팩스\\59-0028",
+          "boundingBox": {
+            "x": 2802,
+            "y": 303,
+            "width": 454,
+            "height": 113
+          }
+        },
+        {
+          "text": "그2-408-7737 -",
+          "boundingBox": {
+            "x": 1626,
+            "y": 608,
+            "width": 687,
+            "height": 131
+          }
+        },
+        {
+          "text": "HP: 010-9276-4225",
+          "boundingBox": {
+            "x": 1682,
+            "y": 663,
+            "width": 599,
+            "height": 125
+          }
+        },
+        {
+          "text": "06월 14일(일요일) (즉시배술) J카졸영요형o 현장사진 요청합",
+          "boundingBox": {
+            "x": 1230,
+            "y": 686,
+            "width": 2274,
+            "height": 494
+          }
+        },
+        {
+          "text": "1이 대특동병원 장례식장 7횟",
+          "boundingBox": {
+            "x": 931,
+            "y": 1368,
+            "width": 994,
+            "height": 293
+          }
+        },
+        {
+          "text": "발는분 : 고인 구본순",
+          "boundingBox": {
+            "x": 954,
+            "y": 1497,
+            "width": 747,
+            "height": 247
+          }
+        },
+        {
+          "text": "(반드시,의용우트",
+          "boundingBox": {
+            "x": 976,
+            "y": 1646,
+            "width": 540,
+            "height": 198
+          }
+        },
+        {
+          "text": "시이에프건설(주) 대프이사 안장열",
+          "boundingBox": {
+            "x": 964,
+            "y": 1171,
+            "width": 1323,
+            "height": 335
+          }
+        },
+        {
+          "text": "FX02-4097796",
+          "boundingBox": {
+            "x": 2265,
+            "y": 492,
+            "width": 554,
+            "height": 153
+          }
+        },
+        {
+          "text": "관계",
+          "boundingBox": {
+            "x": 2051,
+            "y": 1567,
+            "width": 147,
+            "height": 88
+          }
+        },
+        {
+          "text": "수량",
+          "boundingBox": {
+            "x": 2654,
+            "y": 729,
+            "width": 119,
+            "height": 70
+          }
+        },
+        {
+          "text": "HP",
+          "boundingBox": {
+            "x": 2904,
+            "y": 1148,
+            "width": 98,
+            "height": 82
+          }
+        },
+        {
+          "text": "TEL",
+          "boundingBox": {
+            "x": 2944,
+            "y": 1240,
+            "width": 145,
+            "height": 79
+          }
+        },
+        {
+          "text": "인수 시간",
+          "boundingBox": {
+            "x": 2941,
+            "y": 1340,
+            "width": 285,
+            "height": 124
+          }
+        },
+        {
+          "text": "배송하신분은 인수후 바로 하피글 하시요,",
+          "boundingBox": {
+            "x": 1818,
+            "y": 1522,
+            "width": 1254,
+            "height": 332
+          }
+        }
+      ]
+    },
+    {
+      "file": "KakaoTalk_20260621_070828835_06.jpg",
+      "sha256": "9316ef3e58604fde7abd1e0feb8565f76e773fa0abf86d6accafb7b1361bf9e5",
+      "width": 4000,
+      "height": 3000,
+      "processingMs": 465,
+      "fullText": "NO: 202606-260614-hanll-0003\nKDFC KONEA DIRECT TRADE FLOWER CENTEX\n해피콜\n발주처\n주문자\n품명\n리본\n보내는분\n배달장소\n한국직거 래화훼센터\n배달일시 |2026년\n인수하신분\n원산지\nKDFC한일농원\n미입력 -\n근조 - 3단\n삼가 조의를 표합니다\n서울 영등포구-KDFC선유꽃화원-70-4741-0001\n본부전회한: 1566-0028\n본부팩스: 1599-0028\n인 수 증\n서울 보라매병원 1호\n받는분 : 고인 김기회\nTEL: 02-735-6770 \/ FAX: 02-780-6770\nHP: 010-5239-6770\n06월 14일(일요일) \/ 디카활영요정 현장사진 요청함\n관계\n수량\n1학교법인 신일학원 <이사장> 이상균2 서울사이버대학교 <총장> 이은주3신\n|일고등학교 <교장> 모상경\n배송하신분은 인수후 바로 해피콜 하세요,\n절\n|두\nHP\n3\nTEL\n인수시간\n분",
+      "lineCount": 38,
+      "lines": [
+        {
+          "text": "NO: 202606-260614-hanll-0003",
+          "boundingBox": {
+            "x": 469,
+            "y": 150,
+            "width": 787,
+            "height": 78
+          }
+        },
+        {
+          "text": "KDFC KONEA DIRECT TRADE FLOWER CENTEX",
+          "boundingBox": {
+            "x": 560,
+            "y": 377,
+            "width": 871,
+            "height": 54
+          }
+        },
+        {
+          "text": "해피콜",
+          "boundingBox": {
+            "x": 538,
+            "y": 508,
+            "width": 217,
+            "height": 57
+          }
+        },
+        {
+          "text": "발주처",
+          "boundingBox": {
+            "x": 538,
+            "y": 578,
+            "width": 209,
+            "height": 58
+          }
+        },
+        {
+          "text": "주문자",
+          "boundingBox": {
+            "x": 554,
+            "y": 690,
+            "width": 175,
+            "height": 62
+          }
+        },
+        {
+          "text": "품명",
+          "boundingBox": {
+            "x": 556,
+            "y": 804,
+            "width": 137,
+            "height": 55
+          }
+        },
+        {
+          "text": "리본",
+          "boundingBox": {
+            "x": 572,
+            "y": 1052,
+            "width": 127,
+            "height": 59
+          }
+        },
+        {
+          "text": "보내는분",
+          "boundingBox": {
+            "x": 517,
+            "y": 1228,
+            "width": 233,
+            "height": 60
+          }
+        },
+        {
+          "text": "배달장소",
+          "boundingBox": {
+            "x": 472,
+            "y": 1429,
+            "width": 277,
+            "height": 74
+          }
+        },
+        {
+          "text": "한국직거 래화훼센터",
+          "boundingBox": {
+            "x": 799,
+            "y": 267,
+            "width": 649,
+            "height": 111
+          }
+        },
+        {
+          "text": "배달일시 |2026년",
+          "boundingBox": {
+            "x": 523,
+            "y": 909,
+            "width": 531,
+            "height": 73
+          }
+        },
+        {
+          "text": "인수하신분",
+          "boundingBox": {
+            "x": 475,
+            "y": 1614,
+            "width": 295,
+            "height": 57
+          }
+        },
+        {
+          "text": "원산지",
+          "boundingBox": {
+            "x": 495,
+            "y": 2014,
+            "width": 250,
+            "height": 63
+          }
+        },
+        {
+          "text": "KDFC한일농원",
+          "boundingBox": {
+            "x": 860,
+            "y": 546,
+            "width": 430,
+            "height": 61
+          }
+        },
+        {
+          "text": "미입력 -",
+          "boundingBox": {
+            "x": 831,
+            "y": 693,
+            "width": 280,
+            "height": 64
+          }
+        },
+        {
+          "text": "근조 - 3단",
+          "boundingBox": {
+            "x": 832,
+            "y": 798,
+            "width": 332,
+            "height": 68
+          }
+        },
+        {
+          "text": "삼가 조의를 표합니다",
+          "boundingBox": {
+            "x": 862,
+            "y": 1043,
+            "width": 694,
+            "height": 80
+          }
+        },
+        {
+          "text": "서울 영등포구-KDFC선유꽃화원-70-4741-0001",
+          "boundingBox": {
+            "x": 2182,
+            "y": 189,
+            "width": 1177,
+            "height": 66
+          }
+        },
+        {
+          "text": "본부전회한: 1566-0028",
+          "boundingBox": {
+            "x": 2790,
+            "y": 295,
+            "width": 511,
+            "height": 63
+          }
+        },
+        {
+          "text": "본부팩스: 1599-0028",
+          "boundingBox": {
+            "x": 2795,
+            "y": 373,
+            "width": 510,
+            "height": 60
+          }
+        },
+        {
+          "text": "인 수 증",
+          "boundingBox": {
+            "x": 1686,
+            "y": 294,
+            "width": 564,
+            "height": 147
+          }
+        },
+        {
+          "text": "서울 보라매병원 1호",
+          "boundingBox": {
+            "x": 797,
+            "y": 1401,
+            "width": 576,
+            "height": 67
+          }
+        },
+        {
+          "text": "받는분 : 고인 김기회",
+          "boundingBox": {
+            "x": 819,
+            "y": 1477,
+            "width": 573,
+            "height": 67
+          }
+        },
+        {
+          "text": "TEL: 02-735-6770 \/ FAX: 02-780-6770",
+          "boundingBox": {
+            "x": 1567,
+            "y": 521,
+            "width": 1182,
+            "height": 71
+          }
+        },
+        {
+          "text": "HP: 010-5239-6770",
+          "boundingBox": {
+            "x": 1566,
+            "y": 590,
+            "width": 597,
+            "height": 71
+          }
+        },
+        {
+          "text": "06월 14일(일요일) \/ 디카활영요정 현장사진 요청함",
+          "boundingBox": {
+            "x": 1138,
+            "y": 899,
+            "width": 1784,
+            "height": 125
+          }
+        },
+        {
+          "text": "관계",
+          "boundingBox": {
+            "x": 1617,
+            "y": 1617,
+            "width": 156,
+            "height": 70
+          }
+        },
+        {
+          "text": "수량",
+          "boundingBox": {
+            "x": 2461,
+            "y": 819,
+            "width": 116,
+            "height": 58
+          }
+        },
+        {
+          "text": "1학교법인 신일학원 <이사장> 이상균2 서울사이버대학교 <총장> 이은주3신",
+          "boundingBox": {
+            "x": 850,
+            "y": 1179,
+            "width": 2491,
+            "height": 106
+          }
+        },
+        {
+          "text": "|일고등학교 <교장> 모상경",
+          "boundingBox": {
+            "x": 817,
+            "y": 1260,
+            "width": 847,
+            "height": 88
+          }
+        },
+        {
+          "text": "배송하신분은 인수후 바로 해피콜 하세요,",
+          "boundingBox": {
+            "x": 1413,
+            "y": 1739,
+            "width": 1019,
+            "height": 73
+          }
+        },
+        {
+          "text": "절",
+          "boundingBox": {
+            "x": 1522,
+            "y": 1835,
+            "width": 47,
+            "height": 55
+          }
+        },
+        {
+          "text": "|두",
+          "boundingBox": {
+            "x": 2486,
+            "y": 1393,
+            "width": 60,
+            "height": 173
+          }
+        },
+        {
+          "text": "HP",
+          "boundingBox": {
+            "x": 2481,
+            "y": 1413,
+            "width": 76,
+            "height": 54
+          }
+        },
+        {
+          "text": "3",
+          "boundingBox": {
+            "x": 2743,
+            "y": 825,
+            "width": 24,
+            "height": 43
+          }
+        },
+        {
+          "text": "TEL",
+          "boundingBox": {
+            "x": 2468,
+            "y": 1516,
+            "width": 106,
+            "height": 51
+          }
+        },
+        {
+          "text": "인수시간",
+          "boundingBox": {
+            "x": 2402,
+            "y": 1635,
+            "width": 236,
+            "height": 60
+          }
+        },
+        {
+          "text": "분",
+          "boundingBox": {
+            "x": 3057,
+            "y": 1644,
+            "width": 52,
+            "height": 55
+          }
+        }
+      ]
+    },
+    {
+      "file": "KakaoTalk_20260621_070828835_07.jpg",
+      "sha256": "6eb8012c226ccfc70cac39dc863ba94e9836fcf8383a68f8798641d9cd553533",
+      "width": 4000,
+      "height": 3000,
+      "processingMs": 401,
+      "fullText": "99FLOWER\n발주화원\n송화원\n상품영\n배달일시\n배달장소\n리본메세지\n주문자\n요구사항\n인수자\n99플라워\n선유꽃화원\n원산지\n[근조화환 FB268] 근조 3단\n전화\n06월 14일(일) 당일배송 17:00~19 :00 ( 시간엄수 7시\n에 문상가신대요 사장님 부탁드려요)\n[Y디카요청]\n서울 구로구 고려대 구로병원 장례식장 105호\n*받는문: 상주 유기열\n최대한 빼른 배송해주세요\n070-8277-1211\n전화 070-4741-0001\n[ST-FB268 경조사어] 삼가 찾의 롯제을 빕니다\n[보내는분] 강서구 세우회\n거2\n취\n*정자로 이름을 적어주세요.\n전화\n배송 기사님께서는 배송완료 후 즉시 [3070-4741-0001 ]로 전화주세요\n절\n선\n핸드폰\n관계\n인증번호 : 629\n010-2479-1488\n자. (4)",
+      "lineCount": 37,
+      "lines": [
+        {
+          "text": "99FLOWER",
+          "boundingBox": {
+            "x": 717,
+            "y": 107,
+            "width": 362,
+            "height": 76
+          }
+        },
+        {
+          "text": "발주화원",
+          "boundingBox": {
+            "x": 781,
+            "y": 284,
+            "width": 202,
+            "height": 50
+          }
+        },
+        {
+          "text": "송화원",
+          "boundingBox": {
+            "x": 785,
+            "y": 404,
+            "width": 199,
+            "height": 58
+          }
+        },
+        {
+          "text": "상품영",
+          "boundingBox": {
+            "x": 798,
+            "y": 517,
+            "width": 177,
+            "height": 63
+          }
+        },
+        {
+          "text": "배달일시",
+          "boundingBox": {
+            "x": 791,
+            "y": 751,
+            "width": 195,
+            "height": 46
+          }
+        },
+        {
+          "text": "배달장소",
+          "boundingBox": {
+            "x": 780,
+            "y": 1018,
+            "width": 197,
+            "height": 46
+          }
+        },
+        {
+          "text": "리본메세지",
+          "boundingBox": {
+            "x": 751,
+            "y": 1216,
+            "width": 245,
+            "height": 45
+          }
+        },
+        {
+          "text": "주문자",
+          "boundingBox": {
+            "x": 802,
+            "y": 1347,
+            "width": 147,
+            "height": 45
+          }
+        },
+        {
+          "text": "요구사항",
+          "boundingBox": {
+            "x": 769,
+            "y": 1408,
+            "width": 203,
+            "height": 50
+          }
+        },
+        {
+          "text": "인수자",
+          "boundingBox": {
+            "x": 798,
+            "y": 1531,
+            "width": 146,
+            "height": 46
+          }
+        },
+        {
+          "text": "99플라워",
+          "boundingBox": {
+            "x": 1432,
+            "y": 287,
+            "width": 307,
+            "height": 63
+          }
+        },
+        {
+          "text": "선유꽃화원",
+          "boundingBox": {
+            "x": 1445,
+            "y": 407,
+            "width": 287,
+            "height": 60
+          }
+        },
+        {
+          "text": "원산지",
+          "boundingBox": {
+            "x": 756,
+            "y": 1895,
+            "width": 184,
+            "height": 45
+          }
+        },
+        {
+          "text": "[근조화환 FB268] 근조 3단",
+          "boundingBox": {
+            "x": 1108,
+            "y": 525,
+            "width": 751,
+            "height": 60
+          }
+        },
+        {
+          "text": "전화",
+          "boundingBox": {
+            "x": 2135,
+            "y": 288,
+            "width": 115,
+            "height": 60
+          }
+        },
+        {
+          "text": "06월 14일(일) 당일배송 17:00~19 :00 ( 시간엄수 7시",
+          "boundingBox": {
+            "x": 1133,
+            "y": 658,
+            "width": 1677,
+            "height": 70
+          }
+        },
+        {
+          "text": "에 문상가신대요 사장님 부탁드려요)",
+          "boundingBox": {
+            "x": 1114,
+            "y": 748,
+            "width": 1064,
+            "height": 74
+          }
+        },
+        {
+          "text": "[Y디카요청]",
+          "boundingBox": {
+            "x": 1106,
+            "y": 837,
+            "width": 392,
+            "height": 78
+          }
+        },
+        {
+          "text": "서울 구로구 고려대 구로병원 장례식장 105호",
+          "boundingBox": {
+            "x": 1100,
+            "y": 972,
+            "width": 1246,
+            "height": 68
+          }
+        },
+        {
+          "text": "*받는문: 상주 유기열",
+          "boundingBox": {
+            "x": 1118,
+            "y": 1071,
+            "width": 499,
+            "height": 46
+          }
+        },
+        {
+          "text": "최대한 빼른 배송해주세요",
+          "boundingBox": {
+            "x": 1132,
+            "y": 1359,
+            "width": 694,
+            "height": 66
+          }
+        },
+        {
+          "text": "070-8277-1211",
+          "boundingBox": {
+            "x": 2355,
+            "y": 292,
+            "width": 451,
+            "height": 47
+          }
+        },
+        {
+          "text": "전화 070-4741-0001",
+          "boundingBox": {
+            "x": 2135,
+            "y": 375,
+            "width": 671,
+            "height": 125
+          }
+        },
+        {
+          "text": "[ST-FB268 경조사어] 삼가 찾의 롯제을 빕니다",
+          "boundingBox": {
+            "x": 1118,
+            "y": 1178,
+            "width": 1373,
+            "height": 62
+          }
+        },
+        {
+          "text": "[보내는분] 강서구 세우회",
+          "boundingBox": {
+            "x": 1086,
+            "y": 1253,
+            "width": 806,
+            "height": 70
+          }
+        },
+        {
+          "text": "거2",
+          "boundingBox": {
+            "x": 910,
+            "y": 2170,
+            "width": 653,
+            "height": 525
+          }
+        },
+        {
+          "text": "취",
+          "boundingBox": {
+            "x": 2034,
+            "y": 1755,
+            "width": 45,
+            "height": 55
+          }
+        },
+        {
+          "text": "*정자로 이름을 적어주세요.",
+          "boundingBox": {
+            "x": 1724,
+            "y": 1567,
+            "width": 761,
+            "height": 56
+          }
+        },
+        {
+          "text": "전화",
+          "boundingBox": {
+            "x": 2654,
+            "y": 963,
+            "width": 91,
+            "height": 47
+          }
+        },
+        {
+          "text": "배송 기사님께서는 배송완료 후 즉시 [3070-4741-0001 ]로 전화주세요",
+          "boundingBox": {
+            "x": 842,
+            "y": 1664,
+            "width": 2068,
+            "height": 66
+          }
+        },
+        {
+          "text": "절",
+          "boundingBox": {
+            "x": 1598,
+            "y": 1756,
+            "width": 49,
+            "height": 53
+          }
+        },
+        {
+          "text": "선",
+          "boundingBox": {
+            "x": 2478,
+            "y": 1757,
+            "width": 46,
+            "height": 53
+          }
+        },
+        {
+          "text": "핸드폰",
+          "boundingBox": {
+            "x": 2625,
+            "y": 1067,
+            "width": 150,
+            "height": 53
+          }
+        },
+        {
+          "text": "관계",
+          "boundingBox": {
+            "x": 2625,
+            "y": 1534,
+            "width": 113,
+            "height": 46
+          }
+        },
+        {
+          "text": "인증번호 : 629",
+          "boundingBox": {
+            "x": 2968,
+            "y": 865,
+            "width": 369,
+            "height": 53
+          }
+        },
+        {
+          "text": "010-2479-1488",
+          "boundingBox": {
+            "x": 2922,
+            "y": 1077,
+            "width": 454,
+            "height": 47
+          }
+        },
+        {
+          "text": "자. (4)",
+          "boundingBox": {
+            "x": 2977,
+            "y": 1506,
+            "width": 276,
+            "height": 116
+          }
+        }
+      ]
+    }
+  ]
+}
