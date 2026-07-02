@@ -34,6 +34,7 @@ const benchmarkDirectory = path.resolve(
 );
 const nativeReportPath = path.join(benchmarkDirectory, 'native-results.json');
 const parsedReportPath = path.join(benchmarkDirectory, 'parsed-results.json');
+const shouldUpdateParsedReport = process.env.UPDATE_OCR_BENCHMARK === '1';
 
 const demoMarkers = [
   'FL-20260621-1842',
@@ -218,7 +219,9 @@ describe('repository receipt dataset benchmark', () => {
       results,
     };
 
-    fs.writeFileSync(parsedReportPath, `${JSON.stringify(report, null, 2)}\n`);
+    if (shouldUpdateParsedReport) {
+      fs.writeFileSync(parsedReportPath, `${JSON.stringify(report, null, 2)}\n`);
+    }
 
     expect(results).toHaveLength(8);
     expect(report.summary.nativeNonEmptyCount).toBe(8);
