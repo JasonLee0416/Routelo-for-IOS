@@ -61,7 +61,7 @@ import { summarizeDeliveryStats } from './services/deliveryStats';
 import { summarizeEfficiency } from './services/efficiency';
 import { deadlineStatus } from './services/deadline';
 import { buildDailyProfitCsv } from './services/export';
-import { dialableTargets } from './services/phone';
+import { dialableTargets, formatPhone } from './services/phone';
 import {
   applyFuelLogEdit,
   createFuelLog,
@@ -2964,6 +2964,14 @@ function DeliveryDetailSheet({
             <Text style={styles.sheetInfoLabel}>요청사항</Text>
             <Text style={styles.sheetInfoText}>{delivery.customerRequests}</Text>
           </View>
+          {formatPhone(delivery.recipientTel) !== '' && (
+            <View style={styles.sheetInfoBlock}>
+              <Text style={styles.sheetInfoLabel}>수령인 연락처</Text>
+              <Text style={styles.sheetInfoText}>
+                {formatPhone(delivery.recipientTel)}
+              </Text>
+            </View>
+          )}
           {callTargets.length > 0 && (
             <View
               style={{

@@ -1,4 +1,23 @@
-import { dialableTargets, telHref } from '../phone';
+import { dialableTargets, formatPhone, telHref } from '../phone';
+
+describe('formatPhone', () => {
+  test('formats mobile, Seoul, and local numbers', () => {
+    expect(formatPhone('01012345678')).toBe('010-1234-5678');
+    expect(formatPhone('0212345678')).toBe('02-1234-5678');
+    expect(formatPhone('0312345678')).toBe('031-234-5678');
+    expect(formatPhone('021234567')).toBe('02-123-4567');
+  });
+
+  test('strips existing formatting before reformatting', () => {
+    expect(formatPhone('010 1234 5678')).toBe('010-1234-5678');
+  });
+
+  test('returns empty for missing input and the original for unknown lengths', () => {
+    expect(formatPhone('')).toBe('');
+    expect(formatPhone(undefined)).toBe('');
+    expect(formatPhone('12345')).toBe('12345');
+  });
+});
 
 describe('telHref', () => {
   test('builds a tel: URL from a valid number, stripping formatting', () => {
