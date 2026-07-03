@@ -32,6 +32,12 @@
     "plugins": [
       "expo-font",
       "onnxruntime-react-native"
-    ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "1e61d1e8-ac25-41bc-b832-09f858aff8b9"
+      }
+    },
+    "owner": "jasonlee0312"
   }
 }
