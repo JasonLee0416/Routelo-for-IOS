@@ -1,5 +1,5 @@
 import { Delivery } from '../../models';
-import { filterDeliveries } from '../deliveryFilter';
+import { filterDeliveries, sortDeliveries } from '../deliveryFilter';
 
 const base: Delivery = {
   id: 'd0',
@@ -104,5 +104,36 @@ describe('filterDeliveries', () => {
 
   test('trims the query and returns empty on no match', () => {
     expect(filterDeliveries(deliveries, { query: '  없는상품  ' })).toEqual([]);
+  });
+});
+
+describe('sortDeliveries', () => {
+  test('recent keeps the input order', () => {
+    expect(sortDeliveries(deliveries, 'recent').map((d) => d.id)).toEqual([
+      'd1',
+      'd2',
+      'd3',
+    ]);
+  });
+
+  test('urgency: pending before completed, earliest deadline first, missing last', () => {
+    const list: Delivery[] = [
+      { ...base, id: 'done', status: 'completed', deliveryDt: '2026-07-09 08:00' },
+      { ...base, id: 'late', status: 'pending', deliveryDt: '2026-07-11 09:00' },
+      { ...base, id: 'soon', status: 'pending', deliveryDt: '2026-07-10 13:00' },
+      { ...base, id: 'noDate', status: 'pending', deliveryDt: '' },
+    ];
+    expect(sortDeliveries(list, 'urgency').map((d) => d.id)).toEqual([
+      'soon',
+      'late',
+      'noDate',
+      'done',
+    ]);
+  });
+
+  test('does not mutate the input array', () => {
+    const input = [...deliveries];
+    sortDeliveries(input, 'urgency');
+    expect(input.map((d) => d.id)).toEqual(['d1', 'd2', 'd3']);
   });
 });
