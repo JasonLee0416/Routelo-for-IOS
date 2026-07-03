@@ -61,6 +61,7 @@ import { summarizeDeliveryStats } from './services/deliveryStats';
 import { summarizeEfficiency } from './services/efficiency';
 import { deadlineStatus } from './services/deadline';
 import { buildDailyProfitCsv } from './services/export';
+import { formatWonShort } from './services/money';
 import { dialableTargets, formatPhone } from './services/phone';
 import {
   applyFuelLogEdit,
@@ -1451,7 +1452,7 @@ function ProfitTrendCard({
                   }}
                   numberOfLines={1}
                 >
-                  {won(bucket.net)}
+                  {formatWonShort(bucket.net)}
                 </Text>
                 <View
                   style={{
