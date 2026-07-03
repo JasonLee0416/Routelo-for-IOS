@@ -38,6 +38,26 @@ export function useReduceTransparency(): boolean {
   return reduce;
 }
 
+// Tracks the OS "Reduce Motion" setting so animations can be skipped.
+export function useReduceMotion(): boolean {
+  const [reduce, setReduce] = useState(false);
+  useEffect(() => {
+    let mounted = true;
+    AccessibilityInfo.isReduceMotionEnabled?.()
+      .then((value) => mounted && setReduce(Boolean(value)))
+      .catch(() => undefined);
+    const sub = AccessibilityInfo.addEventListener(
+      'reduceMotionChanged',
+      (value) => setReduce(Boolean(value)),
+    );
+    return () => {
+      mounted = false;
+      sub?.remove?.();
+    };
+  }, []);
+  return reduce;
+}
+
 type Props = {
   strength: Exclude<GlassStrength, 'none'>;
   radius: number;

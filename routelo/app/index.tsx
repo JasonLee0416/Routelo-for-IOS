@@ -1,10 +1,20 @@
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { StatusBar } from 'expo-status-bar';
-import { createContext, useContext, useEffect, useMemo, useState } from 'react';
 import {
+  createContext,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
+import {
+  AccessibilityInfo,
   ActivityIndicator,
   Alert,
+  Animated,
+  Easing,
   Image,
   KeyboardAvoidingView,
   Linking,
@@ -93,7 +103,7 @@ import {
 import { DEFAULT_ROUTELO_SETTINGS, NavApp, RouteloSettings } from './settings';
 import { GYEONGGI_DISTRICTS, SEOUL_DISTRICTS } from './settings/districts';
 import { settingsRepository } from './settings/native';
-import { GlassSurface } from './theme/GlassSurface';
+import { GlassSurface, useReduceMotion } from './theme/GlassSurface';
 import { RADIUS } from './theme/tokens';
 import {
   VendorCandidate,
@@ -1355,6 +1365,21 @@ function ProfitTrendCard({
   );
   const totals = useMemo(() => totalProfit(daily), [daily]);
   const maxAbs = Math.max(1, ...buckets.map((bucket) => Math.abs(bucket.net)));
+  const reduceMotion = useReduceMotion();
+  const grow = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    if (reduceMotion) {
+      grow.setValue(1);
+      return;
+    }
+    grow.setValue(0);
+    Animated.timing(grow, {
+      toValue: 1,
+      duration: 700,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: false,
+    }).start();
+  }, [period, buckets.length, reduceMotion, grow]);
   const won = (value: number) => {
     const sign = value < 0 ? '-' : '';
     const abs = Math.abs(Math.round(value))
@@ -1450,9 +1475,10 @@ function ProfitTrendCard({
             height: 132,
           }}
         >
-          {buckets.map((bucket) => {
+          {buckets.map((bucket, index) => {
             const height = 6 + (Math.abs(bucket.net) / maxAbs) * 96;
             const positive = bucket.net >= 0;
+            const start = Math.min(0.55, index * 0.07);
             return (
               <View
                 key={bucket.key}
@@ -1468,10 +1494,14 @@ function ProfitTrendCard({
                 >
                   {formatWonShort(bucket.net)}
                 </Text>
-                <View
+                <Animated.View
                   style={{
                     width: 16,
-                    height,
+                    height: grow.interpolate({
+                      inputRange: [start, start + 0.45],
+                      outputRange: [2, height],
+                      extrapolate: 'clamp',
+                    }),
                     borderRadius: 5,
                     backgroundColor: positive ? C.primary : C.danger,
                   }}
@@ -3848,6 +3878,8 @@ function OcrScannerModal({
 export default function RouteloApp() {
   const insets = useSafeAreaInsets();
   const [activeTab, setActiveTab] = useState<TabKey>('home');
+  const reduceMotion = useReduceMotion();
+  const navRipples = useRef(tabs.map(() => new Animated.Value(0))).current;
   const [orders, setOrders] = useState<DeliveryOrder[]>([]);
   const deliveries = useMemo(
     () => orders.map(orderToLegacyDelivery),
@@ -4167,15 +4199,52 @@ export default function RouteloApp() {
             { minHeight: 60, paddingBottom: 0, paddingHorizontal: 4 },
           ]}
         >
-          {tabs.map((tab) => {
+          {tabs.map((tab, index) => {
             const selected = tab.key === activeTab;
             return (
               <Pressable
                 key={tab.key}
                 testID={`nav-${tab.key}`}
                 style={styles.navItem}
-                onPress={() => setActiveTab(tab.key)}
+                onPress={() => {
+                  setActiveTab(tab.key);
+                  if (!reduceMotion) {
+                    const ripple = navRipples[index];
+                    ripple.setValue(0);
+                    Animated.timing(ripple, {
+                      toValue: 1,
+                      duration: 520,
+                      easing: Easing.out(Easing.quad),
+                      useNativeDriver: true,
+                    }).start();
+                  }
+                }}
               >
+                <Animated.View
+                  pointerEvents="none"
+                  style={{
+                    position: 'absolute',
+                    top: 6,
+                    left: '50%',
+                    marginLeft: -22,
+                    width: 44,
+                    height: 44,
+                    borderRadius: 22,
+                    backgroundColor: C.primary,
+                    opacity: navRipples[index].interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [0.22, 0],
+                    }),
+                    transform: [
+                      {
+                        scale: navRipples[index].interpolate({
+                          inputRange: [0, 1],
+                          outputRange: [0.35, 1.7],
+                        }),
+                      },
+                    ],
+                  }}
+                />
                 <View style={[styles.navIcon, selected && styles.navIconSelected]}>
                   <Ionicons
                     name={selected ? tab.activeIcon : tab.icon}
