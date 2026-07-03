@@ -701,6 +701,11 @@ function DeliveryListScreen({
               }}
             />
           </View>
+          {stats.pendingRevenue > 0 && (
+            <Text style={{ fontSize: 11, color: C.textMuted, marginTop: 5 }}>
+              남은 예상 수입 {formatWonShort(stats.pendingRevenue)}원
+            </Text>
+          )}
         </View>
       )}
       <View
