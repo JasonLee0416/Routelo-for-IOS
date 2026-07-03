@@ -51,7 +51,13 @@ import {
   optimizeByNearestNeighbor,
 } from './services/maps';
 import { NAV_APP_LABEL, openNavigation } from './services/navigation';
-import { summarizeDailyProfit } from './services/profit';
+import {
+  bucketProfit,
+  DailyProfitSummary,
+  ProfitPeriod,
+  summarizeDailyProfit,
+  totalProfit,
+} from './services/profit';
 import { DEFAULT_ROUTELO_SETTINGS, NavApp, RouteloSettings } from './settings';
 import { GYEONGGI_DISTRICTS, SEOUL_DISTRICTS } from './settings/districts';
 import { settingsRepository } from './settings/native';
@@ -830,6 +836,165 @@ const formatDateKey = (date: Date) =>
 const timeLabel = (value?: string) =>
   value?.match(/T(\d{2}:\d{2})/)?.[1] || '';
 
+function ProfitTrendCard({
+  daily,
+}: {
+  daily: Map<string, DailyProfitSummary>;
+}) {
+  const { C } = useTheme();
+  const [period, setPeriod] = useState<ProfitPeriod>('daily');
+  const buckets = useMemo(
+    () => bucketProfit(daily, period).slice(-8),
+    [daily, period],
+  );
+  const totals = useMemo(() => totalProfit(daily), [daily]);
+  const maxAbs = Math.max(1, ...buckets.map((bucket) => Math.abs(bucket.net)));
+  const won = (value: number) => {
+    const sign = value < 0 ? '-' : '';
+    const abs = Math.abs(Math.round(value))
+      .toString()
+      .replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+    return `${sign}${abs}`;
+  };
+  const periods: Array<{ key: ProfitPeriod; label: string }> = [
+    { key: 'daily', label: '일' },
+    { key: 'weekly', label: '주' },
+    { key: 'monthly', label: '월' },
+  ];
+  return (
+    <View
+      style={{
+        backgroundColor: C.surface,
+        borderRadius: 16,
+        borderWidth: 1,
+        borderColor: C.outline,
+        padding: 14,
+        marginBottom: 12,
+      }}
+    >
+      <View
+        style={{
+          flexDirection: 'row',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          marginBottom: 12,
+        }}
+      >
+        <Text style={{ fontSize: 14, fontWeight: '800', color: C.text }}>
+          손익 추이
+        </Text>
+        <View style={{ flexDirection: 'row', gap: 4 }}>
+          {periods.map((item) => {
+            const active = period === item.key;
+            return (
+              <Pressable
+                key={item.key}
+                onPress={() => setPeriod(item.key)}
+                style={{
+                  paddingHorizontal: 12,
+                  paddingVertical: 5,
+                  borderRadius: 8,
+                  backgroundColor: active ? C.primary : C.surfaceAlt,
+                }}
+              >
+                <Text
+                  style={{
+                    fontSize: 12,
+                    fontWeight: '700',
+                    color: active ? '#FFFFFF' : C.textMuted,
+                  }}
+                >
+                  {item.label}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </View>
+      </View>
+      {buckets.length === 0 ? (
+        <Text
+          style={{
+            fontSize: 12,
+            color: C.textMuted,
+            textAlign: 'center',
+            paddingVertical: 24,
+          }}
+        >
+          표시할 손익 데이터가 없습니다
+        </Text>
+      ) : (
+        <View
+          style={{
+            flexDirection: 'row',
+            alignItems: 'flex-end',
+            justifyContent: 'space-around',
+            height: 132,
+          }}
+        >
+          {buckets.map((bucket) => {
+            const height = 6 + (Math.abs(bucket.net) / maxAbs) * 96;
+            const positive = bucket.net >= 0;
+            return (
+              <View
+                key={bucket.key}
+                style={{ alignItems: 'center', flex: 1, gap: 4 }}
+              >
+                <Text
+                  style={{
+                    fontSize: 9,
+                    fontWeight: '700',
+                    color: positive ? C.success : C.danger,
+                  }}
+                  numberOfLines={1}
+                >
+                  {won(bucket.net)}
+                </Text>
+                <View
+                  style={{
+                    width: 16,
+                    height,
+                    borderRadius: 5,
+                    backgroundColor: positive ? C.primary : C.danger,
+                  }}
+                />
+                <Text
+                  style={{ fontSize: 9, color: C.textMuted }}
+                  numberOfLines={1}
+                >
+                  {bucket.label}
+                </Text>
+              </View>
+            );
+          })}
+        </View>
+      )}
+      <View
+        style={{
+          flexDirection: 'row',
+          justifyContent: 'space-between',
+          marginTop: 12,
+          paddingTop: 10,
+          borderTopWidth: 1,
+          borderTopColor: C.outline,
+        }}
+      >
+        <Text style={{ fontSize: 11, color: C.textMuted }}>
+          기간 합계 · {totals.activeDays}일
+        </Text>
+        <Text
+          style={{
+            fontSize: 12,
+            fontWeight: '800',
+            color: totals.net >= 0 ? C.text : C.danger,
+          }}
+        >
+          순익 {won(totals.net)}원
+        </Text>
+      </View>
+    </View>
+  );
+}
+
 function CalendarScreen({
   orders,
   fuelLogs,
@@ -1058,6 +1223,7 @@ function CalendarScreen({
           </Text>
         </View>
       </View>
+      <ProfitTrendCard daily={dailySummaries} />
       {selectedItems.length === 0 ? (
         <View style={styles.calendarEmpty}>
           <Ionicons name="calendar-clear-outline" size={30} color={C.textMuted} />
