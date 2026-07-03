@@ -657,7 +657,7 @@ function DeliveryListScreen({
   onDeliveryPress: (delivery: Delivery) => void;
   onNotifications: () => void;
 }) {
-  const { C, styles } = useTheme();
+  const { C, styles, dark } = useTheme();
   const [filter, setFilter] = useState<DeliveryFilter>('all');
   const [query, setQuery] = useState('');
   const [sortMode, setSortMode] = useState<DeliverySortMode>('urgency');
@@ -717,15 +717,15 @@ function DeliveryListScreen({
           )}
         </View>
       )}
-      <View
+      <GlassSurface
+        strength="subtle"
+        radius={RADIUS.searchBar}
+        dark={dark}
+        colors={{ surface: C.surfaceAlt, primary: C.primary, outline: C.outline }}
         style={{
           flexDirection: 'row',
           alignItems: 'center',
           gap: 8,
-          backgroundColor: C.surfaceAlt,
-          borderWidth: 1,
-          borderColor: C.outline,
-          borderRadius: 12,
           paddingHorizontal: 12,
           marginBottom: 10,
         }}
@@ -743,7 +743,7 @@ function DeliveryListScreen({
             <Ionicons name="close-circle" size={18} color={C.textMuted} />
           </Pressable>
         )}
-      </View>
+      </GlassSurface>
       <View style={styles.filterSegment}>
         {([
           ['all', '전체'],
