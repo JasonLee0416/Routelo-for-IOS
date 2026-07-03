@@ -51,6 +51,7 @@ import {
   mileageLogRepository,
 } from './repositories/native';
 import { filterDeliveries } from './services/deliveryFilter';
+import { summarizeEfficiency } from './services/efficiency';
 import {
   applyFuelLogEdit,
   createFuelLog,
@@ -1858,6 +1859,63 @@ function CalendarScreen({
             ))
         )}
       </View>
+      {(fuelLogs.length > 0 || mileageLogs.length > 0) &&
+        (() => {
+          const eff = summarizeEfficiency(fuelLogs, mileageLogs);
+          const metrics: Array<[string, string]> = [
+            ['연비', eff.kmPerLiter != null ? `${eff.kmPerLiter} km/L` : '-'],
+            [
+              'km당 비용',
+              eff.costPerKm != null ? `${formatWon(eff.costPerKm)}원` : '-',
+            ],
+            ['총 주행', `${formatWon(eff.totalDistanceKm)}km`],
+            ['총 주유', `${formatWon(eff.totalFuelCost)}원`],
+          ];
+          return (
+            <View
+              style={{
+                backgroundColor: C.surface,
+                borderRadius: 16,
+                borderWidth: 1,
+                borderColor: C.outline,
+                padding: 14,
+                marginBottom: 12,
+              }}
+            >
+              <Text
+                style={{
+                  fontSize: 14,
+                  fontWeight: '800',
+                  color: C.text,
+                  marginBottom: 12,
+                }}
+              >
+                연비 요약
+              </Text>
+              <View style={{ flexDirection: 'row' }}>
+                {metrics.map(([label, value]) => (
+                  <View key={label} style={{ flex: 1, alignItems: 'center' }}>
+                    <Text
+                      style={{
+                        fontSize: 14,
+                        fontWeight: '800',
+                        color: C.text,
+                      }}
+                      numberOfLines={1}
+                    >
+                      {value}
+                    </Text>
+                    <Text
+                      style={{ fontSize: 10, color: C.textMuted, marginTop: 2 }}
+                    >
+                      {label}
+                    </Text>
+                  </View>
+                ))}
+              </View>
+            </View>
+          );
+        })()}
       {selectedItems.length === 0 ? (
         <View style={styles.calendarEmpty}>
           <Ionicons name="calendar-clear-outline" size={30} color={C.textMuted} />
