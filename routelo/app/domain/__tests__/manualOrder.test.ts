@@ -2,6 +2,7 @@ import {
   applyManualEdit,
   createManualDeliveryOrder,
   ManualOrderInput,
+  orderToManualInput,
   validateManualOrderInput,
 } from '../manualOrder';
 import { DeliveryOrder } from '../models';
@@ -165,5 +166,27 @@ describe('applyManualEdit', () => {
 
   test('throws on invalid edit input', () => {
     expect(() => applyManualEdit(existing, { productName: '' }, NOW)).toThrow();
+  });
+});
+
+describe('orderToManualInput', () => {
+  test('round-trips the form fields through create', () => {
+    const order = createManualDeliveryOrder(baseInput, { id: 'd1', now: NOW });
+    expect(orderToManualInput(order)).toEqual({
+      productName: '축하 화환 3단',
+      productQuantity: 2,
+      orderingVendorName: '행복꽃집',
+      orderingVendorTel: '021234567',
+      fulfillingVendorName: undefined,
+      fulfillingVendorTel: undefined,
+      serviceDate: '2026-07-10',
+      strictTime: '13:00',
+      eventTime: '14:00',
+      venueName: '강남 웨딩홀',
+      deliveryAddress: '서울시 강남구 테헤란로 1',
+      recipientName: '홍길동',
+      recipientTel: '01099998888',
+      customerRequests: '정문에서 수령',
+    });
   });
 });
