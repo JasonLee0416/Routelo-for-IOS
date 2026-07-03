@@ -51,7 +51,11 @@ import {
   fuelLogRepository,
   mileageLogRepository,
 } from './repositories/native';
-import { filterDeliveries } from './services/deliveryFilter';
+import {
+  DeliverySortMode,
+  filterDeliveries,
+  sortDeliveries,
+} from './services/deliveryFilter';
 import { summarizeEfficiency } from './services/efficiency';
 import { buildDailyProfitCsv } from './services/export';
 import {
@@ -642,7 +646,11 @@ function DeliveryListScreen({
   const { C, styles } = useTheme();
   const [filter, setFilter] = useState<DeliveryFilter>('all');
   const [query, setQuery] = useState('');
-  const filtered = filterDeliveries(deliveries, { query, status: filter });
+  const [sortMode, setSortMode] = useState<DeliverySortMode>('urgency');
+  const filtered = sortDeliveries(
+    filterDeliveries(deliveries, { query, status: filter }),
+    sortMode,
+  );
   return (
     <ScrollView contentContainerStyle={styles.screenContent} showsVerticalScrollIndicator={false}>
       <ScreenHeader
@@ -691,6 +699,45 @@ function DeliveryListScreen({
             onPress={() => setFilter(key)}
           >
             <Text style={[styles.filterText, filter === key && styles.filterTextSelected]}>
+              {label}
+            </Text>
+          </Pressable>
+        ))}
+      </View>
+      <View
+        style={{
+          flexDirection: 'row',
+          alignItems: 'center',
+          gap: 6,
+          marginBottom: 8,
+        }}
+      >
+        <Text style={{ fontSize: 11, color: C.textMuted, marginRight: 2 }}>
+          정렬
+        </Text>
+        {(
+          [
+            ['urgency', '마감순'],
+            ['recent', '최신순'],
+          ] as Array<[DeliverySortMode, string]>
+        ).map(([key, label]) => (
+          <Pressable
+            key={key}
+            onPress={() => setSortMode(key)}
+            style={{
+              paddingHorizontal: 10,
+              paddingVertical: 4,
+              borderRadius: 8,
+              backgroundColor: sortMode === key ? C.primary : C.surfaceAlt,
+            }}
+          >
+            <Text
+              style={{
+                fontSize: 11,
+                fontWeight: '700',
+                color: sortMode === key ? '#FFFFFF' : C.textMuted,
+              }}
+            >
               {label}
             </Text>
           </Pressable>
