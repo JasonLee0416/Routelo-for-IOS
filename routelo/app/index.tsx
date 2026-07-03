@@ -59,6 +59,7 @@ import {
 } from './services/deliveryFilter';
 import { summarizeDeliveryStats } from './services/deliveryStats';
 import { summarizeEfficiency } from './services/efficiency';
+import { deadlineStatus } from './services/deadline';
 import { buildDailyProfitCsv } from './services/export';
 import { dialableTargets } from './services/phone';
 import {
@@ -2908,6 +2909,7 @@ function DeliveryDetailSheet({
     { label: '발주처', phone: delivery.orderVendorTel },
     { label: '화원', phone: delivery.deliveryVendorTel },
   ]);
+  const urgency = deadlineStatus(delivery.deliveryDt, Date.now());
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <View style={styles.modalBackdrop}>
@@ -2933,6 +2935,19 @@ function DeliveryDetailSheet({
               <Text style={[styles.sheetTimeValue, styles.warningText]}>
                 {timeOf(delivery.deliveryDt)}
               </Text>
+              {(urgency === 'overdue' || urgency === 'soon') &&
+                delivery.status !== 'completed' && (
+                  <Text
+                    style={{
+                      fontSize: 10,
+                      fontWeight: '800',
+                      marginTop: 3,
+                      color: urgency === 'overdue' ? C.danger : C.warning,
+                    }}
+                  >
+                    {urgency === 'overdue' ? '● 마감 지남' : '● 임박'}
+                  </Text>
+                )}
             </View>
             <View style={styles.sheetTimeItem}>
               <Text style={styles.sheetTimeLabel}>예식 시간</Text>
