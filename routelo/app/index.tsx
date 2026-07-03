@@ -56,6 +56,7 @@ import {
   filterDeliveries,
   sortDeliveries,
 } from './services/deliveryFilter';
+import { summarizeDeliveryStats } from './services/deliveryStats';
 import { summarizeEfficiency } from './services/efficiency';
 import { buildDailyProfitCsv } from './services/export';
 import {
@@ -651,6 +652,7 @@ function DeliveryListScreen({
     filterDeliveries(deliveries, { query, status: filter }),
     sortMode,
   );
+  const stats = summarizeDeliveryStats(deliveries);
   return (
     <ScrollView contentContainerStyle={styles.screenContent} showsVerticalScrollIndicator={false}>
       <ScreenHeader
@@ -660,6 +662,43 @@ function DeliveryListScreen({
         notificationCount={3}
         onNotificationPress={onNotifications}
       />
+      {stats.total > 0 && (
+        <View style={{ marginBottom: 10 }}>
+          <View
+            style={{
+              flexDirection: 'row',
+              justifyContent: 'space-between',
+              marginBottom: 6,
+            }}
+          >
+            <Text
+              style={{ fontSize: 12, color: C.textMuted, fontWeight: '700' }}
+            >
+              완료 {stats.completed}/{stats.total}
+            </Text>
+            <Text style={{ fontSize: 12, color: C.primary, fontWeight: '800' }}>
+              {stats.completionRate}%
+            </Text>
+          </View>
+          <View
+            style={{
+              height: 8,
+              borderRadius: 4,
+              backgroundColor: C.surfaceAlt,
+              overflow: 'hidden',
+            }}
+          >
+            <View
+              style={{
+                width: `${stats.completionRate}%`,
+                height: 8,
+                borderRadius: 4,
+                backgroundColor: C.primary,
+              }}
+            />
+          </View>
+        </View>
+      )}
       <View
         style={{
           flexDirection: 'row',
