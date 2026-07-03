@@ -93,6 +93,8 @@ import {
 import { DEFAULT_ROUTELO_SETTINGS, NavApp, RouteloSettings } from './settings';
 import { GYEONGGI_DISTRICTS, SEOUL_DISTRICTS } from './settings/districts';
 import { settingsRepository } from './settings/native';
+import { GlassSurface } from './theme/GlassSurface';
+import { RADIUS } from './theme/tokens';
 import {
   VendorCandidate,
   vendorCandidateApplications,
@@ -4132,14 +4134,21 @@ export default function RouteloApp() {
         <Ionicons name="scan-outline" size={23} color="#FFFFFF" />
         <Text style={styles.scanFabText}>인수증 스캔</Text>
       </Pressable>
-      <View style={styles.bottomNavBoundary}>
+      <GlassSurface
+        strength="prominent"
+        radius={RADIUS.floatingNav}
+        dark={darkMode}
+        colors={{ surface: C.surface, primary: C.primary, outline: C.outline }}
+        style={{
+          marginHorizontal: 12,
+          marginTop: 6,
+          marginBottom: Math.max(insets.bottom, 10),
+        }}
+      >
         <View
           style={[
             styles.bottomNav,
-            {
-              minHeight: 66 + insets.bottom,
-              paddingBottom: Math.max(insets.bottom, 8),
-            },
+            { minHeight: 60, paddingBottom: 0, paddingHorizontal: 4 },
           ]}
         >
           {tabs.map((tab) => {
@@ -4168,7 +4177,7 @@ export default function RouteloApp() {
             );
           })}
         </View>
-      </View>
+      </GlassSurface>
       <DeliveryDetailSheet
         delivery={selectedDelivery}
         visible={Boolean(selectedDelivery)}
