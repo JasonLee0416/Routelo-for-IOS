@@ -44,7 +44,14 @@ import {
   OcrFieldResult,
   OcrPipelineResult,
 } from './models';
-import { deliveryRepository } from './repositories/native';
+import { deliveryRepository, fuelLogRepository } from './repositories/native';
+import {
+  applyFuelLogEdit,
+  createFuelLog,
+  FuelLogInput,
+  fuelLogToInput,
+  validateFuelLogInput,
+} from './services/fuel';
 import {
   calculateFeeByAddress,
   findDistrictByAddress,
@@ -836,6 +843,179 @@ const formatDateKey = (date: Date) =>
 const timeLabel = (value?: string) =>
   value?.match(/T(\d{2}:\d{2})/)?.[1] || '';
 
+const FUEL_FORM_FIELDS: Array<{
+  key: keyof FuelLogInput;
+  label: string;
+  placeholder: string;
+}> = [
+  { key: 'date', label: '주유 날짜', placeholder: 'YYYY-MM-DD' },
+  { key: 'liters', label: '주유량 (L)', placeholder: '예: 30' },
+  { key: 'pricePerLiter', label: '리터당 단가 (원)', placeholder: '예: 1700' },
+  { key: 'amount', label: '총 주유금액 (원)', placeholder: '단가 대신 입력 가능' },
+  { key: 'odometerKm', label: '주행거리 (km)', placeholder: '선택' },
+];
+
+function FuelFormModal({
+  visible,
+  initial,
+  onClose,
+  onSubmit,
+}: {
+  visible: boolean;
+  initial?: FuelLog;
+  onClose: () => void;
+  onSubmit: (log: FuelLog) => void;
+}) {
+  const { C } = useTheme();
+  const insets = useSafeAreaInsets();
+  const editing = Boolean(initial);
+  const toValues = (log?: FuelLog): Record<string, string> => {
+    const input = log ? fuelLogToInput(log) : ({} as FuelLogInput);
+    const values: Record<string, string> = {};
+    FUEL_FORM_FIELDS.forEach((field) => {
+      const raw = input[field.key];
+      values[field.key] = raw === undefined || raw === null ? '' : String(raw);
+    });
+    return values;
+  };
+  const [values, setValues] = useState<Record<string, string>>(() =>
+    toValues(initial),
+  );
+  useEffect(() => {
+    if (visible) setValues(toValues(initial));
+  }, [visible, initial]);
+
+  const numeric = (value: string) => {
+    const trimmed = value.trim();
+    if (!trimmed) return undefined;
+    const parsed = Number(trimmed);
+    return Number.isFinite(parsed) ? parsed : undefined;
+  };
+
+  const submit = () => {
+    const input: FuelLogInput = {
+      date: values.date ?? '',
+      liters: numeric(values.liters) ?? 0,
+      pricePerLiter: numeric(values.pricePerLiter),
+      amount: numeric(values.amount),
+      odometerKm: numeric(values.odometerKm),
+    };
+    const errors = validateFuelLogInput(input);
+    if (errors.length) {
+      Alert.alert('입력 확인', errors.join('\n'));
+      return;
+    }
+    try {
+      const log = initial
+        ? applyFuelLogEdit(initial, input)
+        : createFuelLog(input, { id: `fuel-${Date.now()}` });
+      onSubmit(log);
+      onClose();
+    } catch (error) {
+      Alert.alert(
+        '저장 실패',
+        error instanceof Error ? error.message : '알 수 없는 오류',
+      );
+    }
+  };
+
+  return (
+    <Modal visible={visible} animationType="slide" onRequestClose={onClose}>
+      <SafeAreaView style={{ flex: 1, backgroundColor: C.background }}>
+        <View
+          style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            paddingHorizontal: 18,
+            paddingVertical: 14,
+            borderBottomWidth: 1,
+            borderBottomColor: C.outline,
+          }}
+        >
+          <Text style={{ fontSize: 18, fontWeight: '800', color: C.text }}>
+            {editing ? '주유 기록 수정' : '주유 기록 추가'}
+          </Text>
+          <Pressable onPress={onClose} hitSlop={8}>
+            <Ionicons name="close" size={24} color={C.text} />
+          </Pressable>
+        </View>
+        <KeyboardAvoidingView
+          style={{ flex: 1 }}
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        >
+          <ScrollView
+            contentContainerStyle={{ padding: 18, paddingBottom: 32 }}
+            keyboardShouldPersistTaps="handled"
+          >
+            {FUEL_FORM_FIELDS.map((field) => (
+              <View key={field.key} style={{ marginBottom: 14 }}>
+                <Text
+                  style={{
+                    fontSize: 12,
+                    fontWeight: '700',
+                    color: C.textMuted,
+                    marginBottom: 6,
+                  }}
+                >
+                  {field.label}
+                </Text>
+                <TextInput
+                  value={values[field.key]}
+                  onChangeText={(text) =>
+                    setValues((current) => ({ ...current, [field.key]: text }))
+                  }
+                  placeholder={field.placeholder}
+                  placeholderTextColor={C.textMuted}
+                  keyboardType={field.key === 'date' ? 'default' : 'numeric'}
+                  style={{
+                    backgroundColor: C.surfaceAlt,
+                    borderWidth: 1,
+                    borderColor: C.outline,
+                    borderRadius: 12,
+                    paddingHorizontal: 14,
+                    paddingVertical: 12,
+                    fontSize: 15,
+                    color: C.text,
+                  }}
+                />
+              </View>
+            ))}
+            <Text style={{ fontSize: 11, color: C.textMuted, marginTop: 2 }}>
+              단가나 총액 중 하나만 넣어도 나머지는 자동 계산됩니다.
+            </Text>
+          </ScrollView>
+        </KeyboardAvoidingView>
+        <View
+          style={{
+            padding: 18,
+            paddingBottom: 18 + insets.bottom,
+            borderTopWidth: 1,
+            borderTopColor: C.outline,
+          }}
+        >
+          <Pressable
+            onPress={submit}
+            style={({ pressed }) => [
+              {
+                backgroundColor: C.primary,
+                borderRadius: 14,
+                paddingVertical: 15,
+                alignItems: 'center',
+              },
+              pressed && { opacity: 0.85 },
+            ]}
+          >
+            <Text style={{ color: '#FFFFFF', fontSize: 15, fontWeight: '800' }}>
+              {editing ? '수정 저장' : '주유 추가'}
+            </Text>
+          </Pressable>
+        </View>
+      </SafeAreaView>
+    </Modal>
+  );
+}
+
 function ProfitTrendCard({
   daily,
 }: {
@@ -1001,12 +1181,18 @@ function CalendarScreen({
   settings,
   onDeliveryPress,
   onNotifications,
+  onAddFuel,
+  onEditFuel,
+  onDeleteFuel,
 }: {
   orders: DeliveryOrder[];
   fuelLogs: FuelLog[];
   settings: RouteloSettings;
   onDeliveryPress: (delivery: Delivery) => void;
   onNotifications: () => void;
+  onAddFuel: () => void;
+  onEditFuel: (log: FuelLog) => void;
+  onDeleteFuel: (id: string) => void;
 }) {
   const { C, styles } = useTheme();
   const { showFullAddressInList } = usePrivacy();
@@ -1224,6 +1410,120 @@ function CalendarScreen({
         </View>
       </View>
       <ProfitTrendCard daily={dailySummaries} />
+      <View
+        style={{
+          backgroundColor: C.surface,
+          borderRadius: 16,
+          borderWidth: 1,
+          borderColor: C.outline,
+          padding: 14,
+          marginBottom: 12,
+        }}
+      >
+        <View
+          style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            marginBottom: fuelLogs.length ? 10 : 0,
+          }}
+        >
+          <Text style={{ fontSize: 14, fontWeight: '800', color: C.text }}>
+            주유 기록
+          </Text>
+          <Pressable
+            onPress={onAddFuel}
+            style={({ pressed }) => [
+              {
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: 4,
+                paddingHorizontal: 12,
+                paddingVertical: 6,
+                borderRadius: 10,
+                borderWidth: 1,
+                borderColor: C.primary,
+              },
+              pressed && { opacity: 0.6 },
+            ]}
+          >
+            <Ionicons name="add" size={16} color={C.primary} />
+            <Text style={{ color: C.primary, fontSize: 12, fontWeight: '700' }}>
+              추가
+            </Text>
+          </Pressable>
+        </View>
+        {fuelLogs.length === 0 ? (
+          <Text
+            style={{
+              fontSize: 12,
+              color: C.textMuted,
+              paddingVertical: 12,
+              textAlign: 'center',
+            }}
+          >
+            주유 기록이 없습니다 · 추가하면 손익 차트에 반영됩니다
+          </Text>
+        ) : (
+          [...fuelLogs]
+            .sort((a, b) => b.date.localeCompare(a.date))
+            .slice(0, 20)
+            .map((log) => (
+              <View
+                key={log.id}
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  paddingVertical: 8,
+                  borderTopWidth: 1,
+                  borderTopColor: C.surfaceAlt,
+                }}
+              >
+                <View style={{ flex: 1 }}>
+                  <Text style={{ fontSize: 13, fontWeight: '700', color: C.text }}>
+                    {log.date}
+                  </Text>
+                  <Text style={{ fontSize: 11, color: C.textMuted }}>
+                    {log.liters}L · {formatWon(log.pricePerLiter)}원/L
+                  </Text>
+                </View>
+                <Text
+                  style={{
+                    fontSize: 13,
+                    fontWeight: '800',
+                    color: C.text,
+                    marginRight: 10,
+                  }}
+                >
+                  {formatWon(log.amount)}원
+                </Text>
+                <Pressable
+                  onPress={() => onEditFuel(log)}
+                  hitSlop={6}
+                  style={{ padding: 4 }}
+                >
+                  <Ionicons name="create-outline" size={18} color={C.primary} />
+                </Pressable>
+                <Pressable
+                  onPress={() =>
+                    Alert.alert('주유 기록 삭제', `${log.date} 기록을 삭제할까요?`, [
+                      { text: '취소', style: 'cancel' },
+                      {
+                        text: '삭제',
+                        style: 'destructive',
+                        onPress: () => onDeleteFuel(log.id),
+                      },
+                    ])
+                  }
+                  hitSlop={6}
+                  style={{ padding: 4, marginLeft: 2 }}
+                >
+                  <Ionicons name="trash-outline" size={18} color={C.danger} />
+                </Pressable>
+              </View>
+            ))
+        )}
+      </View>
       {selectedItems.length === 0 ? (
         <View style={styles.calendarEmpty}>
           <Ionicons name="calendar-clear-outline" size={30} color={C.textMuted} />
@@ -2954,7 +3254,9 @@ export default function RouteloApp() {
   const [settings, setSettings] = useState<RouteloSettings>(
     DEFAULT_ROUTELO_SETTINGS,
   );
-  const [fuelLogs] = useState<FuelLog[]>([]);
+  const [fuelLogs, setFuelLogs] = useState<FuelLog[]>([]);
+  const [fuelFormVisible, setFuelFormVisible] = useState(false);
+  const [fuelFormLog, setFuelFormLog] = useState<FuelLog | undefined>(undefined);
 
   useEffect(() => {
     deliveryRepository
@@ -2982,6 +3284,37 @@ export default function RouteloApp() {
       .then(setSettings)
       .catch(() => undefined);
   }, []);
+
+  useEffect(() => {
+    fuelLogRepository
+      .list()
+      .then((stored) => {
+        if (stored.length) setFuelLogs(stored);
+      })
+      .catch(() => undefined);
+  }, []);
+
+  const openCreateFuel = () => {
+    setFuelFormLog(undefined);
+    setFuelFormVisible(true);
+  };
+  const editFuel = (log: FuelLog) => {
+    setFuelFormLog(log);
+    setFuelFormVisible(true);
+  };
+  const submitFuel = (log: FuelLog) => {
+    setFuelLogs((current) =>
+      current.some((item) => item.id === log.id)
+        ? current.map((item) => (item.id === log.id ? log : item))
+        : [log, ...current],
+    );
+    fuelLogRepository.save(log).catch(() => undefined);
+    setFuelFormVisible(false);
+  };
+  const deleteFuel = (id: string) => {
+    setFuelLogs((current) => current.filter((item) => item.id !== id));
+    fuelLogRepository.remove(id).catch(() => undefined);
+  };
 
   const notificationCount = 3;
   const openNotifications = () => setActiveTab('notifications');
@@ -3073,6 +3406,9 @@ export default function RouteloApp() {
           settings={settings}
           onDeliveryPress={setSelectedDelivery}
           onNotifications={openNotifications}
+          onAddFuel={openCreateFuel}
+          onEditFuel={editFuel}
+          onDeleteFuel={deleteFuel}
         />
       );
     }
@@ -3214,6 +3550,12 @@ export default function RouteloApp() {
         initial={formOrder}
         onClose={() => setFormVisible(false)}
         onSubmit={submitManualOrder}
+      />
+      <FuelFormModal
+        visible={fuelFormVisible}
+        initial={fuelFormLog}
+        onClose={() => setFuelFormVisible(false)}
+        onSubmit={submitFuel}
       />
       <OcrScannerModal
         visible={scannerVisible}
