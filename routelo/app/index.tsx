@@ -184,12 +184,16 @@ const DARK: Palette = {
 const C = LIGHT;
 
 type AppStyles = ReturnType<typeof makeStyles>;
-type ThemeValue = { C: Palette; styles: AppStyles };
+type ThemeValue = { C: Palette; styles: AppStyles; dark: boolean };
 
 const ThemeContext = createContext<ThemeValue | null>(null);
 
 const useTheme = (): ThemeValue =>
-  useContext(ThemeContext) ?? { C: LIGHT, styles: makeStyles(LIGHT) };
+  useContext(ThemeContext) ?? {
+    C: LIGHT,
+    styles: makeStyles(LIGHT),
+    dark: false,
+  };
 
 // 목록에서의 민감정보 노출 제어(설정 privacy). 증거 보존과 무관하게 "표시"만 가린다.
 type PrivacyValue = {
@@ -2907,7 +2911,7 @@ function DeliveryDetailSheet({
   onEdit: () => void;
   onDelete: () => void;
 }) {
-  const { C, styles } = useTheme();
+  const { C, styles, dark } = useTheme();
   const insets = useSafeAreaInsets();
   if (!delivery) return null;
   const confirmDelete = () =>
@@ -2924,7 +2928,19 @@ function DeliveryDetailSheet({
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <View style={styles.modalBackdrop}>
-        <View style={[styles.bottomSheet, { paddingBottom: 28 + insets.bottom }]}>
+        <GlassSurface
+          strength="regular"
+          radius={RADIUS.bottomSheet}
+          dark={dark}
+          colors={{ surface: C.surface, primary: C.primary, outline: C.outline }}
+          style={{
+            paddingHorizontal: 20,
+            paddingBottom: 28 + insets.bottom,
+            borderBottomLeftRadius: 0,
+            borderBottomRightRadius: 0,
+            borderBottomWidth: 0,
+          }}
+        >
           <View style={styles.sheetHandle} />
           <View style={styles.sheetHeader}>
             <View>
@@ -3073,7 +3089,7 @@ function DeliveryDetailSheet({
               </Text>
             </Pressable>
           </View>
-        </View>
+        </GlassSurface>
       </View>
     </Modal>
   );
@@ -4083,7 +4099,7 @@ export default function RouteloApp() {
   const styles = useMemo(() => makeStyles(C), [C]);
 
   return (
-    <ThemeContext.Provider value={{ C, styles }}>
+    <ThemeContext.Provider value={{ C, styles, dark: darkMode }}>
     <PrivacyContext.Provider
       value={{
         showFullPhoneInList: settings.privacy.showFullPhoneInList,
