@@ -42,6 +42,15 @@ Vision/CLOVA failure. If both preferred iOS paths fail, the app should move to
 manual input unless a product decision explicitly enables PP-OCR as an iOS
 secondary local fallback.
 
+**Interim decision (2026-07-03, walking skeleton):** while the native Apple
+Vision bridge and the CLOVA HTTP adapter are still unimplemented placeholders,
+that product decision is taken — PP-OCRv5 runs as the interim iOS fallback after
+Apple Vision and consented CLOVA fail, before manual input. This is gated by the
+single `IOS_INTERIM_PPOCR_FALLBACK` toggle in `app/platform/receiptRecognition.ts`
+and only affects the active execution chain; the recognizer contract default
+(`recognizersForPlatform('ios')` without options) stays Apple Vision -> CLOVA.
+Flip the toggle off once Apple Vision is the working primary path.
+
 ## Shared parser boundary
 
 Every engine result must be converted into:
@@ -94,6 +103,7 @@ If required fields remain missing after Apple Vision and consented CLOVA:
 - [x] Keep shared PP-OCR recognizer as a common candidate.
 - [x] Add Apple Vision recognizer placeholder for iOS.
 - [x] Add CLOVA recognizer placeholder with consent guard.
+- [x] Enable PP-OCR as the interim iOS fallback (walking skeleton, `IOS_INTERIM_PPOCR_FALLBACK`).
 - [ ] Implement native iOS Vision bridge.
 - [ ] Add CLOVA HTTP adapter and secure secret injection.
 - [ ] Add UI consent copy for cloud fallback.
