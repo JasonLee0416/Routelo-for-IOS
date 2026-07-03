@@ -1884,15 +1884,22 @@ function DeliveryDetailSheet({
   visible,
   onClose,
   onToggle,
+  onDelete,
 }: {
   delivery?: Delivery;
   visible: boolean;
   onClose: () => void;
   onToggle: () => void;
+  onDelete: () => void;
 }) {
   const { C, styles } = useTheme();
   const insets = useSafeAreaInsets();
   if (!delivery) return null;
+  const confirmDelete = () =>
+    Alert.alert('배달 삭제', '이 배달을 삭제할까요? 되돌릴 수 없습니다.', [
+      { text: '취소', style: 'cancel' },
+      { text: '삭제', style: 'destructive', onPress: onDelete },
+    ]);
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <View style={styles.modalBackdrop}>
@@ -1953,6 +1960,27 @@ function DeliveryDetailSheet({
               </Text>
             </Pressable>
           </View>
+          <Pressable
+            onPress={confirmDelete}
+            style={({ pressed }) => [
+              {
+                marginTop: 12,
+                flexDirection: 'row',
+                alignItems: 'center',
+                justifyContent: 'center',
+                paddingVertical: 12,
+                borderRadius: 12,
+                borderWidth: 1,
+                borderColor: C.danger,
+              },
+              pressed && { opacity: 0.6 },
+            ]}
+          >
+            <Ionicons name="trash-outline" size={18} color={C.danger} />
+            <Text style={{ color: C.danger, fontWeight: '600', marginLeft: 6 }}>
+              배달 삭제
+            </Text>
+          </Pressable>
         </View>
       </View>
     </Modal>
@@ -2562,6 +2590,14 @@ export default function RouteloApp() {
     );
   };
 
+  const deleteSelected = async () => {
+    if (!selectedDelivery) return;
+    const { id } = selectedDelivery;
+    setOrders((current) => current.filter((item) => item.id !== id));
+    setSelectedDelivery(undefined);
+    await deliveryRepository.remove(id).catch(() => undefined);
+  };
+
   const screen = useMemo(() => {
     if (activeTab === 'deliveries') {
       return (
@@ -2683,6 +2719,7 @@ export default function RouteloApp() {
         visible={Boolean(selectedDelivery)}
         onClose={() => setSelectedDelivery(undefined)}
         onToggle={toggleSelected}
+        onDelete={deleteSelected}
       />
       <OcrScannerModal
         visible={scannerVisible}
