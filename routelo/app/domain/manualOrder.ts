@@ -160,6 +160,29 @@ export function createManualDeliveryOrder(
   };
 }
 
+// Flattens a canonical order back into the manual form shape, so the edit form
+// can be pre-filled. Inverse of createManualDeliveryOrder for the form fields.
+export function orderToManualInput(order: DeliveryOrder): ManualOrderInput {
+  const strictTime = order.schedule.strictDeadlineAt?.match(/T(\d{2}:\d{2})/)?.[1];
+  const eventTime = order.schedule.eventAt?.match(/T(\d{2}:\d{2})/)?.[1];
+  return {
+    productName: order.product.name ?? '',
+    productQuantity: order.product.quantity,
+    orderingVendorName: order.orderingVendor.name,
+    orderingVendorTel: order.orderingVendor.telephone,
+    fulfillingVendorName: order.fulfillingVendor.name,
+    fulfillingVendorTel: order.fulfillingVendor.telephone,
+    serviceDate: order.schedule.serviceDate,
+    strictTime,
+    eventTime,
+    venueName: order.destination.venueName,
+    deliveryAddress: order.destination.address,
+    recipientName: order.recipient.name,
+    recipientTel: order.recipient.telephone,
+    customerRequests: order.customerRequests,
+  };
+}
+
 // Applies a manual edit to an existing order, preserving identity, creation
 // time, source, status, settlement, and any recorded arrival/completion times.
 export function applyManualEdit(

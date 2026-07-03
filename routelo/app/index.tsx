@@ -26,11 +26,16 @@ import {
 import { AccountState, EnergyType } from './account';
 import { accountRepository } from './account/native';
 import {
+  applyManualEdit,
+  createManualDeliveryOrder,
   DeliveryOrder,
   evaluateCalendarRisks,
   legacyDeliveryToOrder,
+  ManualOrderInput,
   orderToLegacyDelivery,
+  orderToManualInput,
   toCalendarDeliveryItem,
+  validateManualOrderInput,
 } from './domain';
 import {
   Delivery,
@@ -1884,12 +1889,14 @@ function DeliveryDetailSheet({
   visible,
   onClose,
   onToggle,
+  onEdit,
   onDelete,
 }: {
   delivery?: Delivery;
   visible: boolean;
   onClose: () => void;
   onToggle: () => void;
+  onEdit: () => void;
   onDelete: () => void;
 }) {
   const { C, styles } = useTheme();
@@ -1960,29 +1967,243 @@ function DeliveryDetailSheet({
               </Text>
             </Pressable>
           </View>
+          <View style={{ flexDirection: 'row', gap: 10, marginTop: 12 }}>
+            <Pressable
+              onPress={onEdit}
+              style={({ pressed }) => [
+                {
+                  flex: 1,
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  paddingVertical: 12,
+                  borderRadius: 12,
+                  borderWidth: 1,
+                  borderColor: C.primary,
+                },
+                pressed && { opacity: 0.6 },
+              ]}
+            >
+              <Ionicons name="create-outline" size={18} color={C.primary} />
+              <Text style={{ color: C.primary, fontWeight: '600', marginLeft: 6 }}>
+                수정
+              </Text>
+            </Pressable>
+            <Pressable
+              onPress={confirmDelete}
+              style={({ pressed }) => [
+                {
+                  flex: 1,
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  paddingVertical: 12,
+                  borderRadius: 12,
+                  borderWidth: 1,
+                  borderColor: C.danger,
+                },
+                pressed && { opacity: 0.6 },
+              ]}
+            >
+              <Ionicons name="trash-outline" size={18} color={C.danger} />
+              <Text style={{ color: C.danger, fontWeight: '600', marginLeft: 6 }}>
+                삭제
+              </Text>
+            </Pressable>
+          </View>
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
+const DELIVERY_FORM_FIELDS: Array<{
+  key: keyof ManualOrderInput;
+  label: string;
+  placeholder: string;
+  keyboardType?: 'default' | 'numeric' | 'phone-pad';
+  multiline?: boolean;
+}> = [
+  { key: 'productName', label: '상품명 *', placeholder: '예: 축하 3단 화환' },
+  { key: 'productQuantity', label: '수량', placeholder: '예: 2', keyboardType: 'numeric' },
+  { key: 'deliveryAddress', label: '배송 주소', placeholder: '도로명 주소' },
+  { key: 'venueName', label: '장소 / 예식장', placeholder: '예: 강남 웨딩홀' },
+  { key: 'serviceDate', label: '배송 날짜', placeholder: 'YYYY-MM-DD' },
+  { key: 'strictTime', label: '엄수 시간', placeholder: 'HH:mm' },
+  { key: 'eventTime', label: '예식 시간', placeholder: 'HH:mm' },
+  { key: 'recipientName', label: '수령인', placeholder: '이름' },
+  { key: 'recipientTel', label: '수령인 연락처', placeholder: '01000000000', keyboardType: 'phone-pad' },
+  { key: 'orderingVendorName', label: '발주처', placeholder: '상호' },
+  { key: 'orderingVendorTel', label: '발주처 연락처', placeholder: '연락처', keyboardType: 'phone-pad' },
+  { key: 'fulfillingVendorName', label: '담당 화원', placeholder: '상호' },
+  { key: 'fulfillingVendorTel', label: '담당 화원 연락처', placeholder: '연락처', keyboardType: 'phone-pad' },
+  { key: 'customerRequests', label: '요청사항', placeholder: '메모', multiline: true },
+];
+
+function DeliveryFormModal({
+  visible,
+  initial,
+  onClose,
+  onSubmit,
+}: {
+  visible: boolean;
+  initial?: DeliveryOrder;
+  onClose: () => void;
+  onSubmit: (order: DeliveryOrder) => void;
+}) {
+  const { C } = useTheme();
+  const insets = useSafeAreaInsets();
+  const editing = Boolean(initial);
+  const toValues = (order?: DeliveryOrder): Record<string, string> => {
+    const input = order ? orderToManualInput(order) : ({} as ManualOrderInput);
+    const values: Record<string, string> = {};
+    DELIVERY_FORM_FIELDS.forEach((field) => {
+      const raw = input[field.key];
+      values[field.key] = raw === undefined || raw === null ? '' : String(raw);
+    });
+    return values;
+  };
+  const [values, setValues] = useState<Record<string, string>>(() =>
+    toValues(initial),
+  );
+  useEffect(() => {
+    if (visible) setValues(toValues(initial));
+  }, [visible, initial]);
+
+  const submit = () => {
+    const quantityText = values.productQuantity?.trim();
+    const input: ManualOrderInput = {
+      productName: values.productName ?? '',
+      productQuantity: quantityText ? Number(quantityText) : undefined,
+      orderingVendorName: values.orderingVendorName,
+      orderingVendorTel: values.orderingVendorTel,
+      fulfillingVendorName: values.fulfillingVendorName,
+      fulfillingVendorTel: values.fulfillingVendorTel,
+      serviceDate: values.serviceDate,
+      strictTime: values.strictTime,
+      eventTime: values.eventTime,
+      venueName: values.venueName,
+      deliveryAddress: values.deliveryAddress,
+      recipientName: values.recipientName,
+      recipientTel: values.recipientTel,
+      customerRequests: values.customerRequests,
+    };
+    const errors = validateManualOrderInput(input);
+    if (errors.length) {
+      Alert.alert('입력 확인', errors.join('\n'));
+      return;
+    }
+    try {
+      const now = new Date().toISOString();
+      const order = initial
+        ? applyManualEdit(initial, input, now)
+        : createManualDeliveryOrder(input, {
+            id: `delivery-${Date.now()}`,
+            now,
+          });
+      onSubmit(order);
+      onClose();
+    } catch (error) {
+      Alert.alert(
+        '저장 실패',
+        error instanceof Error ? error.message : '알 수 없는 오류',
+      );
+    }
+  };
+
+  return (
+    <Modal visible={visible} animationType="slide" onRequestClose={onClose}>
+      <SafeAreaView style={{ flex: 1, backgroundColor: C.background }}>
+        <View
+          style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            paddingHorizontal: 18,
+            paddingVertical: 14,
+            borderBottomWidth: 1,
+            borderBottomColor: C.outline,
+          }}
+        >
+          <Text style={{ fontSize: 18, fontWeight: '800', color: C.text }}>
+            {editing ? '배달 수정' : '배달 직접 추가'}
+          </Text>
+          <Pressable onPress={onClose} hitSlop={8}>
+            <Ionicons name="close" size={24} color={C.text} />
+          </Pressable>
+        </View>
+        <KeyboardAvoidingView
+          style={{ flex: 1 }}
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        >
+          <ScrollView
+            contentContainerStyle={{ padding: 18, paddingBottom: 32 }}
+            keyboardShouldPersistTaps="handled"
+          >
+            {DELIVERY_FORM_FIELDS.map((field) => (
+              <View key={field.key} style={{ marginBottom: 14 }}>
+                <Text
+                  style={{
+                    fontSize: 12,
+                    fontWeight: '700',
+                    color: C.textMuted,
+                    marginBottom: 6,
+                  }}
+                >
+                  {field.label}
+                </Text>
+                <TextInput
+                  value={values[field.key]}
+                  onChangeText={(text) =>
+                    setValues((current) => ({ ...current, [field.key]: text }))
+                  }
+                  placeholder={field.placeholder}
+                  placeholderTextColor={C.textMuted}
+                  keyboardType={field.keyboardType ?? 'default'}
+                  multiline={field.multiline}
+                  style={{
+                    backgroundColor: C.surfaceAlt,
+                    borderWidth: 1,
+                    borderColor: C.outline,
+                    borderRadius: 12,
+                    paddingHorizontal: 14,
+                    paddingVertical: 12,
+                    fontSize: 15,
+                    color: C.text,
+                    minHeight: field.multiline ? 76 : undefined,
+                    textAlignVertical: field.multiline ? 'top' : 'center',
+                  }}
+                />
+              </View>
+            ))}
+          </ScrollView>
+        </KeyboardAvoidingView>
+        <View
+          style={{
+            padding: 18,
+            paddingBottom: 18 + insets.bottom,
+            borderTopWidth: 1,
+            borderTopColor: C.outline,
+          }}
+        >
           <Pressable
-            onPress={confirmDelete}
+            onPress={submit}
             style={({ pressed }) => [
               {
-                marginTop: 12,
-                flexDirection: 'row',
+                backgroundColor: C.primary,
+                borderRadius: 14,
+                paddingVertical: 15,
                 alignItems: 'center',
-                justifyContent: 'center',
-                paddingVertical: 12,
-                borderRadius: 12,
-                borderWidth: 1,
-                borderColor: C.danger,
               },
-              pressed && { opacity: 0.6 },
+              pressed && { opacity: 0.85 },
             ]}
           >
-            <Ionicons name="trash-outline" size={18} color={C.danger} />
-            <Text style={{ color: C.danger, fontWeight: '600', marginLeft: 6 }}>
-              배달 삭제
+            <Text style={{ color: '#FFFFFF', fontSize: 15, fontWeight: '800' }}>
+              {editing ? '수정 저장' : '배달 추가'}
             </Text>
           </Pressable>
         </View>
-      </View>
+      </SafeAreaView>
     </Modal>
   );
 }
@@ -2524,6 +2745,10 @@ export default function RouteloApp() {
   );
   const [selectedDelivery, setSelectedDelivery] = useState<Delivery>();
   const [scannerVisible, setScannerVisible] = useState(false);
+  const [formVisible, setFormVisible] = useState(false);
+  const [formOrder, setFormOrder] = useState<DeliveryOrder | undefined>(
+    undefined,
+  );
   const [account, setAccount] = useState<AccountState>();
   const [onboardingVisible, setOnboardingVisible] = useState(false);
   const [settings, setSettings] = useState<RouteloSettings>(
@@ -2598,6 +2823,38 @@ export default function RouteloApp() {
     await deliveryRepository.remove(id).catch(() => undefined);
   };
 
+  const openCreateForm = () => {
+    setFormOrder(undefined);
+    setFormVisible(true);
+  };
+
+  const editSelected = () => {
+    if (!selectedDelivery) return;
+    const order = orders.find((item) => item.id === selectedDelivery.id);
+    if (!order) return;
+    setSelectedDelivery(undefined);
+    setFormOrder(order);
+    setFormVisible(true);
+  };
+
+  const submitManualOrder = (order: DeliveryOrder) => {
+    const address = order.destination.address || '';
+    const fee = calculateFeeByAddress(address, settings);
+    const district = findDistrictByAddress(address, settings);
+    const enriched: DeliveryOrder = {
+      ...order,
+      settlement: { ...order.settlement, fee, district },
+    };
+    setOrders((current) =>
+      current.some((item) => item.id === enriched.id)
+        ? current.map((item) => (item.id === enriched.id ? enriched : item))
+        : [enriched, ...current],
+    );
+    deliveryRepository.save(enriched).catch(() => undefined);
+    setFormVisible(false);
+    setActiveTab('deliveries');
+  };
+
   const screen = useMemo(() => {
     if (activeTab === 'deliveries') {
       return (
@@ -2670,6 +2927,36 @@ export default function RouteloApp() {
       <StatusBar style={darkMode ? 'light' : 'dark'} />
       <View style={styles.mainContent}>{screen}</View>
       <Pressable
+        testID="open-manual-delivery"
+        style={{
+          position: 'absolute',
+          right: 18,
+          bottom: 78 + insets.bottom + 62,
+          minHeight: 48,
+          paddingHorizontal: 16,
+          borderRadius: 16,
+          backgroundColor: C.surface,
+          borderWidth: 1,
+          borderColor: C.primary,
+          flexDirection: 'row',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: 6,
+          shadowColor: '#102A65',
+          shadowOffset: { width: 0, height: 4 },
+          shadowOpacity: 0.18,
+          shadowRadius: 8,
+          elevation: 8,
+          zIndex: 20,
+        }}
+        onPress={openCreateForm}
+      >
+        <Ionicons name="add" size={20} color={C.primary} />
+        <Text style={{ color: C.primary, fontSize: 12, fontWeight: '800' }}>
+          직접 추가
+        </Text>
+      </Pressable>
+      <Pressable
         testID="open-ocr-scanner"
         style={[styles.scanFab, { bottom: 78 + insets.bottom }]}
         onPress={() => setScannerVisible(true)}
@@ -2719,7 +3006,14 @@ export default function RouteloApp() {
         visible={Boolean(selectedDelivery)}
         onClose={() => setSelectedDelivery(undefined)}
         onToggle={toggleSelected}
+        onEdit={editSelected}
         onDelete={deleteSelected}
+      />
+      <DeliveryFormModal
+        visible={formVisible}
+        initial={formOrder}
+        onClose={() => setFormVisible(false)}
+        onSubmit={submitManualOrder}
       />
       <OcrScannerModal
         visible={scannerVisible}
