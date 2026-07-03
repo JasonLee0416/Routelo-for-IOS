@@ -56,6 +56,8 @@ import { DEFAULT_ROUTELO_SETTINGS, NavApp, RouteloSettings } from './settings';
 import { GYEONGGI_DISTRICTS, SEOUL_DISTRICTS } from './settings/districts';
 import { settingsRepository } from './settings/native';
 import {
+  VendorCandidate,
+  vendorCandidateApplications,
   vendorDirectoryFor,
   VendorVerification,
   verifyVendor,
@@ -2399,6 +2401,12 @@ function OcrScannerModal({
     );
   };
 
+  const applyVendorCandidate = (candidate: VendorCandidate) => {
+    vendorCandidateApplications(candidate).forEach((application) =>
+      updateField(application.key, application.value),
+    );
+  };
+
   const valueOf = (key: OcrFieldKey) => fields.find((item) => item.key === key)?.value || '';
 
   const register = () => {
@@ -2681,6 +2689,7 @@ function OcrScannerModal({
                     </View>
                   )}
                   {field.key === 'orderingVendorName' && vendorCheck && (
+                    <>
                     <View style={styles.vendorCheckRow}>
                       <Ionicons
                         name={
@@ -2707,10 +2716,35 @@ function OcrScannerModal({
                                 : ''
                             }`
                           : vendorCheck.status === 'ambiguous'
-                            ? `유사 업체 ${vendorCheck.candidates.length}곳 — 직접 확인 필요`
+                            ? `유사 업체 ${vendorCheck.candidates.length}곳 — 아래에서 선택`
                             : '온라인에서 일치하는 업체를 찾지 못했습니다'}
                       </Text>
                     </View>
+                    {vendorCheck.candidates.length > 0 &&
+                      vendorCheck.status !== 'notFound' && (
+                        <View
+                          style={{
+                            flexDirection: 'row',
+                            flexWrap: 'wrap',
+                            gap: 6,
+                            marginTop: 6,
+                          }}
+                        >
+                          {vendorCheck.candidates.map((cand, idx) => (
+                            <Pressable
+                              key={`${cand.name}-${idx}`}
+                              style={styles.candidateChip}
+                              onPress={() => applyVendorCandidate(cand)}
+                            >
+                              <Text style={styles.candidateChipText}>
+                                {cand.name}
+                                {cand.phone ? ` · ${cand.phone}` : ''}
+                              </Text>
+                            </Pressable>
+                          ))}
+                        </View>
+                      )}
+                    </>
                   )}
                 </View>
               ))}
