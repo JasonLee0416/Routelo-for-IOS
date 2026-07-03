@@ -27,6 +27,7 @@ export type ReceiptRecognizerResult = {
 
 export type ReceiptRecognizerContext = {
   allowCloudFallback?: boolean;
+  cloudFallbackConsentNoticeVersion?: string;
   clovaEndpoint?: string;
   clovaSecret?: string;
 };
@@ -46,6 +47,16 @@ const ensureImageUri = (imageUri: string) => {
   if (!imageUri.trim()) {
     throw new Error('A captured receipt image URI is required.');
   }
+};
+
+export const CLOUD_FALLBACK_CONSENT_NOTICE_VERSION =
+  '2026-07-02.clova-consent.v1';
+
+export const CLOUD_FALLBACK_CONSENT_COPY = {
+  title: 'Cloud OCR fallback',
+  body:
+    'CLOVA OCR can retry low-confidence receipts only after you agree to upload receipt evidence for recognition.',
+  confirmLabel: 'Allow CLOVA fallback',
 };
 
 const toGenericLine = (line: PpOcrLine): ReceiptRecognizerLine => ({
@@ -96,6 +107,14 @@ export const clovaRecognizer: ReceiptRecognizer = {
     ensureImageUri(imageUri);
     if (!context?.allowCloudFallback) {
       throw new Error('CLOVA OCR fallback requires explicit user consent.');
+    }
+    if (
+      context.cloudFallbackConsentNoticeVersion !==
+      CLOUD_FALLBACK_CONSENT_NOTICE_VERSION
+    ) {
+      throw new Error(
+        'CLOVA OCR fallback requires the current consent notice version.',
+      );
     }
     if (!context.clovaEndpoint || !context.clovaSecret) {
       throw new Error('CLOVA OCR endpoint and secret are not configured.');

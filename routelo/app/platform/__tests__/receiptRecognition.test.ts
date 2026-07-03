@@ -1,5 +1,12 @@
 import { receiptRecognitionCapability } from '../receiptRecognition';
-import { RECEIPT_RECOGNITION_NOTICE, recognizersForPlatform } from '../receiptRecognizers';
+import {
+  CLOUD_FALLBACK_CONSENT_COPY,
+  CLOUD_FALLBACK_CONSENT_NOTICE_VERSION,
+  RECEIPT_RECOGNITION_NOTICE,
+  appleVisionRecognizer,
+  clovaRecognizer,
+  recognizersForPlatform,
+} from '../receiptRecognizers';
 
 describe('receiptRecognitionCapability', () => {
   test('uses the same pinned PP-OCR model on Android', () => {
@@ -41,5 +48,43 @@ describe('receiptRecognitionCapability', () => {
       ),
     ).toEqual(['apple-vision', 'clova', 'ppocrv5']);
     expect(RECEIPT_RECOGNITION_NOTICE).toContain('manual input');
+  });
+});
+
+describe('iOS OCR consent boundary', () => {
+  test('keeps Apple Vision as an explicit native placeholder until the bridge exists', async () => {
+    await expect(appleVisionRecognizer.recognize('file://receipt.jpg')).rejects.toThrow(
+      'Apple Vision OCR native bridge is not connected yet',
+    );
+  });
+
+  test('requires explicit cloud fallback consent before CLOVA configuration is checked', async () => {
+    await expect(clovaRecognizer.recognize('file://receipt.jpg')).rejects.toThrow(
+      'explicit user consent',
+    );
+  });
+
+  test('requires the current consent notice version for CLOVA fallback', async () => {
+    await expect(
+      clovaRecognizer.recognize('file://receipt.jpg', {
+        allowCloudFallback: true,
+      }),
+    ).rejects.toThrow('current consent notice version');
+  });
+
+  test('keeps CLOVA adapter disabled even after consent until endpoint secrets are configured', async () => {
+    await expect(
+      clovaRecognizer.recognize('file://receipt.jpg', {
+        allowCloudFallback: true,
+        cloudFallbackConsentNoticeVersion:
+          CLOUD_FALLBACK_CONSENT_NOTICE_VERSION,
+      }),
+    ).rejects.toThrow('endpoint and secret are not configured');
+  });
+
+  test('exports consent copy for the future UI gate', () => {
+    expect(CLOUD_FALLBACK_CONSENT_COPY.title).toBeTruthy();
+    expect(CLOUD_FALLBACK_CONSENT_COPY.body).toContain('upload receipt evidence');
+    expect(CLOUD_FALLBACK_CONSENT_COPY.confirmLabel).toBeTruthy();
   });
 });

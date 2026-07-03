@@ -74,9 +74,10 @@ CLOVA is allowed only when all conditions are true:
 
 1. the user enabled cloud OCR fallback;
 2. the app explains that receipt data may leave the device;
-3. the request sends the minimum required image/text data;
-4. no automatic field overwrite occurs without review;
-5. the fallback result is labeled as cloud-derived provenance.
+3. the app records the current consent notice version with the request;
+4. the request sends the minimum required image/text data;
+5. no automatic field overwrite occurs without review;
+6. the fallback result is labeled as cloud-derived provenance.
 
 ## Manual input rule
 
