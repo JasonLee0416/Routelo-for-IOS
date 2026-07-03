@@ -51,6 +51,7 @@ import {
   fuelLogRepository,
   mileageLogRepository,
 } from './repositories/native';
+import { buildBackupJson } from './services/backup';
 import {
   DeliverySortMode,
   filterDeliveries,
@@ -2018,6 +2019,39 @@ function CalendarScreen({
             </View>
           );
         })()}
+      <Pressable
+        onPress={() =>
+          Share.share({
+            message: buildBackupJson({
+              orders,
+              fuelLogs,
+              mileageLogs,
+              settings,
+              exportedAt: new Date().toISOString(),
+            }),
+            title: 'Routelo 데이터 백업 (JSON)',
+          }).catch(() => undefined)
+        }
+        style={({ pressed }) => [
+          {
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: 6,
+            paddingVertical: 12,
+            borderRadius: 12,
+            borderWidth: 1,
+            borderColor: C.outline,
+            marginBottom: 12,
+          },
+          pressed && { opacity: 0.6 },
+        ]}
+      >
+        <Ionicons name="cloud-download-outline" size={18} color={C.textMuted} />
+        <Text style={{ color: C.textMuted, fontSize: 13, fontWeight: '700' }}>
+          데이터 백업 (JSON 내보내기)
+        </Text>
+      </Pressable>
       {selectedItems.length === 0 ? (
         <View style={styles.calendarEmpty}>
           <Ionicons name="calendar-clear-outline" size={30} color={C.textMuted} />
