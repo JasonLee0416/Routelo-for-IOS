@@ -59,6 +59,7 @@ import {
 import { summarizeDeliveryStats } from './services/deliveryStats';
 import { summarizeEfficiency } from './services/efficiency';
 import { buildDailyProfitCsv } from './services/export';
+import { dialableTargets } from './services/phone';
 import {
   applyFuelLogEdit,
   createFuelLog,
@@ -2868,6 +2869,11 @@ function DeliveryDetailSheet({
       { text: '취소', style: 'cancel' },
       { text: '삭제', style: 'destructive', onPress: onDelete },
     ]);
+  const callTargets = dialableTargets([
+    { label: '수령인', phone: delivery.recipientTel },
+    { label: '발주처', phone: delivery.orderVendorTel },
+    { label: '화원', phone: delivery.deliveryVendorTel },
+  ]);
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <View style={styles.modalBackdrop}>
@@ -2909,14 +2915,41 @@ function DeliveryDetailSheet({
             <Text style={styles.sheetInfoLabel}>요청사항</Text>
             <Text style={styles.sheetInfoText}>{delivery.customerRequests}</Text>
           </View>
-          <View style={styles.sheetActions}>
-            <Pressable
-              style={styles.secondaryButton}
-              onPress={() => Linking.openURL(`tel:${delivery.recipientTel}`)}
+          {callTargets.length > 0 && (
+            <View
+              style={{
+                flexDirection: 'row',
+                flexWrap: 'wrap',
+                gap: 8,
+                marginBottom: 10,
+              }}
             >
-              <Ionicons name="call-outline" size={18} color={C.primary} />
-              <Text style={styles.secondaryButtonText}>수령인 전화</Text>
-            </Pressable>
+              {callTargets.map((target) => (
+                <Pressable
+                  key={target.label}
+                  onPress={() => Linking.openURL(target.href)}
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    gap: 5,
+                    paddingHorizontal: 12,
+                    paddingVertical: 9,
+                    borderRadius: 10,
+                    borderWidth: 1,
+                    borderColor: C.primary,
+                  }}
+                >
+                  <Ionicons name="call-outline" size={16} color={C.primary} />
+                  <Text
+                    style={{ color: C.primary, fontWeight: '700', fontSize: 12 }}
+                  >
+                    {target.label}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+          )}
+          <View style={styles.sheetActions}>
             <Pressable style={styles.primaryButton} onPress={onToggle}>
               <Ionicons
                 name={delivery.status === 'completed' ? 'refresh-outline' : 'checkmark'}
