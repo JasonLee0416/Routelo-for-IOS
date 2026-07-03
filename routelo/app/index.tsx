@@ -4096,36 +4096,36 @@ export default function RouteloApp() {
     >
       <StatusBar style={darkMode ? 'light' : 'dark'} />
       <View style={styles.mainContent}>{screen}</View>
-      <Pressable
-        testID="open-manual-delivery"
+      <GlassSurface
+        strength="prominent"
+        radius={RADIUS.fab}
+        dark={darkMode}
+        colors={{ surface: C.surface, primary: C.primary, outline: C.outline }}
         style={{
           position: 'absolute',
           right: 18,
           bottom: 78 + insets.bottom + 62,
-          minHeight: 48,
-          paddingHorizontal: 16,
-          borderRadius: 16,
-          backgroundColor: C.surface,
-          borderWidth: 1,
-          borderColor: C.primary,
-          flexDirection: 'row',
-          alignItems: 'center',
-          justifyContent: 'center',
-          gap: 6,
-          shadowColor: '#102A65',
-          shadowOffset: { width: 0, height: 4 },
-          shadowOpacity: 0.18,
-          shadowRadius: 8,
-          elevation: 8,
           zIndex: 20,
         }}
-        onPress={openCreateForm}
       >
-        <Ionicons name="add" size={20} color={C.primary} />
-        <Text style={{ color: C.primary, fontSize: 12, fontWeight: '800' }}>
-          직접 추가
-        </Text>
-      </Pressable>
+        <Pressable
+          testID="open-manual-delivery"
+          onPress={openCreateForm}
+          style={{
+            minHeight: 48,
+            paddingHorizontal: 16,
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: 6,
+          }}
+        >
+          <Ionicons name="add" size={20} color={C.primary} />
+          <Text style={{ color: C.primary, fontSize: 12, fontWeight: '800' }}>
+            직접 추가
+          </Text>
+        </Pressable>
+      </GlassSurface>
       <Pressable
         testID="open-ocr-scanner"
         style={[styles.scanFab, { bottom: 78 + insets.bottom }]}
