@@ -3,7 +3,7 @@ import {
   ReceiptDocument,
   RoutePlan,
 } from '../domain';
-import { FuelLog } from '../models';
+import { FuelLog, MileageLog } from '../models';
 
 export interface DeliveryRepository {
   initialize(): Promise<void>;
@@ -36,6 +36,12 @@ export interface RoutePlanRepository {
 export interface FuelLogRepository {
   list(): Promise<FuelLog[]>;
   save(log: FuelLog): Promise<void>;
+  remove(id: string): Promise<void>;
+}
+
+export interface MileageLogRepository {
+  list(): Promise<MileageLog[]>;
+  save(log: MileageLog): Promise<void>;
   remove(id: string): Promise<void>;
 }
 

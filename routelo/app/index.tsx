@@ -40,11 +40,16 @@ import {
 import {
   Delivery,
   FuelLog,
+  MileageLog,
   OcrFieldKey,
   OcrFieldResult,
   OcrPipelineResult,
 } from './models';
-import { deliveryRepository, fuelLogRepository } from './repositories/native';
+import {
+  deliveryRepository,
+  fuelLogRepository,
+  mileageLogRepository,
+} from './repositories/native';
 import { filterDeliveries } from './services/deliveryFilter';
 import {
   applyFuelLogEdit,
@@ -53,6 +58,13 @@ import {
   fuelLogToInput,
   validateFuelLogInput,
 } from './services/fuel';
+import {
+  applyMileageLogEdit,
+  createMileageLog,
+  MileageLogInput,
+  mileageLogToInput,
+  validateMileageLogInput,
+} from './services/mileage';
 import {
   calculateFeeByAddress,
   findDistrictByAddress,
@@ -1057,6 +1069,172 @@ function FuelFormModal({
   );
 }
 
+const MILEAGE_FORM_FIELDS: Array<{
+  key: keyof MileageLogInput;
+  label: string;
+  placeholder: string;
+}> = [
+  { key: 'date', label: '기록 날짜', placeholder: 'YYYY-MM-DD' },
+  { key: 'odometerKm', label: '누적 주행거리 (km)', placeholder: '예: 12345' },
+  { key: 'dailyDistanceKm', label: '일일 주행거리 (km)', placeholder: '선택' },
+];
+
+function MileageFormModal({
+  visible,
+  initial,
+  onClose,
+  onSubmit,
+}: {
+  visible: boolean;
+  initial?: MileageLog;
+  onClose: () => void;
+  onSubmit: (log: MileageLog) => void;
+}) {
+  const { C } = useTheme();
+  const insets = useSafeAreaInsets();
+  const editing = Boolean(initial);
+  const toValues = (log?: MileageLog): Record<string, string> => {
+    const input = log ? mileageLogToInput(log) : ({} as MileageLogInput);
+    const values: Record<string, string> = {};
+    MILEAGE_FORM_FIELDS.forEach((field) => {
+      const raw = input[field.key];
+      values[field.key] = raw === undefined || raw === null ? '' : String(raw);
+    });
+    return values;
+  };
+  const [values, setValues] = useState<Record<string, string>>(() =>
+    toValues(initial),
+  );
+  useEffect(() => {
+    if (visible) setValues(toValues(initial));
+  }, [visible, initial]);
+
+  const numeric = (value: string) => {
+    const trimmed = value.trim();
+    if (!trimmed) return undefined;
+    const parsed = Number(trimmed);
+    return Number.isFinite(parsed) ? parsed : undefined;
+  };
+
+  const submit = () => {
+    const input: MileageLogInput = {
+      date: values.date ?? '',
+      odometerKm: numeric(values.odometerKm) ?? 0,
+      dailyDistanceKm: numeric(values.dailyDistanceKm),
+    };
+    const errors = validateMileageLogInput(input);
+    if (errors.length) {
+      Alert.alert('입력 확인', errors.join('\n'));
+      return;
+    }
+    try {
+      const log = initial
+        ? applyMileageLogEdit(initial, input)
+        : createMileageLog(input, { id: `mileage-${Date.now()}` });
+      onSubmit(log);
+      onClose();
+    } catch (error) {
+      Alert.alert(
+        '저장 실패',
+        error instanceof Error ? error.message : '알 수 없는 오류',
+      );
+    }
+  };
+
+  return (
+    <Modal visible={visible} animationType="slide" onRequestClose={onClose}>
+      <SafeAreaView style={{ flex: 1, backgroundColor: C.background }}>
+        <View
+          style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            paddingHorizontal: 18,
+            paddingVertical: 14,
+            borderBottomWidth: 1,
+            borderBottomColor: C.outline,
+          }}
+        >
+          <Text style={{ fontSize: 18, fontWeight: '800', color: C.text }}>
+            {editing ? '주행 기록 수정' : '주행 기록 추가'}
+          </Text>
+          <Pressable onPress={onClose} hitSlop={8}>
+            <Ionicons name="close" size={24} color={C.text} />
+          </Pressable>
+        </View>
+        <KeyboardAvoidingView
+          style={{ flex: 1 }}
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        >
+          <ScrollView
+            contentContainerStyle={{ padding: 18, paddingBottom: 32 }}
+            keyboardShouldPersistTaps="handled"
+          >
+            {MILEAGE_FORM_FIELDS.map((field) => (
+              <View key={field.key} style={{ marginBottom: 14 }}>
+                <Text
+                  style={{
+                    fontSize: 12,
+                    fontWeight: '700',
+                    color: C.textMuted,
+                    marginBottom: 6,
+                  }}
+                >
+                  {field.label}
+                </Text>
+                <TextInput
+                  value={values[field.key]}
+                  onChangeText={(text) =>
+                    setValues((current) => ({ ...current, [field.key]: text }))
+                  }
+                  placeholder={field.placeholder}
+                  placeholderTextColor={C.textMuted}
+                  keyboardType={field.key === 'date' ? 'default' : 'numeric'}
+                  style={{
+                    backgroundColor: C.surfaceAlt,
+                    borderWidth: 1,
+                    borderColor: C.outline,
+                    borderRadius: 12,
+                    paddingHorizontal: 14,
+                    paddingVertical: 12,
+                    fontSize: 15,
+                    color: C.text,
+                  }}
+                />
+              </View>
+            ))}
+          </ScrollView>
+        </KeyboardAvoidingView>
+        <View
+          style={{
+            padding: 18,
+            paddingBottom: 18 + insets.bottom,
+            borderTopWidth: 1,
+            borderTopColor: C.outline,
+          }}
+        >
+          <Pressable
+            onPress={submit}
+            style={({ pressed }) => [
+              {
+                backgroundColor: C.primary,
+                borderRadius: 14,
+                paddingVertical: 15,
+                alignItems: 'center',
+              },
+              pressed && { opacity: 0.85 },
+            ]}
+          >
+            <Text style={{ color: '#FFFFFF', fontSize: 15, fontWeight: '800' }}>
+              {editing ? '수정 저장' : '기록 추가'}
+            </Text>
+          </Pressable>
+        </View>
+      </SafeAreaView>
+    </Modal>
+  );
+}
+
 function ProfitTrendCard({
   daily,
 }: {
@@ -1219,21 +1397,29 @@ function ProfitTrendCard({
 function CalendarScreen({
   orders,
   fuelLogs,
+  mileageLogs,
   settings,
   onDeliveryPress,
   onNotifications,
   onAddFuel,
   onEditFuel,
   onDeleteFuel,
+  onAddMileage,
+  onEditMileage,
+  onDeleteMileage,
 }: {
   orders: DeliveryOrder[];
   fuelLogs: FuelLog[];
+  mileageLogs: MileageLog[];
   settings: RouteloSettings;
   onDeliveryPress: (delivery: Delivery) => void;
   onNotifications: () => void;
   onAddFuel: () => void;
   onEditFuel: (log: FuelLog) => void;
   onDeleteFuel: (id: string) => void;
+  onAddMileage: () => void;
+  onEditMileage: (log: MileageLog) => void;
+  onDeleteMileage: (id: string) => void;
 }) {
   const { C, styles } = useTheme();
   const { showFullAddressInList } = usePrivacy();
@@ -1553,6 +1739,113 @@ function CalendarScreen({
                         text: '삭제',
                         style: 'destructive',
                         onPress: () => onDeleteFuel(log.id),
+                      },
+                    ])
+                  }
+                  hitSlop={6}
+                  style={{ padding: 4, marginLeft: 2 }}
+                >
+                  <Ionicons name="trash-outline" size={18} color={C.danger} />
+                </Pressable>
+              </View>
+            ))
+        )}
+      </View>
+      <View
+        style={{
+          backgroundColor: C.surface,
+          borderRadius: 16,
+          borderWidth: 1,
+          borderColor: C.outline,
+          padding: 14,
+          marginBottom: 12,
+        }}
+      >
+        <View
+          style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            marginBottom: mileageLogs.length ? 10 : 0,
+          }}
+        >
+          <Text style={{ fontSize: 14, fontWeight: '800', color: C.text }}>
+            주행 기록
+          </Text>
+          <Pressable
+            onPress={onAddMileage}
+            style={({ pressed }) => [
+              {
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: 4,
+                paddingHorizontal: 12,
+                paddingVertical: 6,
+                borderRadius: 10,
+                borderWidth: 1,
+                borderColor: C.primary,
+              },
+              pressed && { opacity: 0.6 },
+            ]}
+          >
+            <Ionicons name="add" size={16} color={C.primary} />
+            <Text style={{ color: C.primary, fontSize: 12, fontWeight: '700' }}>
+              추가
+            </Text>
+          </Pressable>
+        </View>
+        {mileageLogs.length === 0 ? (
+          <Text
+            style={{
+              fontSize: 12,
+              color: C.textMuted,
+              paddingVertical: 12,
+              textAlign: 'center',
+            }}
+          >
+            주행 기록이 없습니다
+          </Text>
+        ) : (
+          [...mileageLogs]
+            .sort((a, b) => b.date.localeCompare(a.date))
+            .slice(0, 20)
+            .map((log) => (
+              <View
+                key={log.id}
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  paddingVertical: 8,
+                  borderTopWidth: 1,
+                  borderTopColor: C.surfaceAlt,
+                }}
+              >
+                <View style={{ flex: 1 }}>
+                  <Text style={{ fontSize: 13, fontWeight: '700', color: C.text }}>
+                    {log.date}
+                  </Text>
+                  <Text style={{ fontSize: 11, color: C.textMuted }}>
+                    누적 {formatWon(log.odometerKm)}km
+                    {log.dailyDistanceKm
+                      ? ` · 주행 ${formatWon(log.dailyDistanceKm)}km`
+                      : ''}
+                  </Text>
+                </View>
+                <Pressable
+                  onPress={() => onEditMileage(log)}
+                  hitSlop={6}
+                  style={{ padding: 4 }}
+                >
+                  <Ionicons name="create-outline" size={18} color={C.primary} />
+                </Pressable>
+                <Pressable
+                  onPress={() =>
+                    Alert.alert('주행 기록 삭제', `${log.date} 기록을 삭제할까요?`, [
+                      { text: '취소', style: 'cancel' },
+                      {
+                        text: '삭제',
+                        style: 'destructive',
+                        onPress: () => onDeleteMileage(log.id),
                       },
                     ])
                   }
@@ -3298,6 +3591,11 @@ export default function RouteloApp() {
   const [fuelLogs, setFuelLogs] = useState<FuelLog[]>([]);
   const [fuelFormVisible, setFuelFormVisible] = useState(false);
   const [fuelFormLog, setFuelFormLog] = useState<FuelLog | undefined>(undefined);
+  const [mileageLogs, setMileageLogs] = useState<MileageLog[]>([]);
+  const [mileageFormVisible, setMileageFormVisible] = useState(false);
+  const [mileageFormLog, setMileageFormLog] = useState<MileageLog | undefined>(
+    undefined,
+  );
 
   useEffect(() => {
     deliveryRepository
@@ -3355,6 +3653,37 @@ export default function RouteloApp() {
   const deleteFuel = (id: string) => {
     setFuelLogs((current) => current.filter((item) => item.id !== id));
     fuelLogRepository.remove(id).catch(() => undefined);
+  };
+
+  useEffect(() => {
+    mileageLogRepository
+      .list()
+      .then((stored) => {
+        if (stored.length) setMileageLogs(stored);
+      })
+      .catch(() => undefined);
+  }, []);
+
+  const openCreateMileage = () => {
+    setMileageFormLog(undefined);
+    setMileageFormVisible(true);
+  };
+  const editMileage = (log: MileageLog) => {
+    setMileageFormLog(log);
+    setMileageFormVisible(true);
+  };
+  const submitMileage = (log: MileageLog) => {
+    setMileageLogs((current) =>
+      current.some((item) => item.id === log.id)
+        ? current.map((item) => (item.id === log.id ? log : item))
+        : [log, ...current],
+    );
+    mileageLogRepository.save(log).catch(() => undefined);
+    setMileageFormVisible(false);
+  };
+  const deleteMileage = (id: string) => {
+    setMileageLogs((current) => current.filter((item) => item.id !== id));
+    mileageLogRepository.remove(id).catch(() => undefined);
   };
 
   const notificationCount = 3;
@@ -3444,12 +3773,16 @@ export default function RouteloApp() {
         <CalendarScreen
           orders={orders}
           fuelLogs={fuelLogs}
+          mileageLogs={mileageLogs}
           settings={settings}
           onDeliveryPress={setSelectedDelivery}
           onNotifications={openNotifications}
           onAddFuel={openCreateFuel}
           onEditFuel={editFuel}
           onDeleteFuel={deleteFuel}
+          onAddMileage={openCreateMileage}
+          onEditMileage={editMileage}
+          onDeleteMileage={deleteMileage}
         />
       );
     }
@@ -3597,6 +3930,12 @@ export default function RouteloApp() {
         initial={fuelFormLog}
         onClose={() => setFuelFormVisible(false)}
         onSubmit={submitFuel}
+      />
+      <MileageFormModal
+        visible={mileageFormVisible}
+        initial={mileageFormLog}
+        onClose={() => setMileageFormVisible(false)}
+        onSubmit={submitMileage}
       />
       <OcrScannerModal
         visible={scannerVisible}

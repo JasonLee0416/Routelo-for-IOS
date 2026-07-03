@@ -9,11 +9,12 @@ import {
   RoutePlan,
   toCalendarDeliveryItem,
 } from '../domain';
-import { FuelLog } from '../models';
+import { FuelLog, MileageLog } from '../models';
 import {
   DeliveryRepository,
   FuelLogRepository,
   KeyValueStore,
+  MileageLogRepository,
   ReceiptRepository,
   RoutePlanRepository,
 } from './contracts';
@@ -23,6 +24,7 @@ const DELIVERY_KEY = '@routelo/delivery-orders/v1';
 const RECEIPT_KEY = '@routelo/receipt-documents/v1';
 const ROUTE_KEY = '@routelo/route-plans/v1';
 const FUEL_KEY = '@routelo/fuel-logs/v1';
+const MILEAGE_KEY = '@routelo/mileage-logs/v1';
 const MIGRATION_KEY = '@routelo/migrations/legacy-deliveries-v1';
 
 const SAMPLE_IDS = new Set([
@@ -219,6 +221,30 @@ export class LocalFuelLogRepository implements FuelLogRepository {
     await writeCollection(
       this.store,
       FUEL_KEY,
+      (await this.list()).filter((log) => log.id !== id),
+    );
+  }
+}
+
+export class LocalMileageLogRepository implements MileageLogRepository {
+  constructor(private readonly store: KeyValueStore) {}
+
+  list() {
+    return readCollection<MileageLog>(this.store, MILEAGE_KEY);
+  }
+
+  async save(log: MileageLog) {
+    const records = await this.list();
+    const index = records.findIndex((item) => item.id === log.id);
+    if (index >= 0) records[index] = log;
+    else records.push(log);
+    await writeCollection(this.store, MILEAGE_KEY, records);
+  }
+
+  async remove(id: string) {
+    await writeCollection(
+      this.store,
+      MILEAGE_KEY,
       (await this.list()).filter((log) => log.id !== id),
     );
   }
