@@ -12,6 +12,7 @@ import {
   Platform,
   Pressable,
   ScrollView,
+  Share,
   StyleSheet,
   Switch,
   Text,
@@ -52,6 +53,7 @@ import {
 } from './repositories/native';
 import { filterDeliveries } from './services/deliveryFilter';
 import { summarizeEfficiency } from './services/efficiency';
+import { buildDailyProfitCsv } from './services/export';
 import {
   applyFuelLogEdit,
   createFuelLog,
@@ -1280,9 +1282,22 @@ function ProfitTrendCard({
           marginBottom: 12,
         }}
       >
-        <Text style={{ fontSize: 14, fontWeight: '800', color: C.text }}>
-          손익 추이
-        </Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+          <Text style={{ fontSize: 14, fontWeight: '800', color: C.text }}>
+            손익 추이
+          </Text>
+          <Pressable
+            onPress={() => {
+              Share.share({
+                message: buildDailyProfitCsv(daily),
+                title: '손익 내보내기 (CSV)',
+              }).catch(() => undefined);
+            }}
+            hitSlop={6}
+          >
+            <Ionicons name="share-outline" size={16} color={C.textMuted} />
+          </Pressable>
+        </View>
         <View style={{ flexDirection: 'row', gap: 4 }}>
           {periods.map((item) => {
             const active = period === item.key;
