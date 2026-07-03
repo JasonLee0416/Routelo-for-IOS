@@ -45,6 +45,7 @@ import {
   OcrPipelineResult,
 } from './models';
 import { deliveryRepository, fuelLogRepository } from './repositories/native';
+import { filterDeliveries } from './services/deliveryFilter';
 import {
   applyFuelLogEdit,
   createFuelLog,
@@ -625,9 +626,8 @@ function DeliveryListScreen({
 }) {
   const { C, styles } = useTheme();
   const [filter, setFilter] = useState<DeliveryFilter>('all');
-  const filtered = deliveries.filter((delivery) =>
-    filter === 'all' ? true : delivery.status === filter,
-  );
+  const [query, setQuery] = useState('');
+  const filtered = filterDeliveries(deliveries, { query, status: filter });
   return (
     <ScrollView contentContainerStyle={styles.screenContent} showsVerticalScrollIndicator={false}>
       <ScreenHeader
@@ -637,6 +637,33 @@ function DeliveryListScreen({
         notificationCount={3}
         onNotificationPress={onNotifications}
       />
+      <View
+        style={{
+          flexDirection: 'row',
+          alignItems: 'center',
+          gap: 8,
+          backgroundColor: C.surfaceAlt,
+          borderWidth: 1,
+          borderColor: C.outline,
+          borderRadius: 12,
+          paddingHorizontal: 12,
+          marginBottom: 10,
+        }}
+      >
+        <Ionicons name="search" size={18} color={C.textMuted} />
+        <TextInput
+          value={query}
+          onChangeText={setQuery}
+          placeholder="상품·주소·업체·전화·날짜 검색"
+          placeholderTextColor={C.textMuted}
+          style={{ flex: 1, paddingVertical: 10, fontSize: 14, color: C.text }}
+        />
+        {query.length > 0 && (
+          <Pressable onPress={() => setQuery('')} hitSlop={8}>
+            <Ionicons name="close-circle" size={18} color={C.textMuted} />
+          </Pressable>
+        )}
+      </View>
       <View style={styles.filterSegment}>
         {([
           ['all', '전체'],
@@ -654,6 +681,20 @@ function DeliveryListScreen({
           </Pressable>
         ))}
       </View>
+      {filtered.length === 0 && (
+        <Text
+          style={{
+            color: C.textMuted,
+            fontSize: 13,
+            textAlign: 'center',
+            paddingVertical: 28,
+          }}
+        >
+          {deliveries.length === 0
+            ? '등록된 배달이 없습니다'
+            : '검색·필터 결과가 없습니다'}
+        </Text>
+      )}
       <View style={styles.deliveryList}>
         {filtered.map((delivery) => (
           <DeliveryCard
