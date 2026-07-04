@@ -4,6 +4,7 @@ import {
   OcrFieldResult,
   OcrPipelineResult,
 } from '../models';
+import { shouldRequestCloudFallback } from '../ocr/cloudFallback';
 import {
   cleanVendorName,
   extractPersonName,
@@ -12,6 +13,7 @@ import {
 } from '../ocr/fieldHeuristics';
 import {
   KOREAN_PHONE_PATTERN,
+  detectFieldConflicts,
   isValidKoreanPhone,
   matchKoreanDate,
   normalizeKoreanPhone,
@@ -611,6 +613,19 @@ export function parseReceiptText(
     requiredFields.reduce((sum, item) => sum + item.confidence, 0) /
       Math.max(requiredFields.length, 1),
   );
+
+  // 시간 필드 간 논리 충돌 + CLOVA 2차 보정 제안(자동 실행 아님).
+  const fieldValues: Partial<Record<OcrFieldKey, string>> = {};
+  for (const item of fields) {
+    if (item.value) fieldValues[item.key] = item.value;
+  }
+  const conflicts = detectFieldConflicts(fieldValues);
+  const cloudFallback = shouldRequestCloudFallback({
+    fields,
+    documentConfidence,
+    conflicts,
+  });
+
   return {
     engine: 'fixture',
     rawText: text,
@@ -620,6 +635,8 @@ export function parseReceiptText(
     processingMs: Date.now() - started,
     variantsCompared: 1,
     unmapped,
+    conflicts,
+    cloudFallback,
   };
 }
 

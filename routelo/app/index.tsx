@@ -3446,6 +3446,8 @@ function OcrScannerModal({
       processingMs: 0,
       variantsCompared: 0,
       unmapped: [],
+      conflicts: [],
+      cloudFallback: { trigger: false, reasons: [] },
     });
     setStage('quality');
   };

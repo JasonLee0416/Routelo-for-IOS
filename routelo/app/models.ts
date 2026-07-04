@@ -111,4 +111,8 @@ export type OcrPipelineResult = {
   variantsCompared: number;
   // 어떤 필드에도 매핑되지 않은 줄(라벨/값). 버리지 않고 보존한다(무손실).
   unmapped: { label: string; value: string }[];
+  // 시간 필드 간 논리 충돌(검수 UI 강조용). 없으면 빈 배열.
+  conflicts: { keys: OcrFieldKey[]; message: string }[];
+  // CLOVA 2차 보정 제안(자동 실행 아님, 사용자 동의 필요). 트리거 조건 미충족 시 trigger=false.
+  cloudFallback: { trigger: boolean; reasons: string[] };
 };

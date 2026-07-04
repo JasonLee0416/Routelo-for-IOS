@@ -13,8 +13,8 @@
 | 2 | PR4 값 검증 계층(전화/날짜/시간/수량/충돌) | ✅ | 192 |
 | 3 | PR4 후속(주소 heuristic·업체vs수령자·재랭킹) | ✅ | 204 |
 | 4 | PR4-c 업체명 정제 + 업체↔전화 페어링 | ✅ | 207 |
-| 5 | PR5 클라우드 폴백 결정 로직(동의형) | 진행 | — |
-| 6 | PR6 벤치마크 하네스(필드 성공률 지표) | 예정 | — |
+| 5 | PR5 클라우드 폴백 결정 로직(동의형) | ✅ | 212 |
+| 6 | PR6 벤치마크 하네스(필드 성공률 지표) | 진행 | — |
 
 ---
 
@@ -50,6 +50,28 @@
   `{ trigger, reasons }`. 트리거: 필수필드(배송일/상품명/배송주소) 누락, documentConfidence < 82,
   전화 검증 실패, 시간 충돌 존재, (후속) 엔진 간 후보 큰 차이.
 - 파이프라인 결과에 **제안만** 부착(자동 실행 아님). 순수 TS + 테스트.
+
+### 구현
+- `app/ocr/cloudFallback.ts`: `shouldRequestCloudFallback({fields, documentConfidence, conflicts})`
+  → `{trigger, reasons}`. 트리거: 필수필드 누락, `documentConfidence < 82`, 필드 검증 실패, 시간 충돌.
+- `OcrPipelineResult`에 `conflicts`·`cloudFallback` 필드 추가(자동 실행 아님, 제안만).
+- `parseReceiptText`가 `detectFieldConflicts` + `shouldRequestCloudFallback`를 계산해 결과에 부착.
+- UI 빈 상태 리터럴에도 기본값 채움.
+
+### 테스트 결과 (사후)
+- 신규 테스트 5(cloudFallback). **전체 212 통과(36 스위트), 타입체크 클린.** 회귀 0.
+- 자동 cloud 전송은 여전히 금지 — 이 로직은 "제안"만 생성, 실제 호출은 동의+어댑터(후속).
+
+---
+
+## Iter 6 — PR6: 벤치마크 하네스 (필드 성공률 지표화)
+
+### 계획 (사전)
+- "거의 완벽"을 측정 가능하게: 정답(ground-truth) 픽스처 대비 **필드 단위 성공률**을 계산하는 순수 함수
+  `computeFieldMetrics(expected, actual)` → per-field 정오 + 필수필드 성공률 + 전체 정확도.
+- 픽스처: DEMO 인수증(테스트에 이미 존재)의 정답값을 명시 → parseReceiptText 결과와 대조.
+- 회귀 가드: 필수필드 성공률·핵심 필드 정확도에 **하한 임계값** 단언(미래 변경이 정확도를 떨어뜨리면 실패).
+- 순수 TS + 테스트. 이후 실제 100장 데이터셋으로 확장(학습 루프 진입점).
 
 ### 구현
 (작성 예정)
