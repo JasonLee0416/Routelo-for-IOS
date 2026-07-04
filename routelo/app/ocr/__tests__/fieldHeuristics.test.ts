@@ -53,6 +53,14 @@ describe('extractPersonName (vendor vs recipient disambiguation)', () => {
     expect(extractPersonName('김민준 실장')).toBe('김민준 실장');
   });
 
+  test('strips stacked role/honorific prefixes (고/고인/상주 …)', () => {
+    expect(extractPersonName('고 박희순')).toBe('박희순');
+    expect(extractPersonName('고인 심명철')).toBe('심명철');
+    expect(extractPersonName('받는분 고인 구본순')).toBe('구본순');
+    expect(extractPersonName('상주 유기열')).toBe('유기열');
+    expect(extractPersonName('받는분 : 고인 김기회')).toBe('김기회');
+  });
+
   test('rejects vendors, addresses, instructions, and digit-bearing values', () => {
     expect(extractPersonName('선유꽃화원')).toBe('');
     expect(extractPersonName('서울 강남구 선릉로 757')).toBe('');

@@ -95,8 +95,10 @@ export function autoOrientLines(lines: OrientedLine[]): OrientedLine[] {
   const W = Math.max(...boxed.map((l) => l.boundingBox.x + l.boundingBox.width));
   const H = Math.max(...boxed.map((l) => l.boundingBox.y + l.boundingBox.height));
 
+  // 여기 도달했으면 박스가 세로로 길다 = 회전된 상태이므로 'none'은 후보에서 제외한다.
+  // ccw를 먼저 두어 동점이면 ccw를 택한다(한 방향으로 촬영된 인수증에서 ccw가 지배적).
   const variants: Array<{ rot: Rotation; lines: OrientedLine[] }> = (
-    ['none', 'cw', 'ccw'] as Rotation[]
+    ['ccw', 'cw'] as Rotation[]
   ).map((rot) => ({
     rot,
     lines: lines.map((l) =>

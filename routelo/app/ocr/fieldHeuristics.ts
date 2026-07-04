@@ -52,8 +52,20 @@ export function cleanVendorName(raw: string): string {
 }
 
 // ---------- 사람 이름(수령자/담당자) ----------
+// 역할/존칭 접두어를 반복 제거(예: "받는분 고인 심명철", "고 박희순", "상주 유기열").
 const NAME_ROLE_PREFIX =
-  /^(신랑|신부|상주|고인|故|받는\s*분|받는분|수령인|수령자|인수자|보내는\s*분|보내는분|담당자?|고객)\s*[:：]?\s*/;
+  /^(신랑|신부|상주|고인|故|고(?=\s)|받는\s*분|받는분|수령인|수령자|인수자|보내는\s*분|보내는분|담당자?|고객)\s*[:：]?\s*/;
+
+function stripRolePrefixes(text: string): string {
+  let prev = '';
+  let value = text.trim();
+  // 접두어가 겹쳐 붙는 경우("받는분 고인 …")를 위해 더 이상 안 줄 때까지 반복.
+  while (value && value !== prev) {
+    prev = value;
+    value = value.replace(NAME_ROLE_PREFIX, '').trim();
+  }
+  return value;
+}
 const NAME_INSTRUCTION =
   /(반드시|이름|성명|정자|적어|전화|주세요|바랍니다|please|호실|번지)/;
 const NAME_TITLE = '(실장|팀장|담당자|부장|과장|대리|사장|이사|점장|기사)';
@@ -65,7 +77,7 @@ const NAME_BODY = new RegExp(`^([가-힣]{2,4})(?:\\s*(${NAME_TITLE}))?$`);
  * 업체 문자열이 수령자로 잘못 배정되는 것을 막는 disambiguation 핵심.
  */
 export function extractPersonName(text: string): string {
-  const stripped = text.trim().replace(NAME_ROLE_PREFIX, '').trim();
+  const stripped = stripRolePrefixes(text);
   if (!stripped) return '';
   if (looksLikeVendor(stripped) || looksLikeAddress(stripped)) return '';
   if (NAME_INSTRUCTION.test(stripped)) return '';
