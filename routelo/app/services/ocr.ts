@@ -5,6 +5,7 @@ import {
   OcrPipelineResult,
 } from '../models';
 import {
+  cleanVendorName,
   extractPersonName,
   pickBest,
   scoreAddress,
@@ -276,12 +277,27 @@ export function parseReceiptText(
     '수주화원',
     '수주회원',
   ]);
-  const orderingVendorTel = validatedPhoneCandidate(
-    findLabeledValue(lines, ['발주화원 전화', '발주처 전화', '발주 전화']),
-  );
-  const fulfillingVendorTel = validatedPhoneCandidate(
-    findLabeledValue(lines, ['배송화원 전화', '수주화원 전화', '배송 전화']),
-  );
+  // 업체명에서 전화·라벨 잔여 제거(주소면 상호 아님 → '').
+  const orderingVendorName = cleanVendorName(orderingVendor?.value || '');
+  const fulfillingVendorName = cleanVendorName(fulfillingVendor?.value || '');
+  // 라벨 전화가 없으면 업체명 줄 자체에서 전화를 페어링(업체↔전화 쌍).
+  const vendorPhoneFromLine = (src: ReturnType<typeof findLabeledValue>) => {
+    if (!src) return undefined;
+    const phone = allMatches(src.sourceText, PHONE_PATTERN)
+      .map(normalizePhone)
+      .find((value) => isValidKoreanPhone(value));
+    return phone
+      ? { value: phone, sourceText: src.sourceText, sourceLineIds: src.sourceLineIds }
+      : undefined;
+  };
+  const orderingVendorTel =
+    validatedPhoneCandidate(
+      findLabeledValue(lines, ['발주화원 전화', '발주처 전화', '발주 전화']),
+    ) || vendorPhoneFromLine(orderingVendor);
+  const fulfillingVendorTel =
+    validatedPhoneCandidate(
+      findLabeledValue(lines, ['배송화원 전화', '수주화원 전화', '배송 전화']),
+    ) || vendorPhoneFromLine(fulfillingVendor);
 
   const productSource =
     findLabeledValue(lines, ['상품명', '배송상품', '품명', '상품']) ||
@@ -391,13 +407,13 @@ export function parseReceiptText(
   const fields: OcrFieldResult[] = [
     field(
       'orderingVendorName',
-      orderingVendor?.value || '',
-      orderingVendor ? 78 : 0,
+      orderingVendorName,
+      orderingVendorName ? 78 : 0,
       orderingVendor?.sourceText || '',
       [],
       {
         sourceLineIds: orderingVendor?.sourceLineIds,
-        extractionMethod: orderingVendor ? 'label' : undefined,
+        extractionMethod: orderingVendorName ? 'label' : undefined,
         forceReview: true,
       },
     ),
@@ -414,13 +430,13 @@ export function parseReceiptText(
     ),
     field(
       'fulfillingVendorName',
-      fulfillingVendor?.value || '',
-      fulfillingVendor ? 78 : 0,
+      fulfillingVendorName,
+      fulfillingVendorName ? 78 : 0,
       fulfillingVendor?.sourceText || '',
       [],
       {
         sourceLineIds: fulfillingVendor?.sourceLineIds,
-        extractionMethod: fulfillingVendor ? 'label' : undefined,
+        extractionMethod: fulfillingVendorName ? 'label' : undefined,
         forceReview: true,
       },
     ),

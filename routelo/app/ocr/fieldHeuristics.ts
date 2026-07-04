@@ -2,6 +2,7 @@
 // 라벨 매칭(normalize.ts)과 값 검증(fieldValidation.ts) 사이에서 "이 값이 어떤
 // 종류인지"를 판별해, 라벨이 없거나 애매할 때 올바른 필드로 보내고 오배정을 막는다.
 // 모두 순수 함수.
+import { KOREAN_PHONE_PATTERN } from './fieldValidation';
 
 // ---------- 주소 ----------
 const ADDRESS_REGION =
@@ -31,6 +32,23 @@ const VENDOR_MARKERS =
 
 export function looksLikeVendor(text: string): boolean {
   return VENDOR_MARKERS.test(text);
+}
+
+/**
+ * 업체(화원/예식장)명에서 전화·괄호코드·라벨 잔여를 제거해 순수 상호만 남긴다.
+ * 주소로 판별되면 업체명이 아니므로 '' 반환(반대방향 disambiguation).
+ */
+export function cleanVendorName(raw: string): string {
+  const cleaned = raw
+    .replace(KOREAN_PHONE_PATTERN, ' ')
+    .replace(/\b(TEL|HP|FAX|전화|연락처|팩스)\b.*$/i, ' ')
+    .replace(/[|:：]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  if (!cleaned) return '';
+  if (looksLikeAddress(cleaned)) return '';
+  if (!/[가-힣A-Za-z]/.test(cleaned)) return ''; // 숫자/기호뿐이면 상호 아님
+  return cleaned;
 }
 
 // ---------- 사람 이름(수령자/담당자) ----------

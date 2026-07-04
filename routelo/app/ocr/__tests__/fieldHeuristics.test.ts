@@ -1,5 +1,6 @@
 import {
   classifyEntity,
+  cleanVendorName,
   extractPersonName,
   looksLikeAddress,
   looksLikeVendor,
@@ -57,6 +58,21 @@ describe('extractPersonName (vendor vs recipient disambiguation)', () => {
     expect(extractPersonName('서울 강남구 선릉로 757')).toBe('');
     expect(extractPersonName('반드시 이름으로 적어주세요')).toBe('');
     expect(extractPersonName('010-4821-7732')).toBe('');
+  });
+});
+
+describe('cleanVendorName', () => {
+  test('strips phone and label residue from a shop name', () => {
+    expect(cleanVendorName('㈜99플라워 070-4741-0001')).toBe('㈜99플라워');
+    expect(cleanVendorName('선유꽃화원 TEL 070-4741-0001')).toBe('선유꽃화원');
+    expect(cleanVendorName('마음꽃화원')).toBe('마음꽃화원');
+  });
+  test('keeps vendor names without an explicit marker', () => {
+    expect(cleanVendorName('아뜰리에몽쁠라워')).toBe('아뜰리에몽쁠라워');
+  });
+  test('rejects an address or digits-only value as a vendor name', () => {
+    expect(cleanVendorName('서울 강남구 선릉로 757 3층')).toBe('');
+    expect(cleanVendorName('070-4741-0001')).toBe('');
   });
 });
 
