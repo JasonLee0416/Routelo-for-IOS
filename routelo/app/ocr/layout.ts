@@ -1,3 +1,5 @@
+import { autoOrientLines } from './orientation';
+
 export type LayoutTextLine = {
   text: string;
   boundingBox?: {
@@ -26,7 +28,9 @@ const belongsToRow = (
   );
 };
 
-export function buildLayoutText(lines: LayoutTextLine[], fallbackText = '') {
+export function buildLayoutText(rawLines: LayoutTextLine[], fallbackText = '') {
+  // 회전된 사진(EXIF)으로 세로 배열된 박스를 가로 행으로 되돌린다(정상 방향이면 무변).
+  const lines = autoOrientLines(rawLines);
   const positioned = lines
     .filter(
       (
