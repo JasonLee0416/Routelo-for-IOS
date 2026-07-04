@@ -15,6 +15,7 @@
 | 4 | PR4-c 업체명 정제 + 업체↔전화 페어링 | ✅ | 207 |
 | 5 | PR5 클라우드 폴백 결정 로직(동의형) | ✅ | 212 |
 | 6 | PR6 벤치마크 하네스(필드 성공률 지표) + productName 정제 | ✅ | 215 |
+| 7 | Apple Vision 측정 키트(macOS CLI + before/after 하네스) | ✅ 맥 실행 대기 | 217 |
 
 ---
 
@@ -97,3 +98,24 @@
    (필드 정답 라벨링이 전제 — 사용자 채점과 연결).
 
 즉 순수 로직 계층은 사실상 상한에 도달했고, 다음 정확도 향상은 **실기기/실인식 데이터**에서 나온다.
+
+---
+
+## Iter 7 — Apple Vision 측정 키트 (before/after)
+
+### 계획 (사전)
+- Apple Vision(PR1)이 노이즈 8장에서 PP-OCR 대비 나은지 **맥에서 시뮬/앱빌드 없이** 측정.
+  `VNRecognizeTextRequest`는 macOS 네이티브 → 명령줄 Swift로 앱과 동일 설정으로 실행 가능.
+
+### 구현
+- `tools/vision-ocr/vision-ocr.swift`: macOS Vision CLI(모듈과 동일 설정) → `vision-results.json`.
+- `docs/ocr-benchmark/2026-07-04/pp-ocr-lines.json`: 7-04 실측 PP-OCR 라인 = "before" 픽스처.
+- `app/ocr/__tests__/visionBenchmark.test.ts`: 두 엔진 라인을 `buildLayoutText`+`parseReceiptText`에
+  통과시켜 필드 추출을 비교. Vision JSON 없으면 baseline만 출력(현재), 있으면 before/after 표.
+- `tools/vision-ocr/README.md`: 맥 실행 런북.
+
+### 테스트 결과 (사후)
+- **전체 217(216 통과 + 1 skip=Vision 대기), 타입체크 클린.** 하네스가 PP-OCR baseline을 산출:
+  필수필드 채움 **총 9/24** (R01·R04·R05 = 0/3 — 검출 붕괴). 이것이 "before" 기준선.
+- **다음(맥):** `swift tools/vision-ocr/vision-ocr.swift KakaoTalk_*.jpg > .../vision-results.json`
+  → `npx jest visionBenchmark` → "after" 열이 채워지며 R04(회전)·R01/R05(누락) 회복 여부가 성패 지표.

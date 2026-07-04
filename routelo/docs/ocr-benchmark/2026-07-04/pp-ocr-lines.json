@@ -1,0 +1,1042 @@
+[
+  {
+    "image": "KakaoTalk_20260621_070828835.jpg",
+    "lines": [
+      {
+        "text": "인수",
+        "confidence": 0.622,
+        "box": {
+          "x": 481,
+          "y": 381,
+          "width": 3040,
+          "height": 222
+        }
+      },
+      {
+        "text": "리",
+        "confidence": 0.703,
+        "box": {
+          "x": 461,
+          "y": 596,
+          "width": 2109,
+          "height": 218
+        }
+      },
+      {
+        "text": "TE.:07-03-010/FAX:",
+        "confidence": 0.588,
+        "box": {
+          "x": 1702,
+          "y": 624,
+          "width": 1140,
+          "height": 150
+        }
+      },
+      {
+        "text": "문자미입력w",
+        "confidence": 0.758,
+        "box": {
+          "x": 478,
+          "y": 765,
+          "width": 722,
+          "height": 143
+        }
+      },
+      {
+        "text": "TEL",
+        "confidence": 0.925,
+        "box": {
+          "x": 2403,
+          "y": 853,
+          "width": 160,
+          "height": 79
+        }
+      },
+      {
+        "text": "품명축하-축하3단",
+        "confidence": 0.96,
+        "box": {
+          "x": 515,
+          "y": 882,
+          "width": 945,
+          "height": 130
+        }
+      },
+      {
+        "text": "수량",
+        "confidence": 1,
+        "box": {
+          "x": 2388,
+          "y": 952,
+          "width": 194,
+          "height": 72
+        }
+      },
+      {
+        "text": "현장사진요청합",
+        "confidence": 0.718,
+        "box": {
+          "x": 665,
+          "y": 1104,
+          "width": 961,
+          "height": 111
+        }
+      },
+      {
+        "text": "리본(축화혼)-신부",
+        "confidence": 0.899,
+        "box": {
+          "x": 472,
+          "y": 1228,
+          "width": 1248,
+          "height": 100
+        }
+      },
+      {
+        "text": "보내는분데리츠중권프로트금융8부장김유경",
+        "confidence": 0.749,
+        "box": {
+          "x": 391,
+          "y": 1362,
+          "width": 2072,
+          "height": 109
+        }
+      },
+      {
+        "text": "서을영능군험그드H",
+        "confidence": 0.427,
+        "box": {
+          "x": 489,
+          "y": 1468,
+          "width": 1999,
+          "height": 124
+        }
+      },
+      {
+        "text": "배달장소받는문:신부선단비",
+        "confidence": 0.895,
+        "box": {
+          "x": 379,
+          "y": 1547,
+          "width": 1168,
+          "height": 118
+        }
+      },
+      {
+        "text": "TEL",
+        "confidence": 0.956,
+        "box": {
+          "x": 2337,
+          "y": 1573,
+          "width": 154,
+          "height": 85
+        }
+      },
+      {
+        "text": "인수시간시",
+        "confidence": 0.957,
+        "box": {
+          "x": 2236,
+          "y": 1674,
+          "width": 772,
+          "height": 120
+        }
+      },
+      {
+        "text": "cYnaob",
+        "confidence": 0.504,
+        "box": {
+          "x": 422,
+          "y": 1829,
+          "width": 2939,
+          "height": 633
+        }
+      }
+    ]
+  },
+  {
+    "image": "KakaoTalk_20260621_070828835_01.jpg",
+    "lines": [
+      {
+        "text": "90",
+        "confidence": 0.543,
+        "box": {
+          "x": 2306,
+          "y": 0,
+          "width": 387,
+          "height": 82
+        }
+      },
+      {
+        "text": "cYamnaeelobl",
+        "confidence": 0.532,
+        "box": {
+          "x": 429,
+          "y": 141,
+          "width": 2770,
+          "height": 625
+        }
+      },
+      {
+        "text": "canelob",
+        "confidence": 0.431,
+        "box": {
+          "x": 296,
+          "y": 419,
+          "width": 2640,
+          "height": 1160
+        }
+      },
+      {
+        "text": "cYanelowb",
+        "confidence": 0.461,
+        "box": {
+          "x": 0,
+          "y": 1116,
+          "width": 3723,
+          "height": 1603
+        }
+      }
+    ]
+  },
+  {
+    "image": "KakaoTalk_20260621_070828835_02.jpg",
+    "lines": [
+      {
+        "text": "주문일시:06월1일11시36분",
+        "confidence": 0.943,
+        "box": {
+          "x": 2606,
+          "y": 127,
+          "width": 1167,
+          "height": 79
+        }
+      },
+      {
+        "text": "BESTEFLOWER인수증",
+        "confidence": 0.838,
+        "box": {
+          "x": 202,
+          "y": 312,
+          "width": 2159,
+          "height": 137
+        }
+      },
+      {
+        "text": "서율영등39회신유회원)",
+        "confidence": 0.784,
+        "box": {
+          "x": 2906,
+          "y": 332,
+          "width": 684,
+          "height": 67
+        }
+      },
+      {
+        "text": ".070741-0001",
+        "confidence": 0.927,
+        "box": {
+          "x": 3147,
+          "y": 401,
+          "width": 440,
+          "height": 72
+        }
+      },
+      {
+        "text": "TEL010-5898-954",
+        "confidence": 0.966,
+        "box": {
+          "x": 2649,
+          "y": 517,
+          "width": 775,
+          "height": 73
+        }
+      },
+      {
+        "text": "원",
+        "confidence": 0.644,
+        "box": {
+          "x": 464,
+          "y": 568,
+          "width": 2936,
+          "height": 128
+        }
+      },
+      {
+        "text": "수량1",
+        "confidence": 0.938,
+        "box": {
+          "x": 2633,
+          "y": 722,
+          "width": 316,
+          "height": 105
+        }
+      },
+      {
+        "text": "상품명*착한근조-",
+        "confidence": 0.972,
+        "box": {
+          "x": 524,
+          "y": 734,
+          "width": 1000,
+          "height": 94
+        }
+      },
+      {
+        "text": "주소|울동작구중앙대병원장례식장5호",
+        "confidence": 0.935,
+        "box": {
+          "x": 933,
+          "y": 999,
+          "width": 1620,
+          "height": 85
+        }
+      },
+      {
+        "text": "배달장소",
+        "confidence": 0.994,
+        "box": {
+          "x": 454,
+          "y": 1103,
+          "width": 421,
+          "height": 92
+        }
+      },
+      {
+        "text": "TEL",
+        "confidence": 0.964,
+        "box": {
+          "x": 2625,
+          "y": 1122,
+          "width": 220,
+          "height": 79
+        }
+      },
+      {
+        "text": "받는분고박희순",
+        "confidence": 0.962,
+        "box": {
+          "x": 822,
+          "y": 1173,
+          "width": 834,
+          "height": 92
+        }
+      },
+      {
+        "text": "HP",
+        "confidence": 0.976,
+        "box": {
+          "x": 2648,
+          "y": 1222,
+          "width": 187,
+          "height": 92
+        }
+      },
+      {
+        "text": "가는경조사어:삼가많스의뜻이을밥니다",
+        "confidence": 0.674,
+        "box": {
+          "x": 525,
+          "y": 1371,
+          "width": 2287,
+          "height": 79
+        }
+      },
+      {
+        "text": "르본오내는(주제이콘라의대표이시김장호",
+        "confidence": 0.657,
+        "box": {
+          "x": 410,
+          "y": 1419,
+          "width": 2854,
+          "height": 150
+        }
+      },
+      {
+        "text": "(일수장)길치",
+        "confidence": 0.42,
+        "box": {
+          "x": 517,
+          "y": 1636,
+          "width": 1024,
+          "height": 176
+        }
+      },
+      {
+        "text": "관계",
+        "confidence": 1,
+        "box": {
+          "x": 1616,
+          "y": 1663,
+          "width": 247,
+          "height": 105
+        }
+      },
+      {
+        "text": "'시분",
+        "confidence": 0.801,
+        "box": {
+          "x": 3012,
+          "y": 1676,
+          "width": 317,
+          "height": 79
+        }
+      },
+      {
+        "text": "|인수시간",
+        "confidence": 0.995,
+        "box": {
+          "x": 2582,
+          "y": 1678,
+          "width": 340,
+          "height": 72
+        }
+      }
+    ]
+  },
+  {
+    "image": "KakaoTalk_20260621_070828835_03.jpg",
+    "lines": [
+      {
+        "text": "ip/w.be",
+        "confidence": 0.421,
+        "box": {
+          "x": 2817,
+          "y": 0,
+          "width": 1020,
+          "height": 148
+        }
+      },
+      {
+        "text": "HOWER인수",
+        "confidence": 0.742,
+        "box": {
+          "x": 640,
+          "y": 99,
+          "width": 2966,
+          "height": 212
+        }
+      },
+      {
+        "text": "T.070-4741-0001|",
+        "confidence": 0.981,
+        "box": {
+          "x": 3183,
+          "y": 122,
+          "width": 600,
+          "height": 66
+        }
+      },
+      {
+        "text": "cYanmlllowb",
+        "confidence": 0.587,
+        "box": {
+          "x": 726,
+          "y": 142,
+          "width": 383,
+          "height": 70
+        }
+      },
+      {
+        "text": "T근조3단-",
+        "confidence": 0.941,
+        "box": {
+          "x": 1173,
+          "y": 512,
+          "width": 387,
+          "height": 92
+        }
+      },
+      {
+        "text": "HP",
+        "confidence": 0.94,
+        "box": {
+          "x": 2978,
+          "y": 860,
+          "width": 181,
+          "height": 85
+        }
+      },
+      {
+        "text": "cYa배달장소받는분",
+        "confidence": 0.889,
+        "box": {
+          "x": 730,
+          "y": 866,
+          "width": 790,
+          "height": 148
+        }
+      },
+      {
+        "text": "이고인심명철",
+        "confidence": 0.887,
+        "box": {
+          "x": 1467,
+          "y": 890,
+          "width": 507,
+          "height": 98
+        }
+      },
+      {
+        "text": ":위",
+        "confidence": 0.531,
+        "box": {
+          "x": 736,
+          "y": 1066,
+          "width": 3003,
+          "height": 325
+        }
+      },
+      {
+        "text": "Aro",
+        "confidence": 0.358,
+        "box": {
+          "x": 1042,
+          "y": 1895,
+          "width": 2220,
+          "height": 718
+        }
+      }
+    ]
+  },
+  {
+    "image": "KakaoTalk_20260621_070828835_04.jpg",
+    "lines": [
+      {
+        "text": "c",
+        "confidence": 0.406,
+        "box": {
+          "x": 612,
+          "y": 0,
+          "width": 1802,
+          "height": 978
+        }
+      },
+      {
+        "text": "cYaeeYellol",
+        "confidence": 0.485,
+        "box": {
+          "x": 0,
+          "y": 552,
+          "width": 3714,
+          "height": 1987
+        }
+      }
+    ]
+  },
+  {
+    "image": "KakaoTalk_20260621_070828835_05.jpg",
+    "lines": [
+      {
+        "text": "cYamYlowbl",
+        "confidence": 0.625,
+        "box": {
+          "x": 1524,
+          "y": 132,
+          "width": 1975,
+          "height": 340
+        }
+      },
+      {
+        "text": "cYaYelob",
+        "confidence": 0.522,
+        "box": {
+          "x": 174,
+          "y": 430,
+          "width": 3826,
+          "height": 1495
+        }
+      },
+      {
+        "text": "Ya인수신문",
+        "confidence": 0.585,
+        "box": {
+          "x": 390,
+          "y": 1840,
+          "width": 627,
+          "height": 183
+        }
+      },
+      {
+        "text": "원산지",
+        "confidence": 0.965,
+        "box": {
+          "x": 504,
+          "y": 2404,
+          "width": 401,
+          "height": 157
+        }
+      }
+    ]
+  },
+  {
+    "image": "KakaoTalk_20260621_070828835_06.jpg",
+    "lines": [
+      {
+        "text": "NO:20260-2-",
+        "confidence": 0.753,
+        "box": {
+          "x": 220,
+          "y": 148,
+          "width": 1267,
+          "height": 79
+        }
+      },
+      {
+        "text": "한국직가학침인수",
+        "confidence": 0.496,
+        "box": {
+          "x": 526,
+          "y": 276,
+          "width": 2911,
+          "height": 160
+        }
+      },
+      {
+        "text": "본부전화:1566-0028|",
+        "confidence": 0.995,
+        "box": {
+          "x": 2683,
+          "y": 293,
+          "width": 754,
+          "height": 66
+        }
+      },
+      {
+        "text": "험한농-/로",
+        "confidence": 0.439,
+        "box": {
+          "x": 479,
+          "y": 494,
+          "width": 1855,
+          "height": 169
+        }
+      },
+      {
+        "text": "2-3-7:7",
+        "confidence": 0.585,
+        "box": {
+          "x": 1279,
+          "y": 509,
+          "width": 1667,
+          "height": 85
+        }
+      },
+      {
+        "text": "주문자미입력-",
+        "confidence": 0.998,
+        "box": {
+          "x": 505,
+          "y": 683,
+          "width": 677,
+          "height": 76
+        }
+      },
+      {
+        "text": "품명근조-3단",
+        "confidence": 0.999,
+        "box": {
+          "x": 522,
+          "y": 787,
+          "width": 724,
+          "height": 85
+        }
+      },
+      {
+        "text": "수량그3",
+        "confidence": 0.877,
+        "box": {
+          "x": 2432,
+          "y": 803,
+          "width": 355,
+          "height": 85
+        }
+      },
+      {
+        "text": "리본삼가조의를표합니다",
+        "confidence": 0.99,
+        "box": {
+          "x": 536,
+          "y": 1041,
+          "width": 1204,
+          "height": 79
+        }
+      },
+      {
+        "text": "는문일고등학교<교장>모상경",
+        "confidence": 0.876,
+        "box": {
+          "x": 603,
+          "y": 1258,
+          "width": 1294,
+          "height": 92
+        }
+      },
+      {
+        "text": "HP",
+        "confidence": 0.994,
+        "box": {
+          "x": 2460,
+          "y": 1394,
+          "width": 120,
+          "height": 85
+        }
+      },
+      {
+        "text": "배달장소삶은본라매월회",
+        "confidence": 0.751,
+        "box": {
+          "x": 450,
+          "y": 1403,
+          "width": 1099,
+          "height": 140
+        }
+      },
+      {
+        "text": "TEL",
+        "confidence": 0.993,
+        "box": {
+          "x": 2446,
+          "y": 1501,
+          "width": 154,
+          "height": 79
+        }
+      },
+      {
+        "text": "인수하신문(반드사업관계",
+        "confidence": 0.829,
+        "box": {
+          "x": 400,
+          "y": 1573,
+          "width": 1389,
+          "height": 133
+        }
+      },
+      {
+        "text": "인수시간|시분",
+        "confidence": 0.938,
+        "box": {
+          "x": 2340,
+          "y": 1630,
+          "width": 832,
+          "height": 81
+        }
+      },
+      {
+        "text": "4태송하신분은인수후바로해피를하세요",
+        "confidence": 0.903,
+        "box": {
+          "x": 1065,
+          "y": 1744,
+          "width": 1674,
+          "height": 66
+        }
+      },
+      {
+        "text": "·절",
+        "confidence": 0.556,
+        "box": {
+          "x": 1488,
+          "y": 1819,
+          "width": 107,
+          "height": 79
+        }
+      },
+      {
+        "text": "쳐",
+        "confidence": 0.364,
+        "box": {
+          "x": 1887,
+          "y": 1830,
+          "width": 87,
+          "height": 66
+        }
+      },
+      {
+        "text": "선",
+        "confidence": 0.994,
+        "box": {
+          "x": 2278,
+          "y": 1833,
+          "width": 94,
+          "height": 72
+        }
+      },
+      {
+        "text": "원산지aa",
+        "confidence": 0.544,
+        "box": {
+          "x": 452,
+          "y": 1998,
+          "width": 420,
+          "height": 79
+        }
+      }
+    ]
+  },
+  {
+    "image": "KakaoTalk_20260621_070828835_07.jpg",
+    "lines": [
+      {
+        "text": "199FLOWERO",
+        "confidence": 0.797,
+        "box": {
+          "x": 537,
+          "y": 103,
+          "width": 800,
+          "height": 79
+        }
+      },
+      {
+        "text": "발주화원",
+        "confidence": 0.998,
+        "box": {
+          "x": 730,
+          "y": 271,
+          "width": 307,
+          "height": 72
+        }
+      },
+      {
+        "text": "(주)99플라워",
+        "confidence": 0.849,
+        "box": {
+          "x": 1359,
+          "y": 285,
+          "width": 460,
+          "height": 66
+        }
+      },
+      {
+        "text": "전화|070-8277-1211|",
+        "confidence": 0.981,
+        "box": {
+          "x": 2102,
+          "y": 285,
+          "width": 822,
+          "height": 66
+        }
+      },
+      {
+        "text": "전화|070-4741-0001|",
+        "confidence": 0.942,
+        "box": {
+          "x": 2103,
+          "y": 402,
+          "width": 817,
+          "height": 72
+        }
+      },
+      {
+        "text": "송화원",
+        "confidence": 0.879,
+        "box": {
+          "x": 739,
+          "y": 403,
+          "width": 301,
+          "height": 66
+        }
+      },
+      {
+        "text": "'선유꽃화원'",
+        "confidence": 0.867,
+        "box": {
+          "x": 1372,
+          "y": 403,
+          "width": 434,
+          "height": 66
+        }
+      },
+      {
+        "text": "상품명[근조화환FB268]근조3단",
+        "confidence": 0.917,
+        "box": {
+          "x": 751,
+          "y": 517,
+          "width": 1310,
+          "height": 69
+        }
+      },
+      {
+        "text": "시수",
+        "confidence": 0.395,
+        "box": {
+          "x": 655,
+          "y": 656,
+          "width": 2640,
+          "height": 66
+        }
+      },
+      {
+        "text": "배달일시|에문상가신대요사장님부탁드려요)",
+        "confidence": 0.92,
+        "box": {
+          "x": 739,
+          "y": 744,
+          "width": 1733,
+          "height": 76
+        }
+      },
+      {
+        "text": "[[√디카요청]",
+        "confidence": 0.986,
+        "box": {
+          "x": 1056,
+          "y": 839,
+          "width": 500,
+          "height": 66
+        }
+      },
+      {
+        "text": "인증번호:629",
+        "confidence": 0.988,
+        "box": {
+          "x": 2868,
+          "y": 862,
+          "width": 567,
+          "height": 53
+        }
+      },
+      {
+        "text": "서울구로고려대구로병원장데식장1호전화",
+        "confidence": 0.777,
+        "box": {
+          "x": 778,
+          "y": 949,
+          "width": 2001,
+          "height": 85
+        }
+      },
+      {
+        "text": "배달장소",
+        "confidence": 0.969,
+        "box": {
+          "x": 728,
+          "y": 1013,
+          "width": 294,
+          "height": 53
+        }
+      },
+      {
+        "text": "핸드폰|010-2479-1488|",
+        "confidence": 0.984,
+        "box": {
+          "x": 2586,
+          "y": 1059,
+          "width": 911,
+          "height": 66
+        }
+      },
+      {
+        "text": "|*받는분:상주유기열",
+        "confidence": 0.922,
+        "box": {
+          "x": 984,
+          "y": 1061,
+          "width": 774,
+          "height": 59
+        }
+      },
+      {
+        "text": "리지-조가시의다",
+        "confidence": 0.413,
+        "box": {
+          "x": 682,
+          "y": 1180,
+          "width": 2195,
+          "height": 81
+        }
+      },
+      {
+        "text": "*|[보내는분]강서구청세우회",
+        "confidence": 0.888,
+        "box": {
+          "x": 907,
+          "y": 1256,
+          "width": 1207,
+          "height": 59
+        }
+      },
+      {
+        "text": "주문자|최대한싸른배송해주세요",
+        "confidence": 0.886,
+        "box": {
+          "x": 765,
+          "y": 1339,
+          "width": 1233,
+          "height": 77
+        }
+      },
+      {
+        "text": "'요구사항",
+        "confidence": 0.878,
+        "box": {
+          "x": 722,
+          "y": 1403,
+          "width": 300,
+          "height": 59
+        }
+      },
+      {
+        "text": "인수재유시온한정자로이름을적어주세요",
+        "confidence": 0.85,
+        "box": {
+          "x": 764,
+          "y": 1501,
+          "width": 1917,
+          "height": 124
+        }
+      },
+      {
+        "text": "관계자(4)",
+        "confidence": 0.878,
+        "box": {
+          "x": 2591,
+          "y": 1510,
+          "width": 708,
+          "height": 98
+        }
+      },
+      {
+        "text": "절",
+        "confidence": 0.965,
+        "box": {
+          "x": 1583,
+          "y": 1742,
+          "width": 87,
+          "height": 79
+        }
+      },
+      {
+        "text": "취",
+        "confidence": 0.908,
+        "box": {
+          "x": 2012,
+          "y": 1743,
+          "width": 87,
+          "height": 72
+        }
+      },
+      {
+        "text": "선",
+        "confidence": 0.972,
+        "box": {
+          "x": 2468,
+          "y": 1748,
+          "width": 80,
+          "height": 66
+        }
+      },
+      {
+        "text": "'원산지",
+        "confidence": 0.72,
+        "box": {
+          "x": 710,
+          "y": 1888,
+          "width": 280,
+          "height": 59
+        }
+      }
+    ]
+  }
+]
