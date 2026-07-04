@@ -90,6 +90,36 @@ describe('OCR field extraction — PP-OCR baseline (+ Apple Vision if present)',
           `\nTOTAL required filled: PP-OCR ${ppReq}/24  ->  Apple Vision ${vReq}/24`,
       );
       expect(vision!.length).toBeGreaterThan(0);
+      // 회귀 가드: Apple Vision 경로가 PP-OCR baseline보다 필수필드를 더 채워야 한다.
+      expect(vReq).toBeGreaterThanOrEqual(ppReq);
+    },
+  );
+
+  // Apple Vision 경로에서 수령자 이름이 정답과 일치하는지 고정(존칭 처리 + 스캔 폴백의 회귀 가드).
+  const RECIPIENT_TRUTH: Record<string, string> = {
+    'KakaoTalk_20260621_070828835_01.jpg': '최성인',
+    'KakaoTalk_20260621_070828835_02.jpg': '박희순',
+    'KakaoTalk_20260621_070828835_03.jpg': '심명철',
+    'KakaoTalk_20260621_070828835_05.jpg': '구본순',
+    'KakaoTalk_20260621_070828835_06.jpg': '김기회',
+    'KakaoTalk_20260621_070828835_07.jpg': '유기열',
+  };
+  (vision ? test : test.skip)(
+    'recovers recipient names from Apple Vision output (>= 6/6 known)',
+    () => {
+      const byImage = new Map(vision!.map((v) => [v.image, v]));
+      let hit = 0;
+      const total = Object.keys(RECIPIENT_TRUTH).length;
+      for (const [image, name] of Object.entries(RECIPIENT_TRUTH)) {
+        const v = byImage.get(image);
+        if (!v) continue;
+        const value =
+          parseVision(v).fields.find((f) => f.key === 'recipientName')?.value || '';
+        if (value.includes(name)) hit += 1;
+      }
+      // eslint-disable-next-line no-console
+      console.log(`recipient recovery: ${hit}/${total}`);
+      expect(hit).toBe(total);
     },
   );
 });

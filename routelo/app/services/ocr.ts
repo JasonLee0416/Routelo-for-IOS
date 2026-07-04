@@ -382,7 +382,17 @@ export function parseReceiptText(
     '인수자',
   ]);
   // 업체/주소/지시문이 수령자로 오배정되는 것을 막는다(vendor vs recipient disambiguation).
-  const recipientName = extractPersonName(recipientSource?.value || '');
+  // 폴백: 라벨 행이 다른 셀과 병합돼 startsWith 매칭이 실패해도, "받는분 [존칭] 이름" 패턴을
+  // 병합된 텍스트에서 직접 뽑는다(Vision은 이 조각을 깨끗이 인식하나 레이아웃이 뭉침).
+  const recipientFromLabel = extractPersonName(recipientSource?.value || '');
+  const recipientFromScan = (() => {
+    if (recipientFromLabel) return '';
+    const m = text.match(
+      /(?:받는\s*분|받으실분|수령인|인수자)\s*[:：]?\s*((?:고인?|故|상주|신랑|신부)?\s*[가-힣]{2,4})/,
+    );
+    return m ? extractPersonName(m[1]) : '';
+  })();
+  const recipientName = recipientFromLabel || recipientFromScan;
   const recipientTelSource = validatedPhoneCandidate(
     findLabeledValue(lines, [
       '수령인 전화',
