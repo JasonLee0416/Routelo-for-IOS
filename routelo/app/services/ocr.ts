@@ -4,6 +4,13 @@ import {
   OcrFieldResult,
   OcrPipelineResult,
 } from '../models';
+import {
+  KOREAN_PHONE_PATTERN,
+  isValidKoreanPhone,
+  matchKoreanDate,
+  normalizeKoreanPhone,
+  normalizeKoreanTime,
+} from '../ocr/fieldValidation';
 import { DEFAULT_FIELD_REGISTRY } from '../ocr/fieldRegistry';
 import { buildLayoutText } from '../ocr/layout';
 import { normalizeReceipt } from '../ocr/normalize';
@@ -79,45 +86,11 @@ const REQUIRED = new Set<OcrFieldKey>([
   'deliveryAddress',
 ]);
 
-const PHONE_PATTERN =
-  /(?<!\d)(?:01[016789][-\s]?\d{3,4}[-\s]?\d{4}|02[-\s]?\d{3,4}[-\s]?\d{4}|0[3-6]\d[-\s]?\d{3,4}[-\s]?\d{4})(?!\d)/g;
-const VALID_PHONE =
-  /^(?:01[016789]-\d{3,4}-\d{4}|02-\d{3,4}-\d{4}|0[3-6]\d-\d{3,4}-\d{4})$/;
-
-const normalizeTime = (value: string) => {
-  const compact = value.replace(/\s/g, '');
-  const colon = compact.match(/(\d{1,2}):(\d{2})/);
-  if (colon) {
-    const hour = Number(colon[1]);
-    const minute = Number(colon[2]);
-    if (hour <= 23 && minute <= 59) {
-      return `${String(hour).padStart(2, '0')}:${colon[2]}`;
-    }
-    return '';
-  }
-  const korean = compact.match(/(오전|오후)?(\d{1,2})시(?:(\d{1,2})분)?/);
-  if (!korean) return '';
-  let hour = Number(korean[2]);
-  const minute = Number(korean[3] || 0);
-  if (hour > 23 || minute > 59) return '';
-  if (korean[1] === '오후' && hour < 12) hour += 12;
-  if (korean[1] === '오전' && hour === 12) hour = 0;
-  return `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
-};
-
-const normalizePhone = (value: string) => {
-  const digits = value.replace(/\D/g, '');
-  if (digits.startsWith('010') && digits.length === 11) {
-    return `${digits.slice(0, 3)}-${digits.slice(3, 7)}-${digits.slice(7)}`;
-  }
-  if (digits.startsWith('02') && (digits.length === 9 || digits.length === 10)) {
-    return `${digits.slice(0, 2)}-${digits.slice(2, -4)}-${digits.slice(-4)}`;
-  }
-  if (/^0[3-6]\d/.test(digits) && (digits.length === 10 || digits.length === 11)) {
-    return `${digits.slice(0, 3)}-${digits.slice(3, -4)}-${digits.slice(-4)}`;
-  }
-  return '';
-};
+// 전화/시각/날짜 값 검증은 공용 도메인 모듈(app/ocr/fieldValidation)로 위임한다.
+// 070(VoIP)·1566 대표번호·한글 날짜(2026년 06월 14일)까지 강화된 규칙을 공유한다.
+const PHONE_PATTERN = KOREAN_PHONE_PATTERN;
+const normalizeTime = normalizeKoreanTime;
+const normalizePhone = normalizeKoreanPhone;
 
 const allMatches = (text: string, pattern: RegExp) =>
   [...text.matchAll(pattern)].map((match) => match[0]);
@@ -221,7 +194,7 @@ function validatedPhoneCandidate(
   if (!candidate) return undefined;
   const value = allMatches(candidate.value, PHONE_PATTERN)
     .map(normalizePhone)
-    .find((phone) => VALID_PHONE.test(phone));
+    .find((phone) => isValidKoreanPhone(phone));
   return value ? { ...candidate, value } : undefined;
 }
 
@@ -245,21 +218,6 @@ function normalizeQuantity(value: string) {
   return Number.isInteger(quantity) && quantity > 0 && quantity <= 99
     ? String(quantity)
     : '';
-}
-
-function normalizeDate(text: string) {
-  const exact = text.match(/20\d{2}[.\-/]\d{1,2}[.\-/]\d{1,2}/)?.[0];
-  if (!exact) return '';
-  const [year, month, day] = exact.split(/[.\-/]/).map(Number);
-  const parsed = new Date(Date.UTC(year, month - 1, day));
-  if (
-    parsed.getUTCFullYear() !== year ||
-    parsed.getUTCMonth() !== month - 1 ||
-    parsed.getUTCDate() !== day
-  ) {
-    return '';
-  }
-  return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
 }
 
 export function inspectCaptureQuality(asset: ImageAssetInfo): CaptureQuality {
@@ -355,9 +313,10 @@ export function parseReceiptText(
       /삼가.*(?:명복|조의)|축하.*(?:결혼|개업)|부활/.test(line),
     );
 
-  const deliveryDate = normalizeDate(
-    mapped.deliveryDate || text,
-  );
+  const dateMatch = matchKoreanDate(mapped.deliveryDate || text);
+  const deliveryDate = dateMatch?.value || '';
+  // 재포맷된 날짜의 출처를 원본 매칭 문자열로 남겨 provenance 추적을 유지한다.
+  const deliveryDateSource = dateMatch?.raw || mapped.deliveryDate || '';
   const range = text.match(
     /(\d{1,2}:\d{2})\s*[~～\-]\s*(\d{1,2})\s*:?\s*(\d{2})/,
   );
@@ -414,7 +373,7 @@ export function parseReceiptText(
   );
   const phoneAlternatives = allMatches(text, PHONE_PATTERN)
     .map(normalizePhone)
-    .filter((phone) => VALID_PHONE.test(phone));
+    .filter((phone) => isValidKoreanPhone(phone));
   const memoSource = findLabeledValue(lines, [
     '요청사항',
     '요구사항',
@@ -515,7 +474,7 @@ export function parseReceiptText(
       'deliveryDate',
       deliveryDate,
       deliveryDate ? 92 : 0,
-      mapped.deliveryDate || '',
+      deliveryDateSource,
       [],
       {
         extractionMethod: deliveryDate ? 'pattern' : undefined,
