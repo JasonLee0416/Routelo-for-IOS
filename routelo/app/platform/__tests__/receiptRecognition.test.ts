@@ -57,9 +57,12 @@ describe('receiptRecognitionCapability', () => {
 });
 
 describe('iOS OCR consent boundary', () => {
-  test('keeps Apple Vision as an explicit native placeholder until the bridge exists', async () => {
+  test('falls back cleanly when the Apple Vision native module is unavailable (non-iOS runtime)', async () => {
+    // In Jest/non-iOS there is no linked native binary, so the recognizer must
+    // reject with a clear unavailability error and let the chain move on —
+    // never fabricate OCR output.
     await expect(appleVisionRecognizer.recognize('file://receipt.jpg')).rejects.toThrow(
-      'Apple Vision OCR native bridge is not connected yet',
+      'Apple Vision OCR native module is unavailable',
     );
   });
 

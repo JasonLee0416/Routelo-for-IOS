@@ -1,7 +1,9 @@
 import { Platform } from 'react-native';
 
+import { recognizeTextNative } from '../../modules/apple-vision-ocr';
 import { PP_OCR_MODEL_VERSION } from '../ocr/ppocr/modelManifest';
 import type { PpOcrLine } from '../ocr/ppocr/types';
+import { AppleVisionNoTextError, mapVisionPayloadToResult } from './appleVision';
 
 export type ReceiptRecognizerEngine = 'apple-vision' | 'ppocrv5' | 'clova';
 
@@ -92,9 +94,13 @@ export const appleVisionRecognizer: ReceiptRecognizer = {
   priority: 10,
   async recognize(imageUri) {
     ensureImageUri(imageUri);
-    throw new Error(
-      'Apple Vision OCR native bridge is not connected yet. Route to CLOVA fallback or manual input.',
-    );
+    // recognizeTextNative resolves the native binary lazily via
+    // requireOptionalNativeModule and throws AppleVisionUnavailableError when it
+    // is absent (Android/web/Jest/unlinked build), so the fallback chain moves on.
+    const payload = await recognizeTextNative(imageUri);
+    const result = mapVisionPayloadToResult(payload);
+    if (!result.lines.length) throw new AppleVisionNoTextError();
+    return result;
   },
 };
 
