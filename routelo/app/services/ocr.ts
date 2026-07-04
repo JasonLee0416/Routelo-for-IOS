@@ -311,6 +311,10 @@ export function parseReceiptText(
     (productSource && /\d+\s*개/.test(productSource.value)
       ? productSource
       : undefined);
+  // 상품명은 뒤에 붙은 수량("... 2개")을 떼어 순수 품목만 남긴다(수량은 별도 필드).
+  const productName = (productSource?.value || '')
+    .replace(/\s*\d+\s*개\s*$/, '')
+    .trim();
   const ribbonSource =
     findLabeledValue(lines, [
       '리본문구',
@@ -455,13 +459,13 @@ export function parseReceiptText(
     ),
     field(
       'productName',
-      productSource?.value || '',
-      productSource ? 82 : 0,
+      productName,
+      productName ? 82 : 0,
       productSource?.sourceText || '',
       [],
       {
         sourceLineIds: productSource?.sourceLineIds,
-        extractionMethod: productSource ? 'pattern' : undefined,
+        extractionMethod: productName ? 'pattern' : undefined,
         forceReview: true,
       },
     ),
