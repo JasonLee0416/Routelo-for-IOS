@@ -197,6 +197,23 @@ export function scoreValueForType(type: FieldType, raw: string): number {
   return v.valid ? 1 : 0;
 }
 
+/**
+ * 같은 필드를 두고 경쟁하는 후보 값들 중, 해당 타입으로 가장 잘 검증되는 값을 고른다.
+ * (앵커-값 재랭킹: OCR confidence 대신 값의 타입 적합도로 선택)
+ */
+export function pickTypedValue(type: FieldType, candidates: string[]): string {
+  let best = '';
+  let bestScore = 0;
+  for (const candidate of candidates) {
+    const score = scoreValueForType(type, candidate);
+    if (score > bestScore) {
+      bestScore = score;
+      best = validateFieldValue(type, candidate).value || candidate;
+    }
+  }
+  return best;
+}
+
 // ---------- 교차 필드 충돌 검사 ----------
 export type FieldConflict = { keys: ReceiptFieldKey[]; message: string };
 

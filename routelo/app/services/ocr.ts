@@ -5,6 +5,11 @@ import {
   OcrPipelineResult,
 } from '../models';
 import {
+  extractPersonName,
+  pickBest,
+  scoreAddress,
+} from '../ocr/fieldHeuristics';
+import {
   KOREAN_PHONE_PATTERN,
   isValidKoreanPhone,
   matchKoreanDate,
@@ -198,19 +203,6 @@ function validatedPhoneCandidate(
   return value ? { ...candidate, value } : undefined;
 }
 
-function safeRecipientName(value: string) {
-  const trimmed = value.trim();
-  if (
-    !trimmed ||
-    /플라워|화원|반드시|이름|성명|수령자|인수자|받는분|받는 분/.test(
-      trimmed,
-    )
-  ) {
-    return '';
-  }
-  return trimmed.replace(/\s*(실장|팀장|담당자)$/, ' $1');
-}
-
 function normalizeQuantity(value: string) {
   const explicit = value.match(/수량\s*[|:]?\s*(\d{1,2})/);
   const count = explicit || value.match(/(\d{1,2})\s*개/);
@@ -348,18 +340,27 @@ export function parseReceiptText(
     '웨딩홀',
     '배송처',
   ]);
+  // 라벨 매칭 실패 시, 한국 주소다움 점수가 가장 높은 줄을 폴백으로 선택(앵커-값 재랭킹).
+  const addressFallback = (() => {
+    const best = pickBest(lines, scoreAddress);
+    if (!best) return undefined;
+    return {
+      value: best,
+      sourceText: best,
+      sourceLineIds: [lineId(lines.indexOf(best))],
+    };
+  })();
   const addressSource =
     findLabeledValue(lines, ['배송주소', '배달주소', '배송지', '배달장소', '주소']) ||
-    firstMatchingLine(lines, (line) =>
-      /(?:서울|경기)\s+[\p{Script=Hangul}\d\- ]+(?:구|시|군)\s+/u.test(line),
-    );
+    addressFallback;
   const recipientSource = findLabeledValue(lines, [
     '받는분',
     '받는 분',
     '수령인',
     '인수자',
   ]);
-  const recipientName = safeRecipientName(recipientSource?.value || '');
+  // 업체/주소/지시문이 수령자로 오배정되는 것을 막는다(vendor vs recipient disambiguation).
+  const recipientName = extractPersonName(recipientSource?.value || '');
   const recipientTelSource = validatedPhoneCandidate(
     findLabeledValue(lines, [
       '수령인 전화',
