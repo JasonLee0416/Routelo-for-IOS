@@ -197,13 +197,24 @@ function firstMatchingLine(
   };
 }
 
+// 한 값에 전화가 여러 개면 휴대폰(01x) > VoIP(070) > 기타 순으로 고른다
+// (팩스/대표번호가 담당자 연락처로 잘못 뽑히는 것 방지).
+function pickBestPhone(raw: string): string | undefined {
+  const phones = allMatches(raw, PHONE_PATTERN)
+    .map(normalizePhone)
+    .filter((phone) => isValidKoreanPhone(phone));
+  return (
+    phones.find((p) => p.startsWith('01')) ||
+    phones.find((p) => p.startsWith('070')) ||
+    phones[0]
+  );
+}
+
 function validatedPhoneCandidate(
   candidate: ReturnType<typeof findLabeledValue>,
 ) {
   if (!candidate) return undefined;
-  const value = allMatches(candidate.value, PHONE_PATTERN)
-    .map(normalizePhone)
-    .find((phone) => isValidKoreanPhone(phone));
+  const value = pickBestPhone(candidate.value);
   return value ? { ...candidate, value } : undefined;
 }
 
@@ -286,9 +297,7 @@ export function parseReceiptText(
   // 라벨 전화가 없으면 업체명 줄 자체에서 전화를 페어링(업체↔전화 쌍).
   const vendorPhoneFromLine = (src: ReturnType<typeof findLabeledValue>) => {
     if (!src) return undefined;
-    const phone = allMatches(src.sourceText, PHONE_PATTERN)
-      .map(normalizePhone)
-      .find((value) => isValidKoreanPhone(value));
+    const phone = pickBestPhone(src.sourceText);
     return phone
       ? { value: phone, sourceText: src.sourceText, sourceLineIds: src.sourceLineIds }
       : undefined;
@@ -328,7 +337,10 @@ export function parseReceiptText(
       /삼가.*(?:명복|조의)|축하.*(?:결혼|개업)|부활/.test(line),
     );
 
-  const dateMatch = matchKoreanDate(mapped.deliveryDate || text);
+  // 연도 없는 날짜("06월 14일")도 회복: 텍스트의 20YY를 우선, 없으면 현재 연도로 보정.
+  const inferredYear =
+    Number((text.match(/20\d{2}/) || [])[0]) || new Date().getFullYear();
+  const dateMatch = matchKoreanDate(mapped.deliveryDate || text, inferredYear);
   const deliveryDate = dateMatch?.value || '';
   // 재포맷된 날짜의 출처를 원본 매칭 문자열로 남겨 provenance 추적을 유지한다.
   const deliveryDateSource = dateMatch?.raw || mapped.deliveryDate || '';

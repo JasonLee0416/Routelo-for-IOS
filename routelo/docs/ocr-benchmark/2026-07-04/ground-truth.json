@@ -21,5 +21,26 @@
     "deliveryDate": "2026-06-14",
     "deliveryAddress": "서울 동작구 중앙대병원 장례식장 5호",
     "recipientName": "박희순"
+  },
+  "KakaoTalk_20260621_070828835_03.jpg": {
+    "eventType": "근조",
+    "orderingVendorName": "용인세브란스화원",
+    "orderingVendorTel": "010-3348-8403",
+    "productName": "근조 3단",
+    "deliveryDate": "2026-06-14",
+    "deliveryAddress": "서울 영등포구 선유로 101 교원예움 서서울 장례식장 201호",
+    "recipientName": "심명철"
+  },
+  "KakaoTalk_20260621_070828835_04.jpg": {
+    "eventType": "근조",
+    "orderingVendorName": "가든스토리제블리",
+    "orderingVendorTel": "010-4482-9119",
+    "fulfillingVendorName": "선유꽃화원",
+    "productName": "근조화환",
+    "productQuantity": "1",
+    "deliveryDate": "2026-06-14",
+    "strictTime": "17:00",
+    "deliveryAddress": "고대구로병원 장례식장 105호실",
+    "recipientName": "유기열"
   }
 }
