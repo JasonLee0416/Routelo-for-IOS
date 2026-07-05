@@ -5,6 +5,7 @@ import {
   OcrPipelineResult,
 } from '../models';
 import { shouldRequestCloudFallback } from '../ocr/cloudFallback';
+import { inferEventType } from '../ocr/contentClassifier';
 import {
   cleanVendorName,
   extractPersonName,
@@ -639,6 +640,12 @@ export function parseReceiptText(
     documentConfidence,
     conflicts,
   });
+  // 값 형식으로 경조사 종류 추론(축하/근조) — 레이아웃 무관, 상품·리본 교차검증 기반.
+  const eventInference = inferEventType(text);
+  const eventType = {
+    type: eventInference.type,
+    confidence: eventInference.confidence,
+  };
 
   return {
     engine: 'fixture',
@@ -651,6 +658,7 @@ export function parseReceiptText(
     unmapped,
     conflicts,
     cloudFallback,
+    eventType,
   };
 }
 

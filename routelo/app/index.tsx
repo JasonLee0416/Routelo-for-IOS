@@ -3349,6 +3349,7 @@ function OcrScannerModal({
       unmapped: [],
       conflicts: [],
       cloudFallback: { trigger: false, reasons: [] },
+      eventType: { type: '기타', confidence: 0 },
     });
     setStage('quality');
   };

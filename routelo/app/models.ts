@@ -134,4 +134,6 @@ export type OcrPipelineResult = {
   conflicts: { keys: OcrFieldKey[]; message: string }[];
   // CLOVA 2차 보정 제안(자동 실행 아님, 사용자 동의 필요). 트리거 조건 미충족 시 trigger=false.
   cloudFallback: { trigger: boolean; reasons: string[] };
+  // 값 형식으로 추론한 경조사 종류(축하/근조/개업/기타). 상품·리본 교차검증 및 검수 UI 배지용.
+  eventType: { type: '축하' | '근조' | '개업' | '기타'; confidence: number };
 };
