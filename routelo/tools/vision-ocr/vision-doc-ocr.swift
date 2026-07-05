@@ -1,13 +1,14 @@
-// Apple Vision — Document/Table structure recognition (macOS CLI).
-// Uses the new Swift Vision `RecognizeDocumentsRequest` (iOS 18 / macOS 15+) to
-// detect TABLES and return text grouped by row/cell — so "발주화원 | (주)99플라워 | 070..."
-// arrives already paired by table row, bypassing our heuristic layout reconstruction.
+// Apple Vision — Document transcript recognition (macOS CLI).
+// Uses the new Swift Vision `RecognizeDocumentsRequest` (iOS 18 / macOS 15+).
+//
+// Experiment result on our receipts: `document.tables` is EMPTY — Apple Vision does
+// NOT detect a table structure on these noisy/borderless KakaoTalk receipts, so the
+// row/cell pairing we hoped for is unavailable. What remains is `document.text.transcript`,
+// which MAY order lines better than our current `VNRecognizeTextRequest` output.
+// This CLI outputs ONLY the transcript so we can diff it against vision-results.json.
 //
 // Usage (from repo root, macOS 15+; your OS 26.x qualifies):
 //   swift routelo/tools/vision-ocr/vision-doc-ocr.swift KakaoTalk_*.jpg > doc-results.json
-//
-// NOTE: this is the newest Swift-only Vision API. Property names below are best-effort;
-// if the compiler complains, paste the error and we'll match your SDK's exact signatures.
 //
 import Foundation
 import Vision
@@ -18,53 +19,29 @@ func recognizeDocument(_ path: String) async -> [String: Any] {
   let url = URL(fileURLWithPath: path)
   let request = RecognizeDocumentsRequest()
   do {
-    // New async perform. Returns [DocumentObservation].
     let observations = try await request.perform(on: url)
     guard let document = observations.first?.document else {
-      return ["image": name, "error": "no document observation", "tables": [], "fullText": ""]
+      return ["image": name, "error": "no document observation", "transcript": "", "tableCount": 0]
     }
 
-    // Full transcript (safety fallback for the parser).
-    let fullText = document.text.transcript
-
-    // Tables → rows/cells with indices.
-    var tables: [[String: Any]] = []
-    for table in document.tables {
-      var cells: [[String: Any]] = []
-      for cell in table.cells {
-        cells.append([
-          "row": cell.rowIndexRange.lowerBound,
-          "col": cell.columnIndexRange.lowerBound,
-          "text": cell.content.text.transcript
-            .trimmingCharacters(in: .whitespacesAndNewlines),
-        ])
-      }
-      tables.append([
-        "rowCount": table.rowCount,
-        "columnCount": table.columnCount,
-        "cells": cells,
-      ])
-    }
-
-    // Paragraph/line-level text as an additional fallback view.
-    var paragraphs: [String] = []
-    for paragraph in document.text.paragraphs {
-      let t = paragraph.transcript.trimmingCharacters(in: .whitespacesAndNewlines)
-      if !t.isEmpty { paragraphs.append(t) }
-    }
+    let transcript = document.text.transcript
+    let tableCount = document.tables.count
+    let lines = transcript
+      .split(separator: "\n", omittingEmptySubsequences: false)
+      .map { String($0) }
 
     FileHandle.standardError.write(
-      "[doc] \(name)  tables=\(tables.count)  cells=\(tables.reduce(0){ $0 + (($1["cells"] as? [Any])?.count ?? 0) })  paras=\(paragraphs.count)\n"
+      "[doc] \(name)  tables=\(tableCount)  lines=\(lines.count)  chars=\(transcript.count)\n"
         .data(using: .utf8)!)
 
     return [
       "image": name,
-      "fullText": fullText,
-      "tables": tables,
-      "paragraphs": paragraphs,
+      "transcript": transcript,
+      "lines": lines,
+      "tableCount": tableCount,
     ]
   } catch {
-    return ["image": name, "error": "\(error)", "tables": [], "fullText": ""]
+    return ["image": name, "error": "\(error)", "transcript": "", "tableCount": 0]
   }
 }
 
