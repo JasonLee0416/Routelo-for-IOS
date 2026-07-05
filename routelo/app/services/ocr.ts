@@ -10,6 +10,7 @@ import {
   cleanVendorName,
   extractPersonName,
   pickBest,
+  scanVendorTokens,
   scoreAddress,
 } from '../ocr/fieldHeuristics';
 import {
@@ -292,8 +293,12 @@ export function parseReceiptText(
     '수주회원',
   ]);
   // 업체명에서 전화·라벨 잔여 제거(주소면 상호 아님 → '').
-  const orderingVendorName = cleanVendorName(orderingVendor?.value || '');
-  const fulfillingVendorName = cleanVendorName(fulfillingVendor?.value || '');
+  // 폴백: 라벨 매칭이 비면 값 형식(상호 마커로 끝나는 토큰)으로 회복(등장 순서로 발주/배송 배정).
+  const vendorTokens = scanVendorTokens(text);
+  const orderingVendorName =
+    cleanVendorName(orderingVendor?.value || '') || vendorTokens[0] || '';
+  const fulfillingVendorName =
+    cleanVendorName(fulfillingVendor?.value || '') || vendorTokens[1] || '';
   // 라벨 전화가 없으면 업체명 줄 자체에서 전화를 페어링(업체↔전화 쌍).
   const vendorPhoneFromLine = (src: ReturnType<typeof findLabeledValue>) => {
     if (!src) return undefined;

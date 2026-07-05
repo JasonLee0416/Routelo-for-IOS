@@ -5,6 +5,7 @@ import {
   looksLikeAddress,
   looksLikeVendor,
   pickBest,
+  scanVendorTokens,
   scoreAddress,
 } from '../fieldHeuristics';
 import { pickTypedValue } from '../fieldValidation';
@@ -81,6 +82,23 @@ describe('cleanVendorName', () => {
   test('rejects an address or digits-only value as a vendor name', () => {
     expect(cleanVendorName('서울 강남구 선릉로 757 3층')).toBe('');
     expect(cleanVendorName('070-4741-0001')).toBe('');
+  });
+});
+
+describe('scanVendorTokens', () => {
+  test('recovers shop names by marker, in order, excluding label words', () => {
+    // 라벨(발주화원/배송화원)이 값과 떨어져 병합돼도 상호를 회복
+    expect(
+      scanVendorTokens('발주화원 배송화원 상품명 (주)99플라워 전화 선유꽃화원'),
+    ).toEqual(['(주)99플라워', '선유꽃화원']);
+  });
+  test('extracts a parenthetical shop from a combined line', () => {
+    expect(
+      scanVendorTokens('경기 의정부시 경기의정21호(타임플라워)-010-5898-9543'),
+    ).toEqual(['타임플라워']);
+  });
+  test('dedupes and skips pure label words', () => {
+    expect(scanVendorTokens('발주화원 배송화원 수주화원')).toEqual([]);
   });
 });
 

@@ -51,6 +51,36 @@ export function cleanVendorName(raw: string): string {
   return cleaned;
 }
 
+/**
+ * 상호 마커(화원/플라워/농원…)로 끝나는 상호 토큰을 등장 순서대로 뽑는다.
+ * 라벨이 값과 떨어져 병합돼도(startsWith 실패) 값 형식만으로 상호를 회복.
+ * ㈜/(주) 접두는 보존. 중복 제거.
+ */
+// 상호가 아니라 "라벨" 자체인 …화원 단어(발주화원/배송화원 등)는 제외.
+const VENDOR_LABEL_WORD =
+  /^(발주화원|배송화원|수주화원|발주회원|수주회원|발주처|배송처|수주처)$/;
+
+export function scanVendorTokens(text: string): string[] {
+  const out: string[] = [];
+  const seen = new Set<string>();
+  const re =
+    /((?:㈜|\(주\))?\s*[가-힣A-Za-z0-9]{1,12}(?:꽃화원|화원|플라워|플라웨|농원))/g;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(text))) {
+    const cleaned = cleanVendorName(m[1].replace(/\s+/g, ' ').trim());
+    if (
+      cleaned &&
+      cleaned.length >= 2 &&
+      !VENDOR_LABEL_WORD.test(cleaned) &&
+      !seen.has(cleaned)
+    ) {
+      seen.add(cleaned);
+      out.push(cleaned);
+    }
+  }
+  return out;
+}
+
 // ---------- 사람 이름(수령자/담당자) ----------
 // 역할/존칭 접두어를 반복 제거(예: "받는분 고인 심명철", "고 박희순", "상주 유기열").
 const NAME_ROLE_PREFIX =
