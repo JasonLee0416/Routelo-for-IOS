@@ -100,13 +100,36 @@ describe('parseBackup', () => {
     expect(parseBackup(noVersion).ok).toBe(false);
   });
 
+  test('rejects a zero / negative / non-integer schema version', () => {
+    for (const v of [0, -1, 0.5, NaN]) {
+      const bad = JSON.stringify({ ...buildBackup(input), schemaVersion: v });
+      expect(parseBackup(bad).ok).toBe(false);
+    }
+  });
+
   test('rejects corrupt collections (list not an array)', () => {
     const corrupt = JSON.stringify({ ...buildBackup(input), fuelLogs: null });
     const result = parseBackup(corrupt);
     expect(result).toEqual({
       ok: false,
-      error: '백업 데이터가 손상되었습니다(목록 누락).',
+      error: '백업 데이터가 손상되었습니다(목록 형식 오류).',
     });
+  });
+
+  test('rejects arrays containing non-object / id-less records', () => {
+    expect(
+      parseBackup(JSON.stringify({ ...buildBackup(input), orders: [null, 5] })).ok,
+    ).toBe(false);
+    expect(
+      parseBackup(
+        JSON.stringify({ ...buildBackup(input), fuelLogs: [{ date: 'x' }] }),
+      ).ok,
+    ).toBe(false);
+  });
+
+  test('rejects settings that is an array, not an object', () => {
+    const corrupt = JSON.stringify({ ...buildBackup(input), settings: [] });
+    expect(parseBackup(corrupt).ok).toBe(false);
   });
 
   test('rejects a missing settings object', () => {

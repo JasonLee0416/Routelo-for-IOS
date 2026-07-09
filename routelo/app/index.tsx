@@ -62,6 +62,7 @@ import {
   mileageLogRepository,
 } from './repositories/native';
 import { applyBackup, buildBackupJson, parseBackup } from './services/backup';
+import { mergeSettingsV2 } from './settings/migrations';
 import {
   DeliverySortMode,
   filterDeliveries,
@@ -1588,6 +1589,7 @@ function CalendarScreen({
   );
   const [restoreOpen, setRestoreOpen] = useState(false);
   const [restoreText, setRestoreText] = useState('');
+  const canRestore = restoreText.trim().length > 0;
   const items = useMemo(
     () =>
       orders
@@ -2139,7 +2141,8 @@ function CalendarScreen({
         animationType="fade"
         onRequestClose={() => setRestoreOpen(false)}
       >
-        <View
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
           style={{
             flex: 1,
             backgroundColor: 'rgba(0,0,0,0.45)',
@@ -2215,7 +2218,7 @@ function CalendarScreen({
                 </Text>
               </Pressable>
               <Pressable
-                disabled={restoreText.trim().length === 0}
+                disabled={!canRestore}
                 onPress={() => {
                   setRestoreOpen(false);
                   onImportBackup(restoreText);
@@ -2226,7 +2229,7 @@ function CalendarScreen({
                     paddingHorizontal: 16,
                     borderRadius: 12,
                     backgroundColor: C.primary,
-                    opacity: restoreText.trim().length === 0 ? 0.4 : 1,
+                    opacity: canRestore ? 1 : 0.4,
                   },
                   pressed && { opacity: 0.7 },
                 ]}
@@ -2237,7 +2240,7 @@ function CalendarScreen({
               </Pressable>
             </View>
           </View>
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
       {selectedItems.length === 0 ? (
         <View style={styles.calendarEmpty}>
@@ -4189,12 +4192,31 @@ export default function RouteloApp() {
                 setOrders(backup.orders);
                 setFuelLogs(backup.fuelLogs);
                 setMileageLogs(backup.mileageLogs);
-                setSettings(backup.settings);
+                // Mirror the normalized form that was actually persisted, so
+                // in-memory settings can't diverge from disk (or crash on a
+                // partial settings object).
+                setSettings(mergeSettingsV2(backup.settings));
                 Alert.alert('복원 완료', '백업 데이터로 복원했습니다.');
               })
-              .catch(() =>
-                Alert.alert('복원 실패', '저장 중 오류가 발생했습니다.'),
-              );
+              .catch(() => {
+                Alert.alert('복원 실패', '저장 중 오류가 발생했습니다.');
+                // A restore is not atomic across collections; if a write fails
+                // midway, re-read every store so the UI reflects what actually
+                // landed on disk instead of stale pre-restore state.
+                Promise.all([
+                  deliveryRepository.list(),
+                  fuelLogRepository.list(),
+                  mileageLogRepository.list(),
+                  settingsRepository.get(),
+                ])
+                  .then(([o, f, m, s]) => {
+                    setOrders(o);
+                    setFuelLogs(f);
+                    setMileageLogs(m);
+                    setSettings(s);
+                  })
+                  .catch(() => undefined);
+              });
           },
         },
       ],
