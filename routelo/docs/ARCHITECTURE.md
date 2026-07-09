@@ -40,9 +40,9 @@
 |---|---|---|
 | `index.tsx` | 화면 + 루트 컴포넌트 (모놀리식, 분리 예정) | — |
 | `theme/` | LUCENT 디자인 토큰 + 유리 프리미티브 | `tokens.ts` · `GlassSurface.tsx` · `color.ts` |
-| `services/` | 순수 비즈니스 로직 | `deliveryFilter` · `deliveryStats` · `profit` · `fuel` · `mileage` · `efficiency` · `backup` · `export` · `phone` · `deadline` · `money` · `maps` · `navigation` · `notificationPlan` · `notifications` · `ocr` · `recognizer` |
-| `domain/` | 도메인 모델 + 어댑터 | `models.ts` · `manualOrder.ts` · `calendar.ts` · `legacy.ts` |
-| `repositories/` | 영속 계약 + 구현 | `contracts.ts` · `local.ts` · `native.ts` |
+| `services/` | 순수 비즈니스 로직 | `deliveryFilter` · `deliveryStats` · `profit` · `fuel` · `mileage` · `efficiency` · `backup`(복원 포함) · `export` · `phone` · `contactLog` · `completionPhoto` · `deadline` · `money` · `maps` · `navigation` · `notificationPlan` · `notifications` · `ocr` · `recognizer` |
+| `domain/` | 도메인 모델 + 어댑터 | `models.ts`(DeliveryOrder·FuelLog·MileageLog·ContactLog) · `manualOrder.ts` · `calendar.ts` · `legacy.ts` |
+| `repositories/` | 영속 계약 + 구현 (배달·주유·주행·연락) | `contracts.ts` · `local.ts` · `native.ts` |
 | `ocr/` | PP-OCRv5 런타임 · 정규화 · 필드 레지스트리 + 검증/heuristic/방향/벤치마크 | `ppocr/*` · `normalize.ts` · `layout.ts` · `fieldHeuristics.ts` · `fieldValidation.ts` · `orientation.ts` |
 | `platform/` | 인식기 계약 (Apple Vision / CLOVA / PP-OCR) + Vision 매핑(순수) | `receiptRecognizers.ts` · `receiptRecognition.ts` · `appleVision.ts` |
 | `../modules/apple-vision-ocr/` | 네이티브 Apple Vision Expo 모듈 (Swift, `app/` 밖·routelo 루트) | `ios/AppleVisionOcrModule.swift` |
@@ -59,7 +59,12 @@
   → 발주처 교차검증(옵트인) → `DeliveryOrder` 저장.
 - **동선** — 주문 → `optimizeByNearestNeighbor` → 사용자 재정렬 → 다음 목적지 `openNavigation` 딥링크.
 - **손익** — `summarizeDailyProfit` → `bucketProfit`(일/주/월) → 차트 · `summarizeEfficiency`(주유+주행).
-- **완료** — 상세 시트 완료 토글 → `schedule.completedAt` → `deliveryRepository.save`.
+- **완료** — 상세 시트 완료 토글 → `schedule.completedAt` → `deliveryRepository.save`;
+  완료 사진은 문서 디렉터리에 상대경로로 저장(`completionPhoto`)하고 주문에 부착.
+- **연락** — 전화 버튼 탭(다이얼 열림 성공 시) → `buildContactLog` → `contactLogRepository.save`,
+  상세 시트 "최근 연락"에 표시.
+- **백업/복원** — `buildBackup`이 배달·주유·주행·연락·설정을 스냅샷 → 공유; 붙여넣기 복원은
+  `parseBackup`(검증) → `applyBackup`(전체 덮어쓰기).
 - **알림** — 주문/설정 변경 시 `planDeliveryNotifications(orders, {nowMs, leadMinutes})`(순수)로
   엄수 마감·예식 알림 계획 산출 → 설정 토글로 필터 → `syncScheduledNotifications`(OS 예약 재조정).
 
@@ -86,7 +91,7 @@
 
 ## 6. 테스트 · 빌드
 
-- **테스트** — 39개 파일 / 224 테스트, 순수 서비스·도메인 코어 중심(jest-expo).
+- **테스트** — 42개 파일 / 263 테스트, 순수 서비스·도메인 코어 중심(jest-expo).
   `npm run test:ci` · `npm run typecheck` · `npm run validate`.
 - **CI** — GitHub Actions `Validate Routelo iOS` (PR·main).
 - **빌드** — EAS. `ios-sim`(무료·Apple 계정 불필요, 컴파일 검증) / `device-test`(유료 멤버십).
