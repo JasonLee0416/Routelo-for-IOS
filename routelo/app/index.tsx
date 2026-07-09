@@ -127,9 +127,7 @@ import { settingsRepository } from './settings/native';
 import { makeStyles, styles } from './theme/appStyles';
 import {
   PrivacyContext,
-  PrivacyValue,
   ThemeContext,
-  ThemeValue,
   usePrivacy,
   useTheme,
 } from './theme/context';
