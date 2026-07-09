@@ -87,7 +87,10 @@ import {
   sortDeliveries,
 } from './services/deliveryFilter';
 import { summarizeDeliveryStats } from './services/deliveryStats';
-import { summarizeEfficiency } from './services/efficiency';
+import {
+  summarizeEfficiency,
+  summarizeEfficiencyByVehicle,
+} from './services/efficiency';
 import { deadlineStatus } from './services/deadline';
 import { buildDailyProfitCsv } from './services/export';
 import { planDeliveryNotifications } from './services/notificationPlan';
@@ -1048,16 +1051,19 @@ const FUEL_FORM_FIELDS: Array<{
   { key: 'pricePerLiter', label: '리터당 단가 (원)', placeholder: '예: 1700' },
   { key: 'amount', label: '총 주유금액 (원)', placeholder: '단가 대신 입력 가능' },
   { key: 'odometerKm', label: '주행거리 (km)', placeholder: '선택' },
+  { key: 'vehicle', label: '차량 (선택)', placeholder: '예: 1톤 트럭' },
 ];
 
 function FuelFormModal({
   visible,
   initial,
+  defaultVehicle,
   onClose,
   onSubmit,
 }: {
   visible: boolean;
   initial?: FuelLog;
+  defaultVehicle?: string;
   onClose: () => void;
   onSubmit: (log: FuelLog) => void;
 }) {
@@ -1065,7 +1071,9 @@ function FuelFormModal({
   const insets = useSafeAreaInsets();
   const editing = Boolean(initial);
   const toValues = (log?: FuelLog): Record<string, string> => {
-    const input = log ? fuelLogToInput(log) : ({} as FuelLogInput);
+    const input = log
+      ? fuelLogToInput(log)
+      : ({ vehicle: defaultVehicle } as FuelLogInput);
     const values: Record<string, string> = {};
     FUEL_FORM_FIELDS.forEach((field) => {
       const raw = input[field.key];
@@ -1094,6 +1102,7 @@ function FuelFormModal({
       pricePerLiter: numeric(values.pricePerLiter),
       amount: numeric(values.amount),
       odometerKm: numeric(values.odometerKm),
+      vehicle: values.vehicle,
     };
     const errors = validateFuelLogInput(input);
     if (errors.length) {
@@ -1162,7 +1171,11 @@ function FuelFormModal({
                   }
                   placeholder={field.placeholder}
                   placeholderTextColor={C.textMuted}
-                  keyboardType={field.key === 'date' ? 'default' : 'numeric'}
+                  keyboardType={
+                    field.key === 'date' || field.key === 'vehicle'
+                      ? 'default'
+                      : 'numeric'
+                  }
                   style={{
                     backgroundColor: C.surfaceAlt,
                     borderWidth: 1,
@@ -1219,16 +1232,19 @@ const MILEAGE_FORM_FIELDS: Array<{
   { key: 'date', label: '기록 날짜', placeholder: 'YYYY-MM-DD' },
   { key: 'odometerKm', label: '누적 주행거리 (km)', placeholder: '예: 12345' },
   { key: 'dailyDistanceKm', label: '일일 주행거리 (km)', placeholder: '선택' },
+  { key: 'vehicle', label: '차량 (선택)', placeholder: '예: 1톤 트럭' },
 ];
 
 function MileageFormModal({
   visible,
   initial,
+  defaultVehicle,
   onClose,
   onSubmit,
 }: {
   visible: boolean;
   initial?: MileageLog;
+  defaultVehicle?: string;
   onClose: () => void;
   onSubmit: (log: MileageLog) => void;
 }) {
@@ -1236,7 +1252,9 @@ function MileageFormModal({
   const insets = useSafeAreaInsets();
   const editing = Boolean(initial);
   const toValues = (log?: MileageLog): Record<string, string> => {
-    const input = log ? mileageLogToInput(log) : ({} as MileageLogInput);
+    const input = log
+      ? mileageLogToInput(log)
+      : ({ vehicle: defaultVehicle } as MileageLogInput);
     const values: Record<string, string> = {};
     MILEAGE_FORM_FIELDS.forEach((field) => {
       const raw = input[field.key];
@@ -1263,6 +1281,7 @@ function MileageFormModal({
       date: values.date ?? '',
       odometerKm: numeric(values.odometerKm) ?? 0,
       dailyDistanceKm: numeric(values.dailyDistanceKm),
+      vehicle: values.vehicle,
     };
     const errors = validateMileageLogInput(input);
     if (errors.length) {
@@ -1331,7 +1350,11 @@ function MileageFormModal({
                   }
                   placeholder={field.placeholder}
                   placeholderTextColor={C.textMuted}
-                  keyboardType={field.key === 'date' ? 'default' : 'numeric'}
+                  keyboardType={
+                    field.key === 'date' || field.key === 'vehicle'
+                      ? 'default'
+                      : 'numeric'
+                  }
                   style={{
                     backgroundColor: C.surfaceAlt,
                     borderWidth: 1,
@@ -2043,6 +2066,9 @@ function CalendarScreen({
       {(fuelLogs.length > 0 || mileageLogs.length > 0) &&
         (() => {
           const eff = summarizeEfficiency(fuelLogs, mileageLogs);
+          const byVehicle = summarizeEfficiencyByVehicle(fuelLogs, mileageLogs, {
+            defaultLabel: settings.costs.vehicleModel?.trim() || '기본 차량',
+          });
           const metrics: Array<[string, string]> = [
             ['연비', eff.kmPerLiter != null ? `${eff.kmPerLiter} km/L` : '-'],
             [
@@ -2094,6 +2120,46 @@ function CalendarScreen({
                   </View>
                 ))}
               </View>
+              {byVehicle.length > 1 && (
+                <View
+                  style={{
+                    marginTop: 12,
+                    borderTopWidth: 1,
+                    borderTopColor: C.outline,
+                    paddingTop: 10,
+                    gap: 6,
+                  }}
+                >
+                  <Text
+                    style={{ fontSize: 11, color: C.textMuted, marginBottom: 2 }}
+                  >
+                    차량별
+                  </Text>
+                  {byVehicle.map((entry) => (
+                    <View
+                      key={entry.vehicle}
+                      style={{
+                        flexDirection: 'row',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                      }}
+                    >
+                      <Text
+                        style={{ fontSize: 12, fontWeight: '700', color: C.text }}
+                        numberOfLines={1}
+                      >
+                        {entry.vehicle}
+                      </Text>
+                      <Text style={{ fontSize: 12, color: C.textMuted }}>
+                        {entry.summary.kmPerLiter != null
+                          ? `${entry.summary.kmPerLiter} km/L`
+                          : '-'}{' '}
+                        · {formatWon(entry.summary.totalDistanceKm)}km
+                      </Text>
+                    </View>
+                  ))}
+                </View>
+              )}
             </View>
           );
         })()}
@@ -4785,12 +4851,14 @@ export default function RouteloApp() {
       <FuelFormModal
         visible={fuelFormVisible}
         initial={fuelFormLog}
+        defaultVehicle={settings.costs.vehicleModel}
         onClose={() => setFuelFormVisible(false)}
         onSubmit={submitFuel}
       />
       <MileageFormModal
         visible={mileageFormVisible}
         initial={mileageFormLog}
+        defaultVehicle={settings.costs.vehicleModel}
         onClose={() => setMileageFormVisible(false)}
         onSubmit={submitMileage}
       />

@@ -2,8 +2,26 @@ import {
   applyFuelLogEdit,
   createFuelLog,
   fuelLogToInput,
+  normalizeVehicle,
   validateFuelLogInput,
 } from '../fuel';
+
+describe('normalizeVehicle', () => {
+  test('trims, and maps blank to undefined', () => {
+    expect(normalizeVehicle('  1톤 트럭 ')).toBe('1톤 트럭');
+    expect(normalizeVehicle('   ')).toBeUndefined();
+    expect(normalizeVehicle(undefined)).toBeUndefined();
+  });
+
+  test('createFuelLog carries the normalized vehicle; round-trips via input', () => {
+    const log = createFuelLog(
+      { date: '2026-07-03', liters: 30, pricePerLiter: 1700, vehicle: ' 트럭 ' },
+      { id: 'f1' },
+    );
+    expect(log.vehicle).toBe('트럭');
+    expect(fuelLogToInput(log).vehicle).toBe('트럭');
+  });
+});
 
 describe('validateFuelLogInput', () => {
   test('accepts a valid input with a unit price', () => {

@@ -21,6 +21,7 @@ export type FuelLog = {
   liters: number;
   amount: number;
   odometerKm: number;
+  vehicle?: string; // free-text vehicle label; undefined = default vehicle
 };
 
 export type MileageLog = {
@@ -28,6 +29,7 @@ export type MileageLog = {
   date: string;
   odometerKm: number;
   dailyDistanceKm: number;
+  vehicle?: string; // free-text vehicle label; undefined = default vehicle
 };
 
 export type ContactChannel =
