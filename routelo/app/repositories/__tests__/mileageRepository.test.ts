@@ -41,4 +41,13 @@ describe('LocalMileageLogRepository', () => {
     await repo.remove('m1');
     expect((await repo.list()).map((entry) => entry.id)).toEqual(['m2']);
   });
+
+  test('replaceAll overwrites the whole collection (restore semantics)', async () => {
+    const repo = new LocalMileageLogRepository(new MemoryStore());
+    await repo.save(log('old', '2026-06-01'));
+    await repo.replaceAll([log('m1', '2026-07-01'), log('m2', '2026-07-02')]);
+    expect((await repo.list()).map((entry) => entry.id)).toEqual(['m1', 'm2']);
+    await repo.replaceAll([]);
+    expect(await repo.list()).toEqual([]);
+  });
 });

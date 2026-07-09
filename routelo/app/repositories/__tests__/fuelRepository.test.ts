@@ -48,4 +48,13 @@ describe('LocalFuelLogRepository', () => {
     const reopened = await new LocalFuelLogRepository(store).list();
     expect(reopened.map((entry) => entry.id)).toEqual(['f1']);
   });
+
+  test('replaceAll overwrites the whole collection (restore semantics)', async () => {
+    const repo = new LocalFuelLogRepository(new MemoryStore());
+    await repo.save(log('old', '2026-06-01'));
+    await repo.replaceAll([log('f1', '2026-07-01'), log('f2', '2026-07-02')]);
+    expect((await repo.list()).map((entry) => entry.id)).toEqual(['f1', 'f2']);
+    await repo.replaceAll([]);
+    expect(await repo.list()).toEqual([]);
+  });
 });

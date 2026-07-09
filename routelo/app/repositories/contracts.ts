@@ -36,12 +36,14 @@ export interface RoutePlanRepository {
 export interface FuelLogRepository {
   list(): Promise<FuelLog[]>;
   save(log: FuelLog): Promise<void>;
+  replaceAll(logs: FuelLog[]): Promise<void>;
   remove(id: string): Promise<void>;
 }
 
 export interface MileageLogRepository {
   list(): Promise<MileageLog[]>;
   save(log: MileageLog): Promise<void>;
+  replaceAll(logs: MileageLog[]): Promise<void>;
   remove(id: string): Promise<void>;
 }
 
