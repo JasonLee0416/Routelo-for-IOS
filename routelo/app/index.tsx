@@ -131,6 +131,14 @@ import {
   StatusBadge,
 } from './components/badges';
 import {
+  addMinutes,
+  formatWon,
+  isEventDelivery,
+  maskAddressForList,
+  priorityOf,
+  timeOf,
+} from './services/format';
+import {
   PrivacyContext,
   ThemeContext,
   usePrivacy,
@@ -164,15 +172,6 @@ type DeliveryFilter = 'all' | 'pending' | 'completed';
 
 const C = LIGHT;
 
-// 목록용 주소 마스킹: 앞 2개 토큰(시/구)만 남기고 이후를 가린다.
-const maskAddressForList = (address: string): string => {
-  const parts = address.trim().split(/\s+/).filter(Boolean);
-  if (parts.length <= 2) return address;
-  return `${parts.slice(0, 2).join(' ')} ···`;
-};
-
-const formatWon = (value: number) => `${Math.round(value).toLocaleString('ko-KR')}원`;
-
 const tabs: Array<{
   key: TabKey;
   label: string;
@@ -197,27 +196,6 @@ const tabs: Array<{
   { key: 'settings', label: '설정', icon: 'settings-outline', activeIcon: 'settings' },
 ];
 
-function timeOf(value: string) {
-  return value.split(' ')[1] || value;
-}
-
-function addMinutes(time: string, minutes: number) {
-  const [hour, minute] = time.split(':').map(Number);
-  const total = hour * 60 + minute + minutes;
-  return `${String(Math.floor(total / 60) % 24).padStart(2, '0')}:${String(
-    total % 60,
-  ).padStart(2, '0')}`;
-}
-
-function isEventDelivery(delivery: Delivery) {
-  return Boolean(delivery.eventTime) || delivery.productName.includes('축하');
-}
-
-function priorityOf(delivery: Delivery) {
-  if (isEventDelivery(delivery)) return 'urgent';
-  if (delivery.distanceKm >= 10) return 'risk';
-  return delivery.status === 'completed' ? 'completed' : 'normal';
-}
 
 function ScreenHeader({
   eyebrow,
