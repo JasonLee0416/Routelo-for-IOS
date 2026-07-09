@@ -5,14 +5,7 @@ import { Ionicons } from '@expo/vector-icons';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as ImagePicker from 'expo-image-picker';
 import { StatusBar } from 'expo-status-bar';
-import {
-  createContext,
-  useContext,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   AccessibilityInfo,
   ActivityIndicator,
@@ -131,7 +124,13 @@ import {
 import { DEFAULT_ROUTELO_SETTINGS, NavApp, RouteloSettings } from './settings';
 import { GYEONGGI_DISTRICTS, SEOUL_DISTRICTS } from './settings/districts';
 import { settingsRepository } from './settings/native';
-import { AppStyles, makeStyles, styles } from './theme/appStyles';
+import { makeStyles, styles } from './theme/appStyles';
+import {
+  PrivacyContext,
+  ThemeContext,
+  usePrivacy,
+  useTheme,
+} from './theme/context';
 import { GlassSurface, useReduceMotion } from './theme/GlassSurface';
 import { DARK, LIGHT, Palette } from './theme/palette';
 import { RADIUS } from './theme/tokens';
@@ -159,30 +158,6 @@ type TabKey =
 type DeliveryFilter = 'all' | 'pending' | 'completed';
 
 const C = LIGHT;
-
-type ThemeValue = { C: Palette; styles: AppStyles; dark: boolean };
-
-const ThemeContext = createContext<ThemeValue | null>(null);
-
-const useTheme = (): ThemeValue =>
-  useContext(ThemeContext) ?? {
-    C: LIGHT,
-    styles: makeStyles(LIGHT),
-    dark: false,
-  };
-
-// 목록에서의 민감정보 노출 제어(설정 privacy). 증거 보존과 무관하게 "표시"만 가린다.
-type PrivacyValue = {
-  showFullPhoneInList: boolean;
-  showFullAddressInList: boolean;
-};
-
-const PrivacyContext = createContext<PrivacyValue>({
-  showFullPhoneInList: false,
-  showFullAddressInList: true,
-});
-
-const usePrivacy = (): PrivacyValue => useContext(PrivacyContext);
 
 // 목록용 주소 마스킹: 앞 2개 토큰(시/구)만 남기고 이후를 가린다.
 const maskAddressForList = (address: string): string => {
