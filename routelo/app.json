@@ -12,8 +12,21 @@
       "bundleIdentifier": "com.jasonlee0312.routelo.ios",
       "buildNumber": "1",
       "infoPlist": {
-        "NSCameraUsageDescription": "배송 영수증을 촬영하고 주문 정보를 인식하기 위해 카메라를 사용합니다.",
-        "NSPhotoLibraryUsageDescription": "저장된 배송 영수증을 선택하고 주문 정보를 인식하기 위해 사진 보관함을 사용합니다."
+        "NSCameraUsageDescription": "배송 영수증 촬영·인식과 배송 완료 사진 첨부를 위해 카메라를 사용합니다.",
+        "NSPhotoLibraryUsageDescription": "저장된 배송 영수증 선택·인식과 배송 완료 사진 첨부를 위해 사진 보관함을 사용합니다.",
+        "ITSAppUsesNonExemptEncryption": false
+      },
+      "privacyManifests": {
+        "NSPrivacyAccessedAPITypes": [
+          {
+            "NSPrivacyAccessedAPIType": "NSPrivacyAccessedAPICategoryUserDefaults",
+            "NSPrivacyAccessedAPITypeReasons": ["CA92.1"]
+          },
+          {
+            "NSPrivacyAccessedAPIType": "NSPrivacyAccessedAPICategoryFileTimestamp",
+            "NSPrivacyAccessedAPITypeReasons": ["C617.1"]
+          }
+        ]
       }
     },
     "android": {
