@@ -70,6 +70,7 @@ import {
 import { applyBackup, buildBackupJson, parseBackup } from './services/backup';
 import {
   buildContactLog,
+  formatLocalContactTime,
   recentContactsForDelivery,
 } from './services/contactLog';
 import {
@@ -1572,6 +1573,7 @@ function CalendarScreen({
   orders,
   fuelLogs,
   mileageLogs,
+  contactLogs,
   settings,
   onDeliveryPress,
   onNotifications,
@@ -1586,6 +1588,7 @@ function CalendarScreen({
   orders: DeliveryOrder[];
   fuelLogs: FuelLog[];
   mileageLogs: MileageLog[];
+  contactLogs: ContactLog[];
   settings: RouteloSettings;
   onDeliveryPress: (delivery: Delivery) => void;
   onNotifications: () => void;
@@ -2101,6 +2104,7 @@ function CalendarScreen({
               orders,
               fuelLogs,
               mileageLogs,
+              contactLogs,
               settings,
               exportedAt: new Date().toISOString(),
             }),
@@ -3219,8 +3223,16 @@ function DeliveryDetailSheet({
                 <Pressable
                   key={target.label}
                   onPress={() => {
-                    Linking.openURL(target.href).catch(() => undefined);
-                    onLogCall(target.label, target.href.replace(/^tel:/, ''));
+                    // Log only once the dialer actually opens, so tapping on a
+                    // device without telephony doesn't record a phantom call.
+                    Linking.openURL(target.href)
+                      .then(() =>
+                        onLogCall(
+                          target.label,
+                          target.href.replace(/^tel:/, ''),
+                        ),
+                      )
+                      .catch(() => undefined);
                   }}
                   style={{
                     flexDirection: 'row',
@@ -3260,7 +3272,7 @@ function DeliveryDetailSheet({
                     {contact.label} · {formatPhone(contact.phone)}
                   </Text>
                   <Text style={{ color: C.textMuted, fontSize: 11 }}>
-                    {contact.at.slice(5, 16).replace('T', ' ')}
+                    {formatLocalContactTime(new Date(contact.at))}
                   </Text>
                 </View>
               ))}
@@ -4246,7 +4258,14 @@ export default function RouteloApp() {
     contactLogRepository
       .list()
       .then((stored) => {
-        if (stored.length) setContactLogs(stored);
+        if (!stored.length) return;
+        // Merge, don't clobber: a call could be logged optimistically before
+        // this async read resolves.
+        setContactLogs((current) => {
+          if (!current.length) return stored;
+          const seen = new Set(current.map((log) => log.id));
+          return [...current, ...stored.filter((log) => !seen.has(log.id))];
+        });
       })
       .catch(() => undefined);
   }, []);
@@ -4302,7 +4321,7 @@ export default function RouteloApp() {
     const { backup } = result;
     Alert.alert(
       '백업 복원',
-      `현재 데이터를 이 백업으로 덮어씁니다.\n배달 ${backup.orders.length} · 주유 ${backup.fuelLogs.length} · 주행 ${backup.mileageLogs.length}\n\n계속할까요?`,
+      `현재 데이터를 이 백업으로 덮어씁니다.\n배달 ${backup.orders.length} · 주유 ${backup.fuelLogs.length} · 주행 ${backup.mileageLogs.length} · 연락 ${backup.contactLogs.length}\n\n계속할까요?`,
       [
         { text: '취소', style: 'cancel' },
         {
@@ -4313,12 +4332,14 @@ export default function RouteloApp() {
               saveOrders: (o) => deliveryRepository.saveAll(o),
               replaceFuelLogs: (f) => fuelLogRepository.replaceAll(f),
               replaceMileageLogs: (m) => mileageLogRepository.replaceAll(m),
+              replaceContactLogs: (c) => contactLogRepository.replaceAll(c),
               saveSettings: (s) => settingsRepository.save(s),
             })
               .then(() => {
                 setOrders(backup.orders);
                 setFuelLogs(backup.fuelLogs);
                 setMileageLogs(backup.mileageLogs);
+                setContactLogs(backup.contactLogs);
                 // Mirror the normalized form that was actually persisted, so
                 // in-memory settings can't diverge from disk (or crash on a
                 // partial settings object).
@@ -4334,12 +4355,14 @@ export default function RouteloApp() {
                   deliveryRepository.list(),
                   fuelLogRepository.list(),
                   mileageLogRepository.list(),
+                  contactLogRepository.list(),
                   settingsRepository.get(),
                 ])
-                  .then(([o, f, m, s]) => {
+                  .then(([o, f, m, c, s]) => {
                     setOrders(o);
                     setFuelLogs(f);
                     setMileageLogs(m);
+                    setContactLogs(c);
                     setSettings(s);
                   })
                   .catch(() => undefined);
@@ -4544,6 +4567,7 @@ export default function RouteloApp() {
           orders={orders}
           fuelLogs={fuelLogs}
           mileageLogs={mileageLogs}
+          contactLogs={contactLogs}
           settings={settings}
           onDeliveryPress={setSelectedDelivery}
           onNotifications={openNotifications}

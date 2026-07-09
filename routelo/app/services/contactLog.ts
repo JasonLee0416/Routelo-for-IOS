@@ -30,6 +30,17 @@ export function buildContactLog(input: {
   };
 }
 
+const pad = (n: number): string => String(n).padStart(2, '0');
+
+// "MM-DD HH:mm" in the device's LOCAL time. `at` is stored as a UTC ISO string,
+// so we go through Date to read local components — slicing the ISO directly
+// would show UTC (9h off for KST).
+export function formatLocalContactTime(date: Date): string {
+  return `${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(
+    date.getHours(),
+  )}:${pad(date.getMinutes())}`;
+}
+
 // Most-recent-first contacts for one delivery, capped at `limit`.
 export function recentContactsForDelivery(
   logs: ContactLog[],

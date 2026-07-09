@@ -2,8 +2,17 @@ import { ContactLog } from '../../models';
 import {
   buildContactLog,
   channelFromLabel,
+  formatLocalContactTime,
   recentContactsForDelivery,
 } from '../contactLog';
+
+describe('formatLocalContactTime', () => {
+  test('formats local month-day hour:minute (TZ-independent via local getters)', () => {
+    // Built from local components, read back as local → no TZ assumption.
+    expect(formatLocalContactTime(new Date(2026, 6, 9, 14, 5))).toBe('07-09 14:05');
+    expect(formatLocalContactTime(new Date(2026, 11, 1, 0, 0))).toBe('12-01 00:00');
+  });
+});
 
 describe('channelFromLabel', () => {
   test('maps known Korean labels to channels', () => {

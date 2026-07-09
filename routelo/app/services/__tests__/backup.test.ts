@@ -1,5 +1,5 @@
 import { DeliveryOrder } from '../../domain';
-import { FuelLog, MileageLog } from '../../models';
+import { ContactLog, FuelLog, MileageLog } from '../../models';
 import { DEFAULT_ROUTELO_SETTINGS } from '../../settings';
 import {
   applyBackup,
@@ -25,11 +25,20 @@ const mileage: MileageLog = {
   odometerKm: 12345,
   dailyDistanceKm: 40,
 };
+const contact: ContactLog = {
+  id: 'c1',
+  deliveryId: 'd1',
+  channel: 'recipient',
+  label: '수령인',
+  phone: '01011112222',
+  at: '2026-07-04T00:00:00.000Z',
+};
 
 const input = {
   orders: [order],
   fuelLogs: [fuel],
   mileageLogs: [mileage],
+  contactLogs: [contact],
   settings: DEFAULT_ROUTELO_SETTINGS,
   exportedAt: '2026-07-04T00:00:00.000Z',
 };
@@ -43,6 +52,7 @@ describe('buildBackup', () => {
     expect(backup.orders).toHaveLength(1);
     expect(backup.fuelLogs).toHaveLength(1);
     expect(backup.mileageLogs).toHaveLength(1);
+    expect(backup.contactLogs).toHaveLength(1);
     expect(backup.settings).toBe(DEFAULT_ROUTELO_SETTINGS);
   });
 });
@@ -65,6 +75,21 @@ describe('parseBackup', () => {
     expect(result.backup).toEqual(buildBackup(input));
     expect(result.backup.orders).toHaveLength(1);
     expect(result.backup.fuelLogs[0].amount).toBe(51000);
+    expect(result.backup.contactLogs[0].id).toBe('c1');
+  });
+
+  test('defaults contactLogs to [] for an older backup that lacks them', () => {
+    const { contactLogs, ...legacy } = buildBackup(input);
+    void contactLogs;
+    const result = parseBackup(JSON.stringify(legacy));
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.backup.contactLogs).toEqual([]);
+  });
+
+  test('rejects a corrupt contactLogs list when present', () => {
+    const corrupt = JSON.stringify({ ...buildBackup(input), contactLogs: [1, 2] });
+    expect(parseBackup(corrupt).ok).toBe(false);
   });
 
   test('rejects invalid JSON', () => {
@@ -160,12 +185,21 @@ describe('applyBackup', () => {
       replaceMileageLogs: async (m) => {
         calls.push(`mileage:${m.length}`);
       },
+      replaceContactLogs: async (c) => {
+        calls.push(`contact:${c.length}`);
+      },
       saveSettings: async () => {
         calls.push('settings');
       },
     };
     await applyBackup(buildBackup(input), targets);
-    expect(calls).toEqual(['orders:1', 'fuel:1', 'mileage:1', 'settings']);
+    expect(calls).toEqual([
+      'orders:1',
+      'fuel:1',
+      'mileage:1',
+      'contact:1',
+      'settings',
+    ]);
   });
 
   test('propagates a persistence failure to the caller', async () => {
@@ -175,6 +209,7 @@ describe('applyBackup', () => {
         throw new Error('disk full');
       },
       replaceMileageLogs: async () => undefined,
+      replaceContactLogs: async () => undefined,
       saveSettings: async () => undefined,
     };
     await expect(applyBackup(buildBackup(input), targets)).rejects.toThrow(
