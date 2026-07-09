@@ -126,6 +126,11 @@ import { GYEONGGI_DISTRICTS, SEOUL_DISTRICTS } from './settings/districts';
 import { settingsRepository } from './settings/native';
 import { makeStyles, styles } from './theme/appStyles';
 import {
+  ConfidenceBadge,
+  QualityMeter,
+  StatusBadge,
+} from './components/badges';
+import {
   PrivacyContext,
   ThemeContext,
   usePrivacy,
@@ -212,29 +217,6 @@ function priorityOf(delivery: Delivery) {
   if (isEventDelivery(delivery)) return 'urgent';
   if (delivery.distanceKm >= 10) return 'risk';
   return delivery.status === 'completed' ? 'completed' : 'normal';
-}
-
-function StatusBadge({ status }: { status: Delivery['status'] }) {
-  const { C, styles } = useTheme();
-  const completed = status === 'completed';
-  return (
-    <View style={[styles.badge, completed ? styles.successBadge : styles.waitBadge]}>
-      <View
-        style={[
-          styles.badgeDot,
-          { backgroundColor: completed ? C.success : C.primary },
-        ]}
-      />
-      <Text
-        style={[
-          styles.badgeText,
-          { color: completed ? C.success : C.primary },
-        ]}
-      >
-        {completed ? '완료' : '배달 대기'}
-      </Text>
-    </View>
-  );
 }
 
 function ScreenHeader({
@@ -3595,49 +3577,6 @@ const OCR_FIELD_ICONS: Record<OcrFieldKey, keyof typeof Ionicons.glyphMap> = {
   recipientTel: 'call-outline',
   memo: 'document-text-outline',
 };
-
-function ConfidenceBadge({ field }: { field: OcrFieldResult }) {
-  const { C, styles } = useTheme();
-  const confirmed = field.status === 'confirmed';
-  const review = field.status === 'review';
-  const color = confirmed ? C.success : review ? C.warning : C.danger;
-  const background = confirmed ? C.successBg : review ? C.warningBg : C.dangerBg;
-  return (
-    <View style={[styles.confidenceBadge, { backgroundColor: background }]}>
-      <Ionicons
-        name={confirmed ? 'checkmark-circle' : review ? 'help-circle' : 'warning'}
-        size={14}
-        color={color}
-      />
-      <Text style={[styles.confidenceText, { color }]}>{field.confidence}%</Text>
-    </View>
-  );
-}
-
-function QualityMeter({
-  label,
-  value,
-  icon,
-}: {
-  label: string;
-  value: number;
-  icon: keyof typeof Ionicons.glyphMap;
-}) {
-  const { C, styles } = useTheme();
-  const color = value >= 80 ? C.success : value >= 60 ? C.warning : C.danger;
-  return (
-    <View style={styles.qualityRow}>
-      <View style={styles.qualityLabelGroup}>
-        <Ionicons name={icon} size={17} color={color} />
-        <Text style={styles.qualityLabel}>{label}</Text>
-      </View>
-      <View style={styles.qualityTrack}>
-        <View style={[styles.qualityFill, { width: `${value}%`, backgroundColor: color }]} />
-      </View>
-      <Text style={[styles.qualityValue, { color }]}>{value}</Text>
-    </View>
-  );
-}
 
 function OcrScannerModal({
   visible,
