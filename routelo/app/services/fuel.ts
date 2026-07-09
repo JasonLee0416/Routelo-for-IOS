@@ -8,6 +8,14 @@ export type FuelLogInput = {
   pricePerLiter?: number;
   amount?: number;
   odometerKm?: number;
+  vehicle?: string;
+};
+
+// Normalize a free-text vehicle label: trimmed, or undefined when blank so it
+// falls back to the default vehicle everywhere.
+export const normalizeVehicle = (vehicle?: string): string | undefined => {
+  const trimmed = vehicle?.trim();
+  return trimmed ? trimmed : undefined;
 };
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
@@ -72,6 +80,7 @@ export function createFuelLog(
     pricePerLiter,
     amount,
     odometerKm: input.odometerKm ?? 0,
+    vehicle: normalizeVehicle(input.vehicle),
   };
 }
 
@@ -86,6 +95,7 @@ export function applyFuelLogEdit(log: FuelLog, input: FuelLogInput): FuelLog {
     pricePerLiter,
     amount,
     odometerKm: input.odometerKm ?? 0,
+    vehicle: normalizeVehicle(input.vehicle),
   };
 }
 
@@ -96,5 +106,6 @@ export function fuelLogToInput(log: FuelLog): FuelLogInput {
     pricePerLiter: log.pricePerLiter || undefined,
     amount: log.amount || undefined,
     odometerKm: log.odometerKm || undefined,
+    vehicle: log.vehicle,
   };
 }

@@ -36,3 +36,46 @@ export function summarizeEfficiency(
       totalDistanceKm > 0 ? Math.round(totalFuelCost / totalDistanceKm) : null,
   };
 }
+
+export type VehicleEfficiency = {
+  vehicle: string; // resolved label (never blank)
+  summary: EfficiencySummary;
+};
+
+// Groups fuel + mileage by vehicle label and summarizes each. Logs with no
+// vehicle set are folded into `defaultLabel`, so pre-vehicle data still shows
+// up. Result is sorted by vehicle name for a stable UI.
+export function summarizeEfficiencyByVehicle(
+  fuelLogs: FuelLog[],
+  mileageLogs: MileageLog[],
+  opts: { defaultLabel: string },
+): VehicleEfficiency[] {
+  const label = (v?: string) => {
+    const trimmed = v?.trim();
+    return trimmed ? trimmed : opts.defaultLabel;
+  };
+  const fuelByVehicle = new Map<string, FuelLog[]>();
+  const mileageByVehicle = new Map<string, MileageLog[]>();
+  const vehicles = new Set<string>();
+
+  for (const log of fuelLogs) {
+    const key = label(log.vehicle);
+    vehicles.add(key);
+    fuelByVehicle.set(key, [...(fuelByVehicle.get(key) ?? []), log]);
+  }
+  for (const log of mileageLogs) {
+    const key = label(log.vehicle);
+    vehicles.add(key);
+    mileageByVehicle.set(key, [...(mileageByVehicle.get(key) ?? []), log]);
+  }
+
+  return [...vehicles]
+    .sort((a, b) => a.localeCompare(b))
+    .map((vehicle) => ({
+      vehicle,
+      summary: summarizeEfficiency(
+        fuelByVehicle.get(vehicle) ?? [],
+        mileageByVehicle.get(vehicle) ?? [],
+      ),
+    }));
+}

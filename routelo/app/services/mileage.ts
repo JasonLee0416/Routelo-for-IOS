@@ -1,10 +1,12 @@
 import { MileageLog } from '../models';
+import { normalizeVehicle } from './fuel';
 
 // User-facing input for a daily odometer / driving-distance record.
 export type MileageLogInput = {
   date: string; // YYYY-MM-DD
   odometerKm: number;
   dailyDistanceKm?: number;
+  vehicle?: string;
 };
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
@@ -37,6 +39,7 @@ export function createMileageLog(
     date: input.date,
     odometerKm: input.odometerKm,
     dailyDistanceKm: input.dailyDistanceKm ?? 0,
+    vehicle: normalizeVehicle(input.vehicle),
   };
 }
 
@@ -51,6 +54,7 @@ export function applyMileageLogEdit(
     date: input.date,
     odometerKm: input.odometerKm,
     dailyDistanceKm: input.dailyDistanceKm ?? 0,
+    vehicle: normalizeVehicle(input.vehicle),
   };
 }
 
@@ -59,5 +63,6 @@ export function mileageLogToInput(log: MileageLog): MileageLogInput {
     date: log.date,
     odometerKm: log.odometerKm,
     dailyDistanceKm: log.dailyDistanceKm || undefined,
+    vehicle: log.vehicle,
   };
 }
