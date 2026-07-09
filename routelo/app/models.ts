@@ -30,6 +30,23 @@ export type MileageLog = {
   dailyDistanceKm: number;
 };
 
+export type ContactChannel =
+  | 'recipient'
+  | 'orderingVendor'
+  | 'fulfillingVendor'
+  | 'other';
+
+// A record that the driver placed a call for a delivery, so the history is
+// available for re-contact and dispute handling.
+export type ContactLog = {
+  id: string;
+  deliveryId: string;
+  channel: ContactChannel;
+  label: string; // display label captured at call time (수령인/발주처/화원)
+  phone: string;
+  at: string; // ISO timestamp
+};
+
 export type OcrForm = {
   orderVendor: string;
   orderVendorTel: string;

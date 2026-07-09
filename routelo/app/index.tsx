@@ -53,6 +53,7 @@ import {
   validateManualOrderInput,
 } from './domain';
 import {
+  ContactLog,
   Delivery,
   FuelLog,
   MileageLog,
@@ -61,11 +62,17 @@ import {
   OcrPipelineResult,
 } from './models';
 import {
+  contactLogRepository,
   deliveryRepository,
   fuelLogRepository,
   mileageLogRepository,
 } from './repositories/native';
 import { applyBackup, buildBackupJson, parseBackup } from './services/backup';
+import {
+  buildContactLog,
+  formatLocalContactTime,
+  recentContactsForDelivery,
+} from './services/contactLog';
 import {
   attachCompletionPhoto,
   clearCompletionPhoto,
@@ -1566,6 +1573,7 @@ function CalendarScreen({
   orders,
   fuelLogs,
   mileageLogs,
+  contactLogs,
   settings,
   onDeliveryPress,
   onNotifications,
@@ -1580,6 +1588,7 @@ function CalendarScreen({
   orders: DeliveryOrder[];
   fuelLogs: FuelLog[];
   mileageLogs: MileageLog[];
+  contactLogs: ContactLog[];
   settings: RouteloSettings;
   onDeliveryPress: (delivery: Delivery) => void;
   onNotifications: () => void;
@@ -2095,6 +2104,7 @@ function CalendarScreen({
               orders,
               fuelLogs,
               mileageLogs,
+              contactLogs,
               settings,
               exportedAt: new Date().toISOString(),
             }),
@@ -3091,22 +3101,26 @@ function DeliveryDetailSheet({
   delivery,
   visible,
   completionPhotoUri,
+  recentContacts,
   onClose,
   onToggle,
   onEdit,
   onDelete,
   onAttachPhoto,
   onRemovePhoto,
+  onLogCall,
 }: {
   delivery?: Delivery;
   visible: boolean;
   completionPhotoUri?: string;
+  recentContacts: ContactLog[];
   onClose: () => void;
   onToggle: () => void;
   onEdit: () => void;
   onDelete: () => void;
   onAttachPhoto: () => void;
   onRemovePhoto: () => void;
+  onLogCall: (label: string, phone: string) => void;
 }) {
   const { C, styles, dark } = useTheme();
   const insets = useSafeAreaInsets();
@@ -3208,7 +3222,18 @@ function DeliveryDetailSheet({
               {callTargets.map((target) => (
                 <Pressable
                   key={target.label}
-                  onPress={() => Linking.openURL(target.href)}
+                  onPress={() => {
+                    // Log only once the dialer actually opens, so tapping on a
+                    // device without telephony doesn't record a phantom call.
+                    Linking.openURL(target.href)
+                      .then(() =>
+                        onLogCall(
+                          target.label,
+                          target.href.replace(/^tel:/, ''),
+                        ),
+                      )
+                      .catch(() => undefined);
+                  }}
                   style={{
                     flexDirection: 'row',
                     alignItems: 'center',
@@ -3227,6 +3252,29 @@ function DeliveryDetailSheet({
                     {target.label}
                   </Text>
                 </Pressable>
+              ))}
+            </View>
+          )}
+          {recentContacts.length > 0 && (
+            <View style={styles.sheetInfoBlock}>
+              <Text style={styles.sheetInfoLabel}>최근 연락</Text>
+              {recentContacts.map((contact) => (
+                <View
+                  key={contact.id}
+                  style={{
+                    flexDirection: 'row',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    paddingVertical: 4,
+                  }}
+                >
+                  <Text style={{ color: C.text, fontSize: 12, fontWeight: '600' }}>
+                    {contact.label} · {formatPhone(contact.phone)}
+                  </Text>
+                  <Text style={{ color: C.textMuted, fontSize: 11 }}>
+                    {formatLocalContactTime(new Date(contact.at))}
+                  </Text>
+                </View>
               ))}
             </View>
           )}
@@ -4137,6 +4185,7 @@ export default function RouteloApp() {
   const [mileageFormLog, setMileageFormLog] = useState<MileageLog | undefined>(
     undefined,
   );
+  const [contactLogs, setContactLogs] = useState<ContactLog[]>([]);
 
   useEffect(() => {
     deliveryRepository
@@ -4205,6 +4254,22 @@ export default function RouteloApp() {
       .catch(() => undefined);
   }, []);
 
+  useEffect(() => {
+    contactLogRepository
+      .list()
+      .then((stored) => {
+        if (!stored.length) return;
+        // Merge, don't clobber: a call could be logged optimistically before
+        // this async read resolves.
+        setContactLogs((current) => {
+          if (!current.length) return stored;
+          const seen = new Set(current.map((log) => log.id));
+          return [...current, ...stored.filter((log) => !seen.has(log.id))];
+        });
+      })
+      .catch(() => undefined);
+  }, []);
+
   // Keep OS-scheduled deadline/event reminders in sync with deliveries + setting.
   useEffect(() => {
     const n = settings.notifications;
@@ -4256,7 +4321,7 @@ export default function RouteloApp() {
     const { backup } = result;
     Alert.alert(
       '백업 복원',
-      `현재 데이터를 이 백업으로 덮어씁니다.\n배달 ${backup.orders.length} · 주유 ${backup.fuelLogs.length} · 주행 ${backup.mileageLogs.length}\n\n계속할까요?`,
+      `현재 데이터를 이 백업으로 덮어씁니다.\n배달 ${backup.orders.length} · 주유 ${backup.fuelLogs.length} · 주행 ${backup.mileageLogs.length} · 연락 ${backup.contactLogs.length}\n\n계속할까요?`,
       [
         { text: '취소', style: 'cancel' },
         {
@@ -4267,12 +4332,14 @@ export default function RouteloApp() {
               saveOrders: (o) => deliveryRepository.saveAll(o),
               replaceFuelLogs: (f) => fuelLogRepository.replaceAll(f),
               replaceMileageLogs: (m) => mileageLogRepository.replaceAll(m),
+              replaceContactLogs: (c) => contactLogRepository.replaceAll(c),
               saveSettings: (s) => settingsRepository.save(s),
             })
               .then(() => {
                 setOrders(backup.orders);
                 setFuelLogs(backup.fuelLogs);
                 setMileageLogs(backup.mileageLogs);
+                setContactLogs(backup.contactLogs);
                 // Mirror the normalized form that was actually persisted, so
                 // in-memory settings can't diverge from disk (or crash on a
                 // partial settings object).
@@ -4288,12 +4355,14 @@ export default function RouteloApp() {
                   deliveryRepository.list(),
                   fuelLogRepository.list(),
                   mileageLogRepository.list(),
+                  contactLogRepository.list(),
                   settingsRepository.get(),
                 ])
-                  .then(([o, f, m, s]) => {
+                  .then(([o, f, m, c, s]) => {
                     setOrders(o);
                     setFuelLogs(f);
                     setMileageLogs(m);
+                    setContactLogs(c);
                     setSettings(s);
                   })
                   .catch(() => undefined);
@@ -4437,6 +4506,19 @@ export default function RouteloApp() {
     });
   };
 
+  const logCall = (label: string, phone: string) => {
+    if (!selectedDelivery) return;
+    const log = buildContactLog({
+      id: `c-${Date.now()}-${Math.floor(Math.random() * 1e6)}`,
+      deliveryId: selectedDelivery.id,
+      label,
+      phone,
+      at: new Date().toISOString(),
+    });
+    setContactLogs((current) => [log, ...current]);
+    contactLogRepository.save(log).catch(() => undefined);
+  };
+
   const openCreateForm = () => {
     setFormOrder(undefined);
     setFormVisible(true);
@@ -4485,6 +4567,7 @@ export default function RouteloApp() {
           orders={orders}
           fuelLogs={fuelLogs}
           mileageLogs={mileageLogs}
+          contactLogs={contactLogs}
           settings={settings}
           onDeliveryPress={setSelectedDelivery}
           onNotifications={openNotifications}
@@ -4681,12 +4764,17 @@ export default function RouteloApp() {
               )
             : undefined;
         })()}
+        recentContacts={recentContactsForDelivery(
+          contactLogs,
+          selectedDelivery?.id ?? '',
+        )}
         onClose={() => setSelectedDelivery(undefined)}
         onToggle={toggleSelected}
         onEdit={editSelected}
         onDelete={deleteSelected}
         onAttachPhoto={startCompletionPhoto}
         onRemovePhoto={removeCompletionPhoto}
+        onLogCall={logCall}
       />
       <DeliveryFormModal
         visible={formVisible}

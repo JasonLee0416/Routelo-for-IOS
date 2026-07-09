@@ -1,5 +1,5 @@
 import { DeliveryOrder } from '../domain';
-import { FuelLog, MileageLog } from '../models';
+import { ContactLog, FuelLog, MileageLog } from '../models';
 import { RouteloSettings } from '../settings';
 
 export const BACKUP_SCHEMA_VERSION = 1;
@@ -11,6 +11,7 @@ export type RouteloBackup = {
   orders: DeliveryOrder[];
   fuelLogs: FuelLog[];
   mileageLogs: MileageLog[];
+  contactLogs: ContactLog[];
   settings: RouteloSettings;
 };
 
@@ -18,6 +19,7 @@ export type BackupInput = {
   orders: DeliveryOrder[];
   fuelLogs: FuelLog[];
   mileageLogs: MileageLog[];
+  contactLogs: ContactLog[];
   settings: RouteloSettings;
   exportedAt: string;
 };
@@ -34,6 +36,7 @@ export function buildBackup(input: BackupInput): RouteloBackup {
     orders: input.orders,
     fuelLogs: input.fuelLogs,
     mileageLogs: input.mileageLogs,
+    contactLogs: input.contactLogs,
     settings: input.settings,
   };
 }
@@ -97,6 +100,11 @@ export function parseBackup(json: string): ParseBackupResult {
   ) {
     return { ok: false, error: '백업 데이터가 손상되었습니다(목록 형식 오류).' };
   }
+  // contactLogs was added after v1's first release, so it may be absent in an
+  // older backup — treat missing as empty, but validate it when present.
+  if (raw.contactLogs !== undefined && !isRecordArray(raw.contactLogs)) {
+    return { ok: false, error: '백업 데이터가 손상되었습니다(목록 형식 오류).' };
+  }
   if (!isObject(raw.settings)) {
     return { ok: false, error: '백업 데이터가 손상되었습니다(설정 누락).' };
   }
@@ -110,6 +118,9 @@ export function parseBackup(json: string): ParseBackupResult {
       orders: raw.orders as DeliveryOrder[],
       fuelLogs: raw.fuelLogs as FuelLog[],
       mileageLogs: raw.mileageLogs as MileageLog[],
+      contactLogs: Array.isArray(raw.contactLogs)
+        ? (raw.contactLogs as ContactLog[])
+        : [],
       settings: raw.settings as unknown as RouteloSettings,
     },
   };
@@ -122,6 +133,7 @@ export type RestoreTargets = {
   saveOrders: (orders: DeliveryOrder[]) => Promise<void>;
   replaceFuelLogs: (logs: FuelLog[]) => Promise<void>;
   replaceMileageLogs: (logs: MileageLog[]) => Promise<void>;
+  replaceContactLogs: (logs: ContactLog[]) => Promise<void>;
   saveSettings: (settings: RouteloSettings) => Promise<void>;
 };
 
@@ -132,5 +144,6 @@ export async function applyBackup(
   await targets.saveOrders(backup.orders);
   await targets.replaceFuelLogs(backup.fuelLogs);
   await targets.replaceMileageLogs(backup.mileageLogs);
+  await targets.replaceContactLogs(backup.contactLogs);
   await targets.saveSettings(backup.settings);
 }
