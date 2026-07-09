@@ -122,4 +122,61 @@ describe('OCR field extraction — PP-OCR baseline (+ Apple Vision if present)',
       expect(hit).toBe(total);
     },
   );
+
+  // 값-형식 분류(Phase 1)의 정답(ground-truth) 정확도 바닥을 고정하는 회귀 가드.
+  // 값-정확일치만 카운트. baseline 14/31 → Phase 1 값-형식 스캐너로 20/31.
+  const gtPath = path.join(dir, 'ground-truth.json');
+  const groundTruth: Record<string, Record<string, string>> | null =
+    fs.existsSync(gtPath) ? JSON.parse(fs.readFileSync(gtPath, 'utf8')) : null;
+  (vision && groundTruth ? test : test.skip)(
+    'ground-truth field accuracy stays >= 20/31 (Phase 1 floor)',
+    () => {
+      const byImage = new Map(vision!.map((v) => [v.image, v]));
+      let total = 0;
+      let hit = 0;
+      for (const [image, truth] of Object.entries(groundTruth!)) {
+        if (image.startsWith('_')) continue;
+        const v = byImage.get(image);
+        if (!v) continue;
+        const got: Record<string, string> = {};
+        parseVision(v)
+          .fields.filter((f) => f.value)
+          .forEach((f) => (got[f.key] = f.value));
+        for (const [k, t] of Object.entries(truth)) {
+          if (k === 'eventType') continue;
+          total += 1;
+          if (got[k] === t) hit += 1;
+        }
+      }
+      // eslint-disable-next-line no-console
+      console.log(`ground-truth accuracy: ${hit}/${total}`);
+      expect(hit).toBeGreaterThanOrEqual(20);
+    },
+  );
+
+  // 이번 Phase 1 값-형식 스캐너가 회복한 개별 필드를 고정(핀포인트 회귀 가드).
+  (vision && groundTruth ? test : test.skip)(
+    'value-format scanners recover product/strictTime/condolence-recipient',
+    () => {
+      const byImage = new Map(vision!.map((v) => [v.image, v]));
+      const val = (img: string, key: string) =>
+        parseVision(byImage.get(img)!).fields.find((f) => f.key === key)
+          ?.value || '';
+      expect(val('KakaoTalk_20260621_070828835_02.jpg', 'productName')).toBe(
+        '착한근조',
+      );
+      expect(val('KakaoTalk_20260621_070828835_03.jpg', 'productName')).toBe(
+        '근조 3단',
+      );
+      expect(val('KakaoTalk_20260621_070828835_04.jpg', 'productName')).toBe(
+        '근조화환',
+      );
+      expect(val('KakaoTalk_20260621_070828835_04.jpg', 'strictTime')).toBe(
+        '17:00',
+      );
+      expect(val('KakaoTalk_20260621_070828835_04.jpg', 'recipientName')).toBe(
+        '유기열',
+      );
+    },
+  );
 });

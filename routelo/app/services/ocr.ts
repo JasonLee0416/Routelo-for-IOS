@@ -5,11 +5,12 @@ import {
   OcrPipelineResult,
 } from '../models';
 import { shouldRequestCloudFallback } from '../ocr/cloudFallback';
-import { inferEventType } from '../ocr/contentClassifier';
+import { inferEventType, scanProductName } from '../ocr/contentClassifier';
 import {
   cleanVendorName,
   extractPersonName,
   pickBest,
+  scanCondolenceRecipient,
   scanVendorTokens,
   scoreAddress,
 } from '../ocr/fieldHeuristics';
@@ -20,6 +21,7 @@ import {
   matchKoreanDate,
   normalizeKoreanPhone,
   normalizeKoreanTime,
+  scanStrictTime,
 } from '../ocr/fieldValidation';
 import { DEFAULT_FIELD_REGISTRY } from '../ocr/fieldRegistry';
 import { buildLayoutText } from '../ocr/layout';
@@ -327,9 +329,20 @@ export function parseReceiptText(
       ? productSource
       : undefined);
   // 상품명은 뒤에 붙은 수량("... 2개")을 떼어 순수 품목만 남긴다(수량은 별도 필드).
-  const productName = (productSource?.value || '')
+  let productName = (productSource?.value || '')
     .replace(/\s*\d+\s*개\s*$/, '')
     .trim();
+  // 라벨 값이 비었거나(∅), blob(레이아웃 붕괴로 셀 병합, 길이>16), 또는 라벨/기호 잔여가
+  // 섞였으면(예: "*착한근조- 수량") 값-형식 상품명(간결형)으로 대체한다.
+  const productScan = scanProductName(text);
+  if (
+    productScan &&
+    (!productName ||
+      productName.length > 16 ||
+      /[^가-힣0-9\s]/.test(productName))
+  ) {
+    productName = productScan;
+  }
   const ribbonSource =
     findLabeledValue(lines, [
       '리본문구',
@@ -368,9 +381,12 @@ export function parseReceiptText(
     firstMatchingLine(lines, (line) =>
       /\(\s*\d{1,2}시\s*\d{0,2}분?\s*식\s*\)/.test(line),
     );
+  // 라벨 매칭 실패 시, '까지 배송/도착·엄수' 문맥의 시각을 값 형식으로 회복(레이아웃 무관).
+  // 스캔 경로도 원문 매칭 span을 sourceText로 남겨 위조 방지 provenance를 유지한다.
+  const strictScan = strictSource ? null : scanStrictTime(text);
   const strictTime = strictSource
     ? normalizeTime(strictSource.value)
-    : '';
+    : strictScan?.value || '';
   const eventTime = eventSource ? normalizeTime(eventSource.value) : '';
 
   const venueSource = findLabeledValue(lines, [
@@ -408,7 +424,9 @@ export function parseReceiptText(
     const m = text.match(
       /(?:받는\s*분|받으실분|수령인|인수자)\s*[:：]?\s*((?:고인?|故|상주|신랑|신부)?\s*[가-힣]{2,4})/,
     );
-    return m ? extractPersonName(m[1]) : '';
+    const byLabel = m ? extractPersonName(m[1]) : '';
+    // 라벨이 병합돼 사라진 근조 인수증은 "이름+관계호칭(부친상…)" 형식으로 회복.
+    return byLabel || scanCondolenceRecipient(text);
   })();
   const recipientName = recipientFromLabel || recipientFromScan;
   const recipientTelSource = validatedPhoneCandidate(
@@ -558,11 +576,15 @@ export function parseReceiptText(
       'strictTime',
       strictTime,
       strictTime ? 86 : 0,
-      strictSource?.sourceText || '',
+      strictSource?.sourceText || strictScan?.source || '',
       [],
       {
         sourceLineIds: strictSource?.sourceLineIds,
-        extractionMethod: strictTime ? 'label' : undefined,
+        extractionMethod: strictSource
+          ? 'label'
+          : strictScan
+            ? 'pattern'
+            : undefined,
         forceReview: true,
       },
     ),

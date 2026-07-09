@@ -6,6 +6,7 @@ import {
   normalizeKoreanTime,
   normalizeQuantity,
   parseTimeRange,
+  scanStrictTime,
   scoreValueForType,
   validateFieldValue,
 } from '../fieldValidation';
@@ -147,5 +148,23 @@ describe('detectFieldConflicts', () => {
     expect(
       detectFieldConflicts({ strictTime: '11:00', eventTime: '12:00' }),
     ).toHaveLength(0);
+  });
+});
+
+describe('scanStrictTime (마감시각 값-형식 회복)', () => {
+  test('"17시 00분 까지 배송" → 17:00 + 원문 span', () => {
+    const r = scanStrictTime('2026년 06월 14일 일요일 17시 00분 까지 배송 ()');
+    expect(r?.value).toBe('17:00');
+    expect(r?.source).toContain('17시');
+    expect(r?.source).toContain('까지 배송');
+  });
+  test('"오후 5시 엄수" 지원', () => {
+    expect(scanStrictTime('오후 5시 엄수')?.value).toBe('17:00');
+  });
+  test('배달 시간창의 단순 "까지"는 잡지 않음(배송/도착/엄수 요구)', () => {
+    expect(scanStrictTime('11:00~12:30 까지')).toBeNull();
+  });
+  test('주문 시각처럼 마감 문맥이 없으면 null', () => {
+    expect(scanStrictTime('14시 43분 주문합니다')).toBeNull();
   });
 });

@@ -121,6 +121,21 @@ export function looksLikePersonName(text: string): boolean {
   return extractPersonName(text) !== '';
 }
 
+// 이름 뒤에 붙는 상(喪) 관계호칭(근조 인수증의 수령인 형식 신호).
+const CONDOLENCE_RELATION =
+  /(부친상|모친상|조부상|조모상|빙부상|빙모상|처부상|처모상|본인상|자당상|엄친상|선친상|시부상|시모상|장인상|장모상)/;
+
+/**
+ * "유기열 부친상"처럼 이름 뒤에 상(喪) 관계호칭이 붙은 근조 수령인을 값 형식으로 뽑는다.
+ * 라벨('받는분')이 병합돼 사라져도 회복. 이름만 반환(관계호칭 제거). 실패 시 ''.
+ */
+export function scanCondolenceRecipient(text: string): string {
+  const m = text.match(
+    new RegExp(`([가-힣]{2,4})\\s*${CONDOLENCE_RELATION.source}`),
+  );
+  return m ? extractPersonName(m[1]) : '';
+}
+
 /** 값의 성격을 태그로 분류(디버깅·재랭킹 보조). */
 export function classifyEntity(
   text: string,

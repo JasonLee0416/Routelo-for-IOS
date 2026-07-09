@@ -5,6 +5,7 @@ import {
   looksLikeAddress,
   looksLikeVendor,
   pickBest,
+  scanCondolenceRecipient,
   scanVendorTokens,
   scoreAddress,
 } from '../fieldHeuristics';
@@ -99,6 +100,19 @@ describe('scanVendorTokens', () => {
   });
   test('dedupes and skips pure label words', () => {
     expect(scanVendorTokens('발주화원 배송화원 수주화원')).toEqual([]);
+  });
+});
+
+describe('scanCondolenceRecipient', () => {
+  test('이름 + 상(喪) 관계호칭에서 이름만 회복', () => {
+    expect(scanCondolenceRecipient('유기열 부친상')).toBe('유기열');
+    expect(scanCondolenceRecipient('...보내는분 김철수 모친상 삼가')).toBe('김철수');
+  });
+  test('관계호칭이 없으면 빈 문자열', () => {
+    expect(scanCondolenceRecipient('보내는분 강서구청 동기생 일동')).toBe('');
+  });
+  test('업체/지시문은 이름으로 오인하지 않음', () => {
+    expect(scanCondolenceRecipient('선유꽃화원 부친상')).toBe('');
   });
 });
 

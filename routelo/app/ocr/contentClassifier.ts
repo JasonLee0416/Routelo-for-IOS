@@ -43,3 +43,21 @@ export function expectedProductCategory(type: EventType): string | null {
   if (type === '개업') return '개업화환';
   return null;
 }
+
+/**
+ * 값 형식으로 상품명(간결형)을 뽑는다. 라벨 값이 비거나 레이아웃 붕괴로 blob이 될 때 폴백.
+ * 우선순위: 화환+단수 조합 > 브랜드형(착한근조) > 단수 > 화환/화분. 없으면 ''.
+ * 도메인 일반 규칙만 사용(특정 상호/상품 하드코딩 금지).
+ */
+export function scanProductName(text: string): string {
+  const combo = text.match(/(근조|축하|개업)\s*화환\s*(\d)\s*단/);
+  if (combo) return `${combo[1]}화환 ${combo[2]}단`;
+  const brand = text.match(/착한(근조|축하)/);
+  if (brand) return `착한${brand[1]}`;
+  // 원문 토큰을 그대로 유지(위조 방지). 공백은 provenance 비교에서 무시되므로 안전.
+  const tier = text.match(/(근조|축하|개업)\s*(\d)\s*단/);
+  if (tier) return `${tier[1]} ${tier[2]}단`;
+  const wreath = text.match(/(근조|축하|개업)\s*(화환|화분)/);
+  if (wreath) return `${wreath[1]}${wreath[2]}`;
+  return '';
+}

@@ -116,6 +116,23 @@ export function normalizeKoreanTime(text: string): string {
   return `${pad2(hour)}:${pad2(minute)}`;
 }
 
+/**
+ * "17시 00분 까지 배송"·"오후 5시 엄수"처럼 마감('까지 배송/도착' 또는 '엄수') 문맥이
+ * 붙은 시각을 뽑는다. 라벨이 값과 떨어져 병합돼도 값 형식만으로 엄수시간을 회복.
+ * 배달 시간창(11:00~12:30)의 '까지'와 섞이지 않도록 배송/도착/엄수 어를 요구한다.
+ */
+export function scanStrictTime(
+  text: string,
+): { value: string; source: string } | null {
+  const m = text.match(
+    /(오전|오후)?\s*(\d{1,2})\s*(?::|시)\s*(\d{2})?\s*분?\s*(?:까지\s*(?:배송|도착)|엄수)/,
+  );
+  if (!m) return null;
+  const value = normalizeKoreanTime(`${m[1] || ''}${m[2]}시${m[3] || '0'}분`);
+  // source = 원문 매칭 span(위조 방지 provenance 유지용).
+  return value ? { value, source: m[0] } : null;
+}
+
 /** `11:00~12:30`, `11:00 - 12시` 같은 범위에서 시작/종료 시각을 뽑는다. */
 export function parseTimeRange(
   text: string,
