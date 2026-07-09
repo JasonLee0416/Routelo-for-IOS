@@ -6,8 +6,9 @@
 철학을 재해석한 자체 디자인 시스템 **LUCENT**를 사용한다.
 
 > 이 저장소는 `JasonLee0416/Routelo.version_2`(Android 우선 v2)에서 iOS로 분기했다.
-> iOS OCR은 `Apple Vision → 동의 기반 CLOVA → 공유 정규화` 를 지향하며, 두 네이티브
-> 경로가 준비되기 전까지는 **온디바이스 PP-OCRv5**가 잠정 경로로 동작한다.
+> iOS OCR 우선순위는 `Apple Vision → 동의 기반 CLOVA → PP-OCRv5(폴백) → 수동`.
+> **Apple Vision 네이티브 모듈은 구현·실측 완료**(앱 내 end-to-end 검증 대기)이며, 그 전까지
+> `IOS_INTERIM_PPOCR_FALLBACK`로 온디바이스 **PP-OCRv5**가 잠정 실행된다.
 
 ---
 
@@ -18,11 +19,14 @@
 - **검색·필터·정렬** — 텍스트 검색(상품/주소/업체/전화/날짜) · 상태 필터 · 마감순/최신순
 - **한눈에 파악** — 완료율 진행바 · 남은 예상 수입 · 엄수 마감 임박/지남 배지
 - **연락** — 수령인·발주처·화원 전화 버튼(한국 번호 포맷)
+- **알림** — 엄수 마감·예식 시간 **로컬 푸시 알림**(설정한 lead 분 전, `expo-notifications`)
 
 ### OCR (인수증)
-- 온디바이스 **PP-OCRv5**(ONNX Runtime) 잠정 경로 + 촬영 품질 검사(선명도·밝기·기울기…)
+- **Apple Vision**(iOS 전용 네이티브 Expo 모듈, `VNRecognizeTextRequest`) — 온디바이스·무료·동의 불필요. 실측에서 PP-OCR 대비 필수필드 **9/24 → 19/24**, 수령인 **0/7 → 6/7** 로 우월(주력 인식기)
+- **PP-OCRv5**(ONNX Runtime) — Android 주력 + iOS 폴백. 방향 자동 보정·값 검증·필드 heuristic·벤치마크 하네스
+- **CLOVA** — 저신뢰 재시도용 동의형 클라우드 폴백(결정 로직 준비, 실호출은 키 발급 후)
 - **발주처 온라인 교차검증(#48)** — 후보 선택 UI, **업체명만 전송(PII 차단)**, 키 없으면 자동 비활성
-- 무손실 보존(원문·정규화·미매핑) + **zero-fabrication** 검수 원칙
+- 무손실 보존 + **zero-fabrication** 검수. 상세는 아래 [문서](#-문서) 참고
 
 ### 동선
 - **Nearest Neighbor** 추천 순서 + 사용자 재정렬
@@ -46,7 +50,8 @@
 ## 🧱 기술 스택
 
 Expo SDK 56 · React Native 0.85 · React 19 · TypeScript 6 ·
-onnxruntime-react-native · expo-blur · AsyncStorage · Jest(jest-expo).
+onnxruntime-react-native · Apple Vision(네이티브 Swift Expo 모듈) ·
+expo-blur · expo-notifications · AsyncStorage · Jest(jest-expo).
 CI: GitHub Actions · 빌드: EAS(클라우드).
 
 ## 📁 프로젝트 구조
@@ -57,15 +62,16 @@ Routelo-for-IOS/
 ├─ routelo/                  ← 앱 소스 (Expo 프로젝트)
 │  ├─ app/
 │  │  ├─ index.tsx           화면·루트 컴포넌트 (모놀리식, 분리 예정)
-│  │  ├─ theme/              LUCENT 디자인 토큰 + GlassSurface
-│  │  ├─ services/           순수 비즈니스 로직 (검색·정렬·손익·주유·연비·백업·전화·마감…)
+│  │  ├─ theme/              LUCENT 디자인 토큰 + GlassSurface + 접근성 훅
+│  │  ├─ services/           순수 비즈니스 로직 (검색·정렬·손익·주유·연비·백업·전화·마감·알림…)
 │  │  ├─ domain/             도메인 모델 + 어댑터 (DeliveryOrder·수동주문·달력·legacy)
 │  │  ├─ repositories/       영속 계약 + AsyncStorage 구현
-│  │  ├─ ocr/ + platform/    PP-OCRv5 런타임 + 인식기 계약(Apple Vision/CLOVA/PP-OCR)
+│  │  ├─ ocr/ + platform/    PP-OCRv5 런타임 + Apple Vision 매핑 + 인식기 계약(Vision/CLOVA/PP-OCR)
 │  │  ├─ vendor/             발주처 교차검증(카카오, PII 안전)
 │  │  ├─ settings/ account/  설정 v2 스키마 + 계정
-│  │  └─ __tests__ (모듈별)  32개 테스트 파일 · 165 테스트
-│  ├─ docs/                  설계 문서 (아래)
+│  │  └─ __tests__ (모듈별)  39개 테스트 파일 · 224 테스트
+│  ├─ modules/apple-vision-ocr/  네이티브 Apple Vision Expo 모듈 (Swift, VNRecognizeTextRequest)
+│  ├─ docs/                  설계 문서 (아래 · OCR/디자인/빌드 런북)
 │  └─ eas.json               빌드 프로파일: device-test / ios-sim / preview / production
 └─ docs/                     상위 히스토리 (CHANGELOG · HANDOFF · EVOLUTION · ADR)
 ```
@@ -109,17 +115,28 @@ npm run build:ios:device      # docs/IOS_DEVICE_TEST.md 참고
 
 ## ✅ 테스트 · CI
 
-- `npm run test:ci` — 32개 테스트 파일 / 165 테스트 (순수 서비스·도메인 코어 중심)
+- `npm run test:ci` — 39개 테스트 파일 / 224 테스트 (순수 서비스·도메인 코어 중심)
 - GitHub Actions `Validate Routelo iOS` — 모든 PR·main push마다 `test:ci · typecheck · verify:no-mlkit · verify:ocr-models`
 
 ## 🗺️ 상태 · 로드맵
 
-**완료** — 위 기능 전체, LUCENT 디자인 이식(팔레트·토큰·GlassSurface·모션), EAS 시뮬 빌드 파이프라인.
+**완료** — 위 기능 전체, **Apple Vision 네이티브 OCR**(구현 + 실측), **로컬 알림**,
+LUCENT 디자인 이식(팔레트·토큰·GlassSurface·모션), EAS 시뮬 빌드 파이프라인.
 
-**유료/네이티브 대기** —
-- **Apple Vision 브릿지** (네이티브 Vision 모듈)
+**다음 (무지출)** —
+- **Apple Vision 앱 내 end-to-end 검증** (네이티브 모듈 포함 빌드에서 자동링크·인식 확인)
+- OCR **표 컬럼 재구성** (수령자·연락처 회복)
+- **백업 복원(import)** · **완료 사진 첨부** · `index.tsx` 분리 리팩터
+
+**유료/멤버십 대기** —
 - **CLOVA / Kakao 실호출** (유료 키 발급 후)
 - **실기기·TestFlight·App Store** (유료 Apple Developer 멤버십)
+
+## 📚 문서
+
+- **[아키텍처](routelo/docs/ARCHITECTURE.md)** · **[디자인 시스템(LUCENT)](routelo/docs/DESIGN_SYSTEM.md)**
+- OCR — [파이프라인](routelo/docs/OCR_PIPELINE.md) · [Apple Vision 계획](routelo/docs/APPLE_VISION_OCR_PLAN.md) · [파이프라인 로그](routelo/docs/OCR_PIPELINE_LOG.md) · [실측 보고서(2026-07-04)](routelo/docs/OCR_RECEIPT_TEST_2026-07-04.md) · [iOS 인식기 경계](routelo/docs/IOS_OCR_PIPELINE.md)
+- 빌드/실행 — [맥 시뮬 뷰어 런북](routelo/docs/IOS_SIM_PREVIEW.md) · [실기기 테스트](routelo/docs/IOS_DEVICE_TEST.md)
 
 ## 🔒 불변 원칙 (OCR)
 
