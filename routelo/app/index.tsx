@@ -143,7 +143,6 @@ import {
   formatWon,
   isEventDelivery,
   maskAddressForList,
-  priorityOf,
   timeOf,
 } from './services/format';
 import {
