@@ -61,7 +61,7 @@ import {
   fuelLogRepository,
   mileageLogRepository,
 } from './repositories/native';
-import { buildBackupJson } from './services/backup';
+import { applyBackup, buildBackupJson, parseBackup } from './services/backup';
 import {
   DeliverySortMode,
   filterDeliveries,
@@ -1563,6 +1563,7 @@ function CalendarScreen({
   onAddMileage,
   onEditMileage,
   onDeleteMileage,
+  onImportBackup,
 }: {
   orders: DeliveryOrder[];
   fuelLogs: FuelLog[];
@@ -1576,6 +1577,7 @@ function CalendarScreen({
   onAddMileage: () => void;
   onEditMileage: (log: MileageLog) => void;
   onDeleteMileage: (id: string) => void;
+  onImportBackup: (json: string) => void;
 }) {
   const { C, styles } = useTheme();
   const { showFullAddressInList } = usePrivacy();
@@ -1584,6 +1586,8 @@ function CalendarScreen({
   const [cursor, setCursor] = useState(
     new Date(today.getFullYear(), today.getMonth(), today.getDate()),
   );
+  const [restoreOpen, setRestoreOpen] = useState(false);
+  const [restoreText, setRestoreText] = useState('');
   const items = useMemo(
     () =>
       orders
@@ -2104,6 +2108,137 @@ function CalendarScreen({
           데이터 백업 (JSON 내보내기)
         </Text>
       </Pressable>
+      <Pressable
+        onPress={() => {
+          setRestoreText('');
+          setRestoreOpen(true);
+        }}
+        style={({ pressed }) => [
+          {
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: 6,
+            paddingVertical: 12,
+            borderRadius: 12,
+            borderWidth: 1,
+            borderColor: C.outline,
+            marginBottom: 12,
+          },
+          pressed && { opacity: 0.6 },
+        ]}
+      >
+        <Ionicons name="cloud-upload-outline" size={18} color={C.textMuted} />
+        <Text style={{ color: C.textMuted, fontSize: 13, fontWeight: '700' }}>
+          데이터 복원 (JSON 붙여넣기)
+        </Text>
+      </Pressable>
+      <Modal
+        visible={restoreOpen}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setRestoreOpen(false)}
+      >
+        <View
+          style={{
+            flex: 1,
+            backgroundColor: 'rgba(0,0,0,0.45)',
+            justifyContent: 'center',
+            padding: 20,
+          }}
+        >
+          <View
+            style={{
+              backgroundColor: C.surface,
+              borderRadius: 20,
+              padding: 20,
+            }}
+          >
+            <Text
+              style={{
+                fontSize: 16,
+                fontWeight: '800',
+                color: C.text,
+                marginBottom: 6,
+              }}
+            >
+              데이터 복원
+            </Text>
+            <Text
+              style={{ fontSize: 12, color: C.textMuted, marginBottom: 12 }}
+            >
+              내보낸 백업 JSON을 붙여넣으세요. 복원하면 현재 데이터를 덮어씁니다.
+            </Text>
+            <TextInput
+              value={restoreText}
+              onChangeText={setRestoreText}
+              multiline
+              placeholder="{ &quot;app&quot;: &quot;routelo-for-ios&quot;, ... }"
+              placeholderTextColor={C.textMuted}
+              autoCapitalize="none"
+              autoCorrect={false}
+              style={{
+                minHeight: 140,
+                maxHeight: 240,
+                borderWidth: 1,
+                borderColor: C.outline,
+                borderRadius: 12,
+                padding: 12,
+                color: C.text,
+                fontSize: 12,
+                textAlignVertical: 'top',
+              }}
+            />
+            <View
+              style={{
+                flexDirection: 'row',
+                justifyContent: 'flex-end',
+                gap: 8,
+                marginTop: 16,
+              }}
+            >
+              <Pressable
+                onPress={() => setRestoreOpen(false)}
+                style={({ pressed }) => [
+                  {
+                    paddingVertical: 10,
+                    paddingHorizontal: 16,
+                    borderRadius: 12,
+                  },
+                  pressed && { opacity: 0.6 },
+                ]}
+              >
+                <Text
+                  style={{ color: C.textMuted, fontSize: 14, fontWeight: '700' }}
+                >
+                  취소
+                </Text>
+              </Pressable>
+              <Pressable
+                disabled={restoreText.trim().length === 0}
+                onPress={() => {
+                  setRestoreOpen(false);
+                  onImportBackup(restoreText);
+                }}
+                style={({ pressed }) => [
+                  {
+                    paddingVertical: 10,
+                    paddingHorizontal: 16,
+                    borderRadius: 12,
+                    backgroundColor: C.primary,
+                    opacity: restoreText.trim().length === 0 ? 0.4 : 1,
+                  },
+                  pressed && { opacity: 0.7 },
+                ]}
+              >
+                <Text style={{ color: '#FFFFFF', fontSize: 14, fontWeight: '800' }}>
+                  복원
+                </Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
       {selectedItems.length === 0 ? (
         <View style={styles.calendarEmpty}>
           <Ionicons name="calendar-clear-outline" size={30} color={C.textMuted} />
@@ -4025,6 +4160,47 @@ export default function RouteloApp() {
     mileageLogRepository.remove(id).catch(() => undefined);
   };
 
+  // Restore from a pasted JSON backup. Validation lives in the pure
+  // `parseBackup`; here we only confirm the destructive overwrite, persist via
+  // the repositories, and mirror the result into in-memory state.
+  const importBackup = (json: string) => {
+    const result = parseBackup(json);
+    if (!result.ok) {
+      Alert.alert('복원 실패', result.error);
+      return;
+    }
+    const { backup } = result;
+    Alert.alert(
+      '백업 복원',
+      `현재 데이터를 이 백업으로 덮어씁니다.\n배달 ${backup.orders.length} · 주유 ${backup.fuelLogs.length} · 주행 ${backup.mileageLogs.length}\n\n계속할까요?`,
+      [
+        { text: '취소', style: 'cancel' },
+        {
+          text: '덮어쓰기',
+          style: 'destructive',
+          onPress: () => {
+            applyBackup(backup, {
+              saveOrders: (o) => deliveryRepository.saveAll(o),
+              replaceFuelLogs: (f) => fuelLogRepository.replaceAll(f),
+              replaceMileageLogs: (m) => mileageLogRepository.replaceAll(m),
+              saveSettings: (s) => settingsRepository.save(s),
+            })
+              .then(() => {
+                setOrders(backup.orders);
+                setFuelLogs(backup.fuelLogs);
+                setMileageLogs(backup.mileageLogs);
+                setSettings(backup.settings);
+                Alert.alert('복원 완료', '백업 데이터로 복원했습니다.');
+              })
+              .catch(() =>
+                Alert.alert('복원 실패', '저장 중 오류가 발생했습니다.'),
+              );
+          },
+        },
+      ],
+    );
+  };
+
   const notificationCount = 3;
   const openNotifications = () => setActiveTab('notifications');
   const toggleSelected = async () => {
@@ -4122,6 +4298,7 @@ export default function RouteloApp() {
           onAddMileage={openCreateMileage}
           onEditMileage={editMileage}
           onDeleteMileage={deleteMileage}
+          onImportBackup={importBackup}
         />
       );
     }

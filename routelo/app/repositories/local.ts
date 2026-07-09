@@ -217,6 +217,10 @@ export class LocalFuelLogRepository implements FuelLogRepository {
     await writeCollection(this.store, FUEL_KEY, records);
   }
 
+  async replaceAll(logs: FuelLog[]) {
+    await writeCollection(this.store, FUEL_KEY, logs);
+  }
+
   async remove(id: string) {
     await writeCollection(
       this.store,
@@ -239,6 +243,10 @@ export class LocalMileageLogRepository implements MileageLogRepository {
     if (index >= 0) records[index] = log;
     else records.push(log);
     await writeCollection(this.store, MILEAGE_KEY, records);
+  }
+
+  async replaceAll(logs: MileageLog[]) {
+    await writeCollection(this.store, MILEAGE_KEY, logs);
   }
 
   async remove(id: string) {
