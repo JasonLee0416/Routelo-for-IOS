@@ -131,7 +131,9 @@ import {
   StatusBadge,
 } from './components/badges';
 import {
+  CompactDelivery,
   MetricCard,
+  ProgressCard,
   ScreenHeader,
   SectionHeader,
   TimeAlertCard,
@@ -202,88 +204,6 @@ const tabs: Array<{
   { key: 'settings', label: '설정', icon: 'settings-outline', activeIcon: 'settings' },
 ];
 
-
-function ProgressCard({
-  completed,
-  total,
-  distance,
-}: {
-  completed: number;
-  total: number;
-  distance: number;
-}) {
-  const { C, styles } = useTheme();
-  const progress = total ? completed / total : 0;
-  return (
-    <View style={styles.progressCard}>
-      <View style={styles.progressTop}>
-        <View>
-          <Text style={styles.progressLabel}>오늘의 업무 진행률</Text>
-          <Text style={styles.progressValue}>{Math.round(progress * 100)}%</Text>
-        </View>
-        <View style={styles.progressSummary}>
-          <Text style={styles.progressSummaryValue}>
-            {completed}/{total}
-          </Text>
-          <Text style={styles.progressSummaryLabel}>완료</Text>
-        </View>
-      </View>
-      <View style={styles.progressTrack}>
-        <View style={[styles.progressFill, { width: `${progress * 100}%` }]} />
-      </View>
-      <View style={styles.progressMeta}>
-        <View style={styles.metaItem}>
-          <Ionicons name="navigate-outline" size={16} color={C.textMuted} />
-          <Text style={styles.metaText}>남은 예상 거리 {distance.toFixed(1)}km</Text>
-        </View>
-        <View style={styles.metaItem}>
-          <Ionicons name="time-outline" size={16} color={C.textMuted} />
-          <Text style={styles.metaText}>약 {Math.round(distance * 4.2)}분</Text>
-        </View>
-      </View>
-    </View>
-  );
-}
-
-function CompactDelivery({
-  delivery,
-  index,
-  onPress,
-}: {
-  delivery: Delivery;
-  index: number;
-  onPress: () => void;
-}) {
-  const { C, styles } = useTheme();
-  const { showFullAddressInList } = usePrivacy();
-  const priority = priorityOf(delivery);
-  return (
-    <Pressable style={styles.compactDelivery} onPress={onPress}>
-      <View style={styles.sequenceMarker}>
-        <Text style={styles.sequenceMarkerText}>{index + 1}</Text>
-      </View>
-      <View style={styles.flex}>
-        <View style={styles.rowBetween}>
-          <Text style={styles.compactTime}>{timeOf(delivery.deliveryDt)}</Text>
-          <StatusBadge status={delivery.status} />
-        </View>
-        <Text style={styles.compactTitle}>{delivery.productName}</Text>
-        <Text style={styles.compactAddress} numberOfLines={1}>
-          {showFullAddressInList
-            ? delivery.deliveryAddress
-            : maskAddressForList(delivery.deliveryAddress)}
-        </Text>
-        {priority === 'urgent' && (
-          <View style={styles.inlineUrgent}>
-            <Ionicons name="alert-circle" size={15} color={C.danger} />
-            <Text style={styles.inlineUrgentText}>예식 {delivery.eventTime} · 시간 엄수</Text>
-          </View>
-        )}
-      </View>
-      <Ionicons name="chevron-forward" size={20} color={C.textMuted} />
-    </Pressable>
-  );
-}
 
 function HomeScreen({
   deliveries,
