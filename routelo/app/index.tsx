@@ -53,6 +53,7 @@ import {
   validateManualOrderInput,
 } from './domain';
 import {
+  ContactLog,
   Delivery,
   FuelLog,
   MileageLog,
@@ -61,11 +62,16 @@ import {
   OcrPipelineResult,
 } from './models';
 import {
+  contactLogRepository,
   deliveryRepository,
   fuelLogRepository,
   mileageLogRepository,
 } from './repositories/native';
 import { applyBackup, buildBackupJson, parseBackup } from './services/backup';
+import {
+  buildContactLog,
+  recentContactsForDelivery,
+} from './services/contactLog';
 import {
   attachCompletionPhoto,
   clearCompletionPhoto,
@@ -3091,22 +3097,26 @@ function DeliveryDetailSheet({
   delivery,
   visible,
   completionPhotoUri,
+  recentContacts,
   onClose,
   onToggle,
   onEdit,
   onDelete,
   onAttachPhoto,
   onRemovePhoto,
+  onLogCall,
 }: {
   delivery?: Delivery;
   visible: boolean;
   completionPhotoUri?: string;
+  recentContacts: ContactLog[];
   onClose: () => void;
   onToggle: () => void;
   onEdit: () => void;
   onDelete: () => void;
   onAttachPhoto: () => void;
   onRemovePhoto: () => void;
+  onLogCall: (label: string, phone: string) => void;
 }) {
   const { C, styles, dark } = useTheme();
   const insets = useSafeAreaInsets();
@@ -3208,7 +3218,10 @@ function DeliveryDetailSheet({
               {callTargets.map((target) => (
                 <Pressable
                   key={target.label}
-                  onPress={() => Linking.openURL(target.href)}
+                  onPress={() => {
+                    Linking.openURL(target.href).catch(() => undefined);
+                    onLogCall(target.label, target.href.replace(/^tel:/, ''));
+                  }}
                   style={{
                     flexDirection: 'row',
                     alignItems: 'center',
@@ -3227,6 +3240,29 @@ function DeliveryDetailSheet({
                     {target.label}
                   </Text>
                 </Pressable>
+              ))}
+            </View>
+          )}
+          {recentContacts.length > 0 && (
+            <View style={styles.sheetInfoBlock}>
+              <Text style={styles.sheetInfoLabel}>최근 연락</Text>
+              {recentContacts.map((contact) => (
+                <View
+                  key={contact.id}
+                  style={{
+                    flexDirection: 'row',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    paddingVertical: 4,
+                  }}
+                >
+                  <Text style={{ color: C.text, fontSize: 12, fontWeight: '600' }}>
+                    {contact.label} · {formatPhone(contact.phone)}
+                  </Text>
+                  <Text style={{ color: C.textMuted, fontSize: 11 }}>
+                    {contact.at.slice(5, 16).replace('T', ' ')}
+                  </Text>
+                </View>
               ))}
             </View>
           )}
@@ -4137,6 +4173,7 @@ export default function RouteloApp() {
   const [mileageFormLog, setMileageFormLog] = useState<MileageLog | undefined>(
     undefined,
   );
+  const [contactLogs, setContactLogs] = useState<ContactLog[]>([]);
 
   useEffect(() => {
     deliveryRepository
@@ -4201,6 +4238,15 @@ export default function RouteloApp() {
       .list()
       .then((stored) => {
         if (stored.length) setMileageLogs(stored);
+      })
+      .catch(() => undefined);
+  }, []);
+
+  useEffect(() => {
+    contactLogRepository
+      .list()
+      .then((stored) => {
+        if (stored.length) setContactLogs(stored);
       })
       .catch(() => undefined);
   }, []);
@@ -4435,6 +4481,19 @@ export default function RouteloApp() {
       ...clearCompletionPhoto(order),
       updatedAt: new Date().toISOString(),
     });
+  };
+
+  const logCall = (label: string, phone: string) => {
+    if (!selectedDelivery) return;
+    const log = buildContactLog({
+      id: `c-${Date.now()}-${Math.floor(Math.random() * 1e6)}`,
+      deliveryId: selectedDelivery.id,
+      label,
+      phone,
+      at: new Date().toISOString(),
+    });
+    setContactLogs((current) => [log, ...current]);
+    contactLogRepository.save(log).catch(() => undefined);
   };
 
   const openCreateForm = () => {
@@ -4681,12 +4740,17 @@ export default function RouteloApp() {
               )
             : undefined;
         })()}
+        recentContacts={recentContactsForDelivery(
+          contactLogs,
+          selectedDelivery?.id ?? '',
+        )}
         onClose={() => setSelectedDelivery(undefined)}
         onToggle={toggleSelected}
         onEdit={editSelected}
         onDelete={deleteSelected}
         onAttachPhoto={startCompletionPhoto}
         onRemovePhoto={removeCompletionPhoto}
+        onLogCall={logCall}
       />
       <DeliveryFormModal
         visible={formVisible}

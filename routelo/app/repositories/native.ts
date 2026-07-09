@@ -1,6 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import {
+  LocalContactLogRepository,
   LocalDeliveryRepository,
   LocalFuelLogRepository,
   LocalMileageLogRepository,
@@ -13,4 +14,5 @@ export const receiptRepository = new LocalReceiptRepository(AsyncStorage);
 export const routePlanRepository = new LocalRoutePlanRepository(AsyncStorage);
 export const fuelLogRepository = new LocalFuelLogRepository(AsyncStorage);
 export const mileageLogRepository = new LocalMileageLogRepository(AsyncStorage);
+export const contactLogRepository = new LocalContactLogRepository(AsyncStorage);
 
