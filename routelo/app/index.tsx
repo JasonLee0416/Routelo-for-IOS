@@ -1,4 +1,8 @@
 import { Ionicons } from '@expo/vector-icons';
+// Classic string-path API (documentDirectory/copyAsync/…). SDK 56's default
+// entry is the new File/Directory API; the /legacy entry keeps the path-based
+// calls our completionPhoto path service is built around.
+import * as FileSystem from 'expo-file-system/legacy';
 import * as ImagePicker from 'expo-image-picker';
 import { StatusBar } from 'expo-status-bar';
 import {
@@ -62,6 +66,11 @@ import {
   mileageLogRepository,
 } from './repositories/native';
 import { applyBackup, buildBackupJson, parseBackup } from './services/backup';
+import {
+  attachCompletionPhoto,
+  clearCompletionPhoto,
+  completionPhotoTarget,
+} from './services/completionPhoto';
 import { mergeSettingsV2 } from './settings/migrations';
 import {
   DeliverySortMode,
@@ -3079,17 +3088,23 @@ function OnboardingModal({
 function DeliveryDetailSheet({
   delivery,
   visible,
+  completionPhotoUri,
   onClose,
   onToggle,
   onEdit,
   onDelete,
+  onAttachPhoto,
+  onRemovePhoto,
 }: {
   delivery?: Delivery;
   visible: boolean;
+  completionPhotoUri?: string;
   onClose: () => void;
   onToggle: () => void;
   onEdit: () => void;
   onDelete: () => void;
+  onAttachPhoto: () => void;
+  onRemovePhoto: () => void;
 }) {
   const { C, styles, dark } = useTheme();
   const insets = useSafeAreaInsets();
@@ -3213,6 +3228,70 @@ function DeliveryDetailSheet({
               ))}
             </View>
           )}
+          <View style={styles.sheetInfoBlock}>
+            <Text style={styles.sheetInfoLabel}>완료 사진</Text>
+            {completionPhotoUri ? (
+              <View style={{ gap: 8 }}>
+                <Image
+                  source={{ uri: completionPhotoUri }}
+                  style={{
+                    width: '100%',
+                    height: 180,
+                    borderRadius: 12,
+                    backgroundColor: C.surfaceAlt,
+                  }}
+                  resizeMode="cover"
+                />
+                <Pressable
+                  onPress={onRemovePhoto}
+                  style={({ pressed }) => [
+                    {
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: 6,
+                      paddingVertical: 10,
+                      borderRadius: 10,
+                      borderWidth: 1,
+                      borderColor: C.danger,
+                    },
+                    pressed && { opacity: 0.6 },
+                  ]}
+                >
+                  <Ionicons name="trash-outline" size={16} color={C.danger} />
+                  <Text
+                    style={{ color: C.danger, fontWeight: '700', fontSize: 12 }}
+                  >
+                    사진 삭제
+                  </Text>
+                </Pressable>
+              </View>
+            ) : (
+              <Pressable
+                onPress={onAttachPhoto}
+                style={({ pressed }) => [
+                  {
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: 6,
+                    paddingVertical: 11,
+                    borderRadius: 10,
+                    borderWidth: 1,
+                    borderColor: C.outline,
+                  },
+                  pressed && { opacity: 0.6 },
+                ]}
+              >
+                <Ionicons name="camera-outline" size={18} color={C.textMuted} />
+                <Text
+                  style={{ color: C.textMuted, fontWeight: '700', fontSize: 12 }}
+                >
+                  완료 사진 첨부
+                </Text>
+              </Pressable>
+            )}
+          </View>
           <View style={styles.sheetActions}>
             <Pressable style={styles.primaryButton} onPress={onToggle}>
               <Ionicons
@@ -4263,6 +4342,91 @@ export default function RouteloApp() {
     await deliveryRepository.remove(id).catch(() => undefined);
   };
 
+  const persistOrder = (next: DeliveryOrder) => {
+    setOrders((current) =>
+      current.map((item) => (item.id === next.id ? next : item)),
+    );
+    deliveryRepository.save(next).catch(() => undefined);
+  };
+
+  const captureCompletionPhoto = async (
+    order: DeliveryOrder,
+    source: 'camera' | 'library',
+  ) => {
+    const permission =
+      source === 'camera'
+        ? await ImagePicker.requestCameraPermissionsAsync()
+        : await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!permission.granted) {
+      Alert.alert(
+        '권한 필요',
+        '사진을 첨부하려면 카메라/사진 접근 권한이 필요합니다.',
+      );
+      return;
+    }
+    const options: ImagePicker.ImagePickerOptions = {
+      mediaTypes: ['images'],
+      quality: 0.6,
+      allowsEditing: true,
+    };
+    const picked =
+      source === 'camera'
+        ? await ImagePicker.launchCameraAsync(options)
+        : await ImagePicker.launchImageLibraryAsync(options);
+    if (picked.canceled) return;
+    const asset = picked.assets[0];
+    const { dir, uri } = completionPhotoTarget(
+      FileSystem.documentDirectory ?? '',
+      order.id,
+    );
+    try {
+      await FileSystem.makeDirectoryAsync(dir, { intermediates: true }).catch(
+        () => undefined,
+      );
+      // Overwrite any previous proof for this order (deterministic path).
+      await FileSystem.deleteAsync(uri, { idempotent: true }).catch(
+        () => undefined,
+      );
+      await FileSystem.copyAsync({ from: asset.uri, to: uri });
+    } catch {
+      Alert.alert('첨부 실패', '사진을 저장하지 못했습니다.');
+      return;
+    }
+    persistOrder({
+      ...attachCompletionPhoto(order, uri),
+      updatedAt: new Date().toISOString(),
+    });
+  };
+
+  const startCompletionPhoto = () => {
+    if (!selectedDelivery) return;
+    const order = orders.find((item) => item.id === selectedDelivery.id);
+    if (!order) return;
+    Alert.alert('완료 사진', '사진을 추가할 방법을 선택하세요.', [
+      { text: '카메라', onPress: () => captureCompletionPhoto(order, 'camera') },
+      {
+        text: '앨범에서 선택',
+        onPress: () => captureCompletionPhoto(order, 'library'),
+      },
+      { text: '취소', style: 'cancel' },
+    ]);
+  };
+
+  const removeCompletionPhoto = () => {
+    if (!selectedDelivery) return;
+    const order = orders.find((item) => item.id === selectedDelivery.id);
+    if (!order) return;
+    const { uri } = completionPhotoTarget(
+      FileSystem.documentDirectory ?? '',
+      order.id,
+    );
+    FileSystem.deleteAsync(uri, { idempotent: true }).catch(() => undefined);
+    persistOrder({
+      ...clearCompletionPhoto(order),
+      updatedAt: new Date().toISOString(),
+    });
+  };
+
   const openCreateForm = () => {
     setFormOrder(undefined);
     setFormVisible(true);
@@ -4496,10 +4660,16 @@ export default function RouteloApp() {
       <DeliveryDetailSheet
         delivery={selectedDelivery}
         visible={Boolean(selectedDelivery)}
+        completionPhotoUri={
+          orders.find((item) => item.id === selectedDelivery?.id)
+            ?.completionPhotoUri
+        }
         onClose={() => setSelectedDelivery(undefined)}
         onToggle={toggleSelected}
         onEdit={editSelected}
         onDelete={deleteSelected}
+        onAttachPhoto={startCompletionPhoto}
+        onRemovePhoto={removeCompletionPhoto}
       />
       <DeliveryFormModal
         visible={formVisible}

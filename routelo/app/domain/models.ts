@@ -81,6 +81,8 @@ export type DeliveryOrder = {
   customerRequests?: string;
   status: DeliveryStatus;
   settlement: SettlementInfo;
+  // Persistent file URI of the delivery-completion proof photo, if attached.
+  completionPhotoUri?: string;
   source: {
     type: 'manual' | 'ocr' | 'migration' | 'sample';
     receiptId?: string;
