@@ -71,6 +71,12 @@ import { summarizeDeliveryStats } from './services/deliveryStats';
 import { summarizeEfficiency } from './services/efficiency';
 import { deadlineStatus } from './services/deadline';
 import { buildDailyProfitCsv } from './services/export';
+import { planDeliveryNotifications } from './services/notificationPlan';
+import {
+  cancelAllScheduledNotifications,
+  ensureNotificationPermission,
+  syncScheduledNotifications,
+} from './services/notifications';
 import { formatWonShort } from './services/money';
 import { dialableTargets, formatPhone } from './services/phone';
 import {
@@ -2391,15 +2397,18 @@ function SettingsScreen({
           trailing={
             <Switch
               value={settings.notifications.strictDeadlineEnabled}
-              onValueChange={(enabled) =>
+              onValueChange={(enabled) => {
+                if (enabled) {
+                  ensureNotificationPermission().catch(() => undefined);
+                }
                 updateSettings({
                   ...settings,
                   notifications: {
                     ...settings.notifications,
                     strictDeadlineEnabled: enabled,
                   },
-                })
-              }
+                });
+              }}
               trackColor={{ true: C.primary }}
             />
           }
@@ -2412,15 +2421,18 @@ function SettingsScreen({
           trailing={
             <Switch
               value={settings.notifications.eventTimeEnabled}
-              onValueChange={(enabled) =>
+              onValueChange={(enabled) => {
+                if (enabled) {
+                  ensureNotificationPermission().catch(() => undefined);
+                }
                 updateSettings({
                   ...settings,
                   notifications: {
                     ...settings.notifications,
                     eventTimeEnabled: enabled,
                   },
-                })
-              }
+                });
+              }}
               trackColor={{ true: C.primary }}
             />
           }
@@ -3973,6 +3985,23 @@ export default function RouteloApp() {
       })
       .catch(() => undefined);
   }, []);
+
+  // Keep OS-scheduled deadline/event reminders in sync with deliveries + setting.
+  useEffect(() => {
+    const n = settings.notifications;
+    if (!n.strictDeadlineEnabled && !n.eventTimeEnabled) {
+      cancelAllScheduledNotifications().catch(() => undefined);
+      return;
+    }
+    const lead = n.strictDeadlineLeadMinutes?.[0] ?? 30;
+    const plan = planDeliveryNotifications(orders, {
+      nowMs: Date.now(),
+      leadMinutes: lead,
+    }).filter((item) =>
+      item.kind === 'deadline' ? n.strictDeadlineEnabled : n.eventTimeEnabled,
+    );
+    syncScheduledNotifications(plan).catch(() => undefined);
+  }, [orders, settings.notifications]);
 
   const openCreateMileage = () => {
     setMileageFormLog(undefined);
