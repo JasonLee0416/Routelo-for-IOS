@@ -15,7 +15,8 @@
 ├────────────────────────────────────────────────────────────┤
 │ ③ 서비스      순수 로직 (app/services) — 화면이 호출         │
 │   검색/정렬 · 통계 · 손익/버킷 · 주유 · 계기판 · 연비 ·      │
-│   백업 · 내보내기 · 전화 · 마감 · 금액 · 경로 · 내비 · OCR   │
+│   백업 · 내보내기 · 전화 · 마감 · 금액 · 경로 · 내비 ·       │
+│   알림 계획(notificationPlan) · OCR                          │
 ├────────────────────────────────────────────────────────────┤
 │ ④ 도메인      DeliveryOrder · ReceiptDocument · RoutePlan ·  │
 │   (app/domain) 수동주문 · 달력 · legacy 어댑터 (무손실)      │
@@ -24,7 +25,8 @@
 │   (app/repositories) → AsyncStorage (로컬 우선, 샘플 없음)   │
 ├────────────────────────────────────────────────────────────┤
 │ ⑥ 외부        내비 앱 딥링크(티맵·카카오·네이버) + 웹 폴백 · │
-│               Kakao REST(교차검증) · ONNX 모델(번들 자산)    │
+│               Kakao REST(교차검증) · ONNX 모델(번들 자산) ·  │
+│               Apple Vision(네이티브 모듈) · 로컬 알림(OS)    │
 └────────────────────────────────────────────────────────────┘
 ```
 
@@ -38,11 +40,12 @@
 |---|---|---|
 | `index.tsx` | 화면 + 루트 컴포넌트 (모놀리식, 분리 예정) | — |
 | `theme/` | LUCENT 디자인 토큰 + 유리 프리미티브 | `tokens.ts` · `GlassSurface.tsx` · `color.ts` |
-| `services/` | 순수 비즈니스 로직 | `deliveryFilter` · `deliveryStats` · `profit` · `fuel` · `mileage` · `efficiency` · `backup` · `export` · `phone` · `deadline` · `money` · `maps` · `navigation` · `ocr` · `recognizer` |
+| `services/` | 순수 비즈니스 로직 | `deliveryFilter` · `deliveryStats` · `profit` · `fuel` · `mileage` · `efficiency` · `backup` · `export` · `phone` · `deadline` · `money` · `maps` · `navigation` · `notificationPlan` · `notifications` · `ocr` · `recognizer` |
 | `domain/` | 도메인 모델 + 어댑터 | `models.ts` · `manualOrder.ts` · `calendar.ts` · `legacy.ts` |
 | `repositories/` | 영속 계약 + 구현 | `contracts.ts` · `local.ts` · `native.ts` |
-| `ocr/` | PP-OCRv5 런타임 · 정규화 · 필드 레지스트리 | `ppocr/*` · `normalize.ts` · `layout.ts` |
-| `platform/` | 인식기 계약 (Apple Vision / CLOVA / PP-OCR) | `receiptRecognizers.ts` · `receiptRecognition.ts` |
+| `ocr/` | PP-OCRv5 런타임 · 정규화 · 필드 레지스트리 + 검증/heuristic/방향/벤치마크 | `ppocr/*` · `normalize.ts` · `layout.ts` · `fieldHeuristics.ts` · `fieldValidation.ts` · `orientation.ts` |
+| `platform/` | 인식기 계약 (Apple Vision / CLOVA / PP-OCR) + Vision 매핑(순수) | `receiptRecognizers.ts` · `receiptRecognition.ts` · `appleVision.ts` |
+| `../modules/apple-vision-ocr/` | 네이티브 Apple Vision Expo 모듈 (Swift, `app/` 밖·routelo 루트) | `ios/AppleVisionOcrModule.swift` |
 | `vendor/` | 발주처 교차검증 (카카오, PII 안전) | `verify.ts` · `resolve.ts` · `apply.ts` · `kakao.ts` |
 | `settings/` | 설정 v2 스키마·기본값·마이그레이션·저장소 | `schema.ts` · `repository.ts` |
 | `account/` | 계정 모델·저장소 | — |
@@ -52,11 +55,13 @@
 - **부팅** — `RouteloApp`이 마운트 시 각 repository에서 상태 로드:
   `deliveryRepository.initialize() → list()`, `settingsRepository.get()`,
   `accountRepository.get()`, `fuelLogRepository.list()`, `mileageLogRepository.list()`.
-- **스캔** — 카메라/갤러리 → `runReceiptOcr` (PP-OCR 잠정) → 필드 검수(zero-fabrication)
+- **스캔** — 카메라/갤러리 → `runReceiptOcr` (Apple Vision 우선 · PP-OCR 폴백) → 필드 검수(zero-fabrication)
   → 발주처 교차검증(옵트인) → `DeliveryOrder` 저장.
 - **동선** — 주문 → `optimizeByNearestNeighbor` → 사용자 재정렬 → 다음 목적지 `openNavigation` 딥링크.
 - **손익** — `summarizeDailyProfit` → `bucketProfit`(일/주/월) → 차트 · `summarizeEfficiency`(주유+주행).
 - **완료** — 상세 시트 완료 토글 → `schedule.completedAt` → `deliveryRepository.save`.
+- **알림** — 주문/설정 변경 시 `planDeliveryNotifications(orders, {nowMs, leadMinutes})`(순수)로
+  엄수 마감·예식 알림 계획 산출 → 설정 토글로 필터 → `syncScheduledNotifications`(OS 예약 재조정).
 
 ## 4. 테마 시스템
 
@@ -70,12 +75,18 @@
 
 `ReceiptRecognizer` 계약(포트-어댑터) — Apple Vision / CLOVA / PP-OCRv5 어댑터가 같은
 계약을 구현하고, **어떤 엔진도 공유 파서(`normalizeReceipt`/`parseReceiptText`)를 우회하지
-않는다**. iOS 실행 순서: Apple Vision(스텁) → CLOVA(스텁·동의 게이트) → **PP-OCR(잠정, 동작)**
-→ 수동 입력. 토글 `IOS_INTERIM_PPOCR_FALLBACK` 로 관리. 자세히: **[IOS_OCR_PIPELINE.md](IOS_OCR_PIPELINE.md)**.
+않는다**. iOS 실행 순서: **Apple Vision(네이티브 모듈, 실측 우월)** → CLOVA(동의 게이트, 실호출 대기)
+→ **PP-OCR(폴백)** → 수동 입력. 잠정 폴백은 토글 `IOS_INTERIM_PPOCR_FALLBACK` 로 관리.
+
+- **Apple Vision** — `modules/apple-vision-ocr`(Swift `VNRecognizeTextRequest`, `.accurate`, 한국어 도메인
+  어휘, EXIF 방향 보정)이 원시 박스를 반환하고, 순수 `platform/appleVision.ts` 가 Vision 정규화 좌표를
+  픽셀로 변환·매핑한다(테스트 가능). 실측: 필수필드 9/24 → 19/24, 수령인 0/7 → 6/7 (PP-OCR 대비).
+- 앱 내 end-to-end(모듈 자동링크·인식) 검증은 다음 시뮬 빌드 대상.
+- 자세히: **[IOS_OCR_PIPELINE.md](IOS_OCR_PIPELINE.md)** · **[APPLE_VISION_OCR_PLAN.md](APPLE_VISION_OCR_PLAN.md)** · **[OCR_RECEIPT_TEST_2026-07-04.md](OCR_RECEIPT_TEST_2026-07-04.md)**.
 
 ## 6. 테스트 · 빌드
 
-- **테스트** — 32개 파일 / 165 테스트, 순수 서비스·도메인 코어 중심(jest-expo).
+- **테스트** — 39개 파일 / 224 테스트, 순수 서비스·도메인 코어 중심(jest-expo).
   `npm run test:ci` · `npm run typecheck` · `npm run validate`.
 - **CI** — GitHub Actions `Validate Routelo iOS` (PR·main).
 - **빌드** — EAS. `ios-sim`(무료·Apple 계정 불필요, 컴파일 검증) / `device-test`(유료 멤버십).
@@ -85,5 +96,7 @@
 
 - **`app/index.tsx` 모놀리식(~5,200줄)** — 화면·컴포넌트·스타일이 한 파일.
   screens/components/hooks/stores 로 분리하는 것이 우선 리팩터 대상.
-- Apple Vision / CLOVA 는 스텁(유료·네이티브 준비 후 구현).
+- **Apple Vision** 은 네이티브 모듈로 구현·실측 완료지만, 앱 내 end-to-end 자동링크 검증 대기.
+  **CLOVA** 는 결정 로직만(실호출은 유료 키 후).
 - 백업 **복원(import)** 미구현 (내보내기만).
+- `notifications.ts`(OS 예약 wrapper)는 네이티브 표면이라 단위테스트 없음 — 계획은 순수 `notificationPlan` 로 검증.
