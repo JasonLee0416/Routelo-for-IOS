@@ -1,38 +1,59 @@
 import { DeliveryOrder } from '../domain';
 
 // Delivery-completion proof photos are copied out of the picker's cache into a
-// stable per-order location so they survive app restarts and cache eviction.
-// The path math lives here (pure, testable); the file I/O and image capture
-// stay in the UI layer.
+// stable location under the app document dir. The path math lives here (pure,
+// testable); file I/O and image capture stay in the UI layer.
+//
+// Two deliberate choices, both driven by real failure modes:
+//  - We store a RELATIVE path on the order and resolve it against the CURRENT
+//    document dir at read time. iOS document-dir container UUIDs change across
+//    reinstall / backup-restore, so a persisted absolute file URI would dangle.
+//  - Each attach uses a fresh token in the file name. React Native's Image
+//    caches by URI string, so reusing one path would keep showing the previous
+//    photo after a re-attach; a new name busts the cache (and the old file is
+//    deleted by the caller).
 
 export const COMPLETION_PHOTO_DIR = 'completion-photos';
 
-// Order ids come from generators/OCR and could in theory contain characters
-// that are unsafe in a file name; keep only a conservative allowlist.
-const safeName = (orderId: string): string =>
-  orderId.replace(/[^a-zA-Z0-9_-]/g, '_') || 'order';
+// Order ids / tokens come from generators and could contain characters that are
+// unsafe in a file name; keep only a conservative allowlist.
+const safeName = (value: string): string =>
+  value.replace(/[^a-zA-Z0-9_-]/g, '_') || 'x';
 
-// Deterministic destination for an order's proof photo under the app's
-// document directory. Same order id → same uri, so re-attaching overwrites the
-// previous photo instead of leaking files.
-export function completionPhotoTarget(
-  documentDir: string,
+const withTrailingSlash = (dir: string): string =>
+  dir.endsWith('/') ? dir : `${dir}/`;
+
+// Path stored ON the order, relative to the document dir. `token` makes it
+// unique per attach (e.g. a timestamp) for cache-busting.
+export function completionPhotoRelativePath(
   orderId: string,
-): { dir: string; uri: string } {
-  const base = documentDir.endsWith('/') ? documentDir : `${documentDir}/`;
-  const dir = `${base}${COMPLETION_PHOTO_DIR}/`;
-  return { dir, uri: `${dir}${safeName(orderId)}.jpg` };
+  token: string,
+): string {
+  return `${COMPLETION_PHOTO_DIR}/${safeName(orderId)}-${safeName(token)}.jpg`;
+}
+
+// Directory that must exist before copying a photo in.
+export function completionPhotoDir(documentDir: string): string {
+  return `${withTrailingSlash(documentDir)}${COMPLETION_PHOTO_DIR}/`;
+}
+
+// Absolute file URI for a stored relative path, against the current doc dir.
+export function resolveCompletionPhotoUri(
+  documentDir: string,
+  relativePath: string,
+): string {
+  return `${withTrailingSlash(documentDir)}${relativePath}`;
 }
 
 export function attachCompletionPhoto(
   order: DeliveryOrder,
-  uri: string,
+  relativePath: string,
 ): DeliveryOrder {
-  return { ...order, completionPhotoUri: uri };
+  return { ...order, completionPhotoPath: relativePath };
 }
 
 export function clearCompletionPhoto(order: DeliveryOrder): DeliveryOrder {
-  const { completionPhotoUri, ...rest } = order;
-  void completionPhotoUri;
+  const { completionPhotoPath, ...rest } = order;
+  void completionPhotoPath;
   return rest;
 }

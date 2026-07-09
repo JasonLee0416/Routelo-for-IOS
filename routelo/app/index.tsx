@@ -69,7 +69,9 @@ import { applyBackup, buildBackupJson, parseBackup } from './services/backup';
 import {
   attachCompletionPhoto,
   clearCompletionPhoto,
-  completionPhotoTarget,
+  completionPhotoDir,
+  completionPhotoRelativePath,
+  resolveCompletionPhotoUri,
 } from './services/completionPhoto';
 import { mergeSettingsV2 } from './settings/migrations';
 import {
@@ -4373,27 +4375,31 @@ export default function RouteloApp() {
       source === 'camera'
         ? await ImagePicker.launchCameraAsync(options)
         : await ImagePicker.launchImageLibraryAsync(options);
-    if (picked.canceled) return;
+    if (picked.canceled || !picked.assets?.[0]) return;
     const asset = picked.assets[0];
-    const { dir, uri } = completionPhotoTarget(
-      FileSystem.documentDirectory ?? '',
-      order.id,
-    );
+    const docDir = FileSystem.documentDirectory ?? '';
+    // Fresh token per attach → new file name → new URI, so RN's Image cache
+    // can't show the previous photo after a re-attach.
+    const relativePath = completionPhotoRelativePath(order.id, String(Date.now()));
+    const dest = resolveCompletionPhotoUri(docDir, relativePath);
     try {
-      await FileSystem.makeDirectoryAsync(dir, { intermediates: true }).catch(
-        () => undefined,
-      );
-      // Overwrite any previous proof for this order (deterministic path).
-      await FileSystem.deleteAsync(uri, { idempotent: true }).catch(
-        () => undefined,
-      );
-      await FileSystem.copyAsync({ from: asset.uri, to: uri });
+      await FileSystem.makeDirectoryAsync(completionPhotoDir(docDir), {
+        intermediates: true,
+      }).catch(() => undefined);
+      // Drop the previous proof file (different name now) to avoid leaks.
+      if (order.completionPhotoPath) {
+        await FileSystem.deleteAsync(
+          resolveCompletionPhotoUri(docDir, order.completionPhotoPath),
+          { idempotent: true },
+        ).catch(() => undefined);
+      }
+      await FileSystem.copyAsync({ from: asset.uri, to: dest });
     } catch {
       Alert.alert('첨부 실패', '사진을 저장하지 못했습니다.');
       return;
     }
     persistOrder({
-      ...attachCompletionPhoto(order, uri),
+      ...attachCompletionPhoto(order, relativePath),
       updatedAt: new Date().toISOString(),
     });
   };
@@ -4416,11 +4422,15 @@ export default function RouteloApp() {
     if (!selectedDelivery) return;
     const order = orders.find((item) => item.id === selectedDelivery.id);
     if (!order) return;
-    const { uri } = completionPhotoTarget(
-      FileSystem.documentDirectory ?? '',
-      order.id,
-    );
-    FileSystem.deleteAsync(uri, { idempotent: true }).catch(() => undefined);
+    if (order.completionPhotoPath) {
+      FileSystem.deleteAsync(
+        resolveCompletionPhotoUri(
+          FileSystem.documentDirectory ?? '',
+          order.completionPhotoPath,
+        ),
+        { idempotent: true },
+      ).catch(() => undefined);
+    }
     persistOrder({
       ...clearCompletionPhoto(order),
       updatedAt: new Date().toISOString(),
@@ -4660,10 +4670,17 @@ export default function RouteloApp() {
       <DeliveryDetailSheet
         delivery={selectedDelivery}
         visible={Boolean(selectedDelivery)}
-        completionPhotoUri={
-          orders.find((item) => item.id === selectedDelivery?.id)
-            ?.completionPhotoUri
-        }
+        completionPhotoUri={(() => {
+          const path = orders.find(
+            (item) => item.id === selectedDelivery?.id,
+          )?.completionPhotoPath;
+          return path
+            ? resolveCompletionPhotoUri(
+                FileSystem.documentDirectory ?? '',
+                path,
+              )
+            : undefined;
+        })()}
         onClose={() => setSelectedDelivery(undefined)}
         onToggle={toggleSelected}
         onEdit={editSelected}

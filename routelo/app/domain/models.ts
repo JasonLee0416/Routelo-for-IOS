@@ -81,8 +81,10 @@ export type DeliveryOrder = {
   customerRequests?: string;
   status: DeliveryStatus;
   settlement: SettlementInfo;
-  // Persistent file URI of the delivery-completion proof photo, if attached.
-  completionPhotoUri?: string;
+  // Path of the delivery-completion proof photo relative to the app document
+  // dir (resolved against the current dir at read time so it survives the
+  // container UUID changing across reinstall / backup-restore).
+  completionPhotoPath?: string;
   source: {
     type: 'manual' | 'ocr' | 'migration' | 'sample';
     receiptId?: string;

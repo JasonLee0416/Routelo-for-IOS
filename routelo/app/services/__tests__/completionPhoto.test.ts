@@ -2,48 +2,63 @@ import { DeliveryOrder } from '../../domain';
 import {
   attachCompletionPhoto,
   clearCompletionPhoto,
-  completionPhotoTarget,
+  completionPhotoDir,
+  completionPhotoRelativePath,
   COMPLETION_PHOTO_DIR,
+  resolveCompletionPhotoUri,
 } from '../completionPhoto';
 
 const order = (over: Partial<DeliveryOrder> = {}): DeliveryOrder =>
   ({ id: 'd1', status: 'completed', ...over }) as DeliveryOrder;
 
-describe('completionPhotoTarget', () => {
-  test('builds a stable per-order jpg path under the document dir', () => {
-    const { dir, uri } = completionPhotoTarget('file:///docs/', 'd1');
-    expect(dir).toBe(`file:///docs/${COMPLETION_PHOTO_DIR}/`);
-    expect(uri).toBe(`file:///docs/${COMPLETION_PHOTO_DIR}/d1.jpg`);
+describe('completionPhotoRelativePath', () => {
+  test('is relative (no doc dir) and includes the token for cache-busting', () => {
+    expect(completionPhotoRelativePath('d1', '1720000000000')).toBe(
+      `${COMPLETION_PHOTO_DIR}/d1-1720000000000.jpg`,
+    );
+  });
+
+  test('different tokens yield different paths (re-attach busts Image cache)', () => {
+    expect(completionPhotoRelativePath('d1', 'a')).not.toBe(
+      completionPhotoRelativePath('d1', 'b'),
+    );
+  });
+
+  test('sanitizes unsafe characters in id and token', () => {
+    expect(completionPhotoRelativePath('a/b:1', 't x')).toBe(
+      `${COMPLETION_PHOTO_DIR}/a_b_1-t_x.jpg`,
+    );
+  });
+});
+
+describe('resolveCompletionPhotoUri / completionPhotoDir', () => {
+  test('resolves a relative path against the document dir', () => {
+    expect(
+      resolveCompletionPhotoUri('file:///docs/', `${COMPLETION_PHOTO_DIR}/d1-1.jpg`),
+    ).toBe(`file:///docs/${COMPLETION_PHOTO_DIR}/d1-1.jpg`);
   });
 
   test('normalizes a document dir with no trailing slash', () => {
-    const { uri } = completionPhotoTarget('file:///docs', 'd1');
-    expect(uri).toBe(`file:///docs/${COMPLETION_PHOTO_DIR}/d1.jpg`);
-  });
-
-  test('is deterministic (same id → same uri) so re-attach overwrites', () => {
-    const a = completionPhotoTarget('file:///docs/', 'abc');
-    const b = completionPhotoTarget('file:///docs/', 'abc');
-    expect(a.uri).toBe(b.uri);
-  });
-
-  test('sanitizes unsafe characters in the order id', () => {
-    const { uri } = completionPhotoTarget('file:///docs/', 'a/b:c 1');
-    expect(uri).toBe(`file:///docs/${COMPLETION_PHOTO_DIR}/a_b_c_1.jpg`);
+    expect(resolveCompletionPhotoUri('file:///docs', 'x.jpg')).toBe(
+      'file:///docs/x.jpg',
+    );
+    expect(completionPhotoDir('file:///docs')).toBe(
+      `file:///docs/${COMPLETION_PHOTO_DIR}/`,
+    );
   });
 });
 
 describe('attach / clear completion photo', () => {
-  test('attach sets the uri without mutating the input', () => {
+  test('attach sets the relative path without mutating the input', () => {
     const original = order();
-    const next = attachCompletionPhoto(original, 'file:///p.jpg');
-    expect(next.completionPhotoUri).toBe('file:///p.jpg');
-    expect(original.completionPhotoUri).toBeUndefined();
+    const next = attachCompletionPhoto(original, 'completion-photos/d1-1.jpg');
+    expect(next.completionPhotoPath).toBe('completion-photos/d1-1.jpg');
+    expect(original.completionPhotoPath).toBeUndefined();
   });
 
-  test('clear removes the uri key entirely', () => {
-    const withPhoto = order({ completionPhotoUri: 'file:///p.jpg' });
+  test('clear removes the path key entirely', () => {
+    const withPhoto = order({ completionPhotoPath: 'completion-photos/d1-1.jpg' });
     const cleared = clearCompletionPhoto(withPhoto);
-    expect('completionPhotoUri' in cleared).toBe(false);
+    expect('completionPhotoPath' in cleared).toBe(false);
   });
 });
