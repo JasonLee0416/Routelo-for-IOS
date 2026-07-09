@@ -45,7 +45,7 @@
 | `repositories/` | 영속 계약 + 구현 | `contracts.ts` · `local.ts` · `native.ts` |
 | `ocr/` | PP-OCRv5 런타임 · 정규화 · 필드 레지스트리 + 검증/heuristic/방향/벤치마크 | `ppocr/*` · `normalize.ts` · `layout.ts` · `fieldHeuristics.ts` · `fieldValidation.ts` · `orientation.ts` |
 | `platform/` | 인식기 계약 (Apple Vision / CLOVA / PP-OCR) + Vision 매핑(순수) | `receiptRecognizers.ts` · `receiptRecognition.ts` · `appleVision.ts` |
-| `modules/apple-vision-ocr/` | 네이티브 Apple Vision Expo 모듈 (Swift) | `ios/AppleVisionOcrModule.swift` |
+| `../modules/apple-vision-ocr/` | 네이티브 Apple Vision Expo 모듈 (Swift, `app/` 밖·routelo 루트) | `ios/AppleVisionOcrModule.swift` |
 | `vendor/` | 발주처 교차검증 (카카오, PII 안전) | `verify.ts` · `resolve.ts` · `apply.ts` · `kakao.ts` |
 | `settings/` | 설정 v2 스키마·기본값·마이그레이션·저장소 | `schema.ts` · `repository.ts` |
 | `account/` | 계정 모델·저장소 | — |
