@@ -129,7 +129,7 @@ describe('OCR field extraction — PP-OCR baseline (+ Apple Vision if present)',
   const groundTruth: Record<string, Record<string, string>> | null =
     fs.existsSync(gtPath) ? JSON.parse(fs.readFileSync(gtPath, 'utf8')) : null;
   (vision && groundTruth ? test : test.skip)(
-    'ground-truth field accuracy stays >= 22/31 (Phase 1 floor)',
+    'ground-truth field accuracy stays >= 26/31 (Phase 1 floor)',
     () => {
       const byImage = new Map(vision!.map((v) => [v.image, v]));
       let total = 0;
@@ -150,7 +150,7 @@ describe('OCR field extraction — PP-OCR baseline (+ Apple Vision if present)',
       }
       // eslint-disable-next-line no-console
       console.log(`ground-truth accuracy: ${hit}/${total}`);
-      expect(hit).toBeGreaterThanOrEqual(22);
+      expect(hit).toBeGreaterThanOrEqual(26);
     },
   );
 
@@ -183,6 +183,19 @@ describe('OCR field extraction — PP-OCR baseline (+ Apple Vision if present)',
       );
       expect(val('KakaoTalk_20260621_070828835_04.jpg', 'deliveryAddress')).toBe(
         '고대구로병원 장례식장 105호실',
+      );
+      // 예식시간('식' 앵커) + 문서순 발주/배송 전화 폴백.
+      expect(val('KakaoTalk_20260621_070828835_01.jpg', 'eventTime')).toBe(
+        '13:20',
+      );
+      expect(val('KakaoTalk_20260621_070828835_01.jpg', 'orderingVendorTel')).toBe(
+        '070-8277-1211',
+      );
+      expect(
+        val('KakaoTalk_20260621_070828835_01.jpg', 'fulfillingVendorTel'),
+      ).toBe('070-4741-0001');
+      expect(val('KakaoTalk_20260621_070828835_04.jpg', 'orderingVendorTel')).toBe(
+        '010-4482-9119',
       );
     },
   );

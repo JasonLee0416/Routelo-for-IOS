@@ -12,6 +12,25 @@ import { ReceiptFieldKey } from './schema';
 export const KOREAN_PHONE_PATTERN =
   /(?<!\d)(?:01[016789][-\s]?\d{3,4}[-\s]?\d{4}|070[-\s]?\d{4}[-\s]?\d{4}|02[-\s]?\d{3,4}[-\s]?\d{4}|0[3-6][0-9][-\s]?\d{3,4}[-\s]?\d{4}|1[0-9]{3}[-\s]?\d{4})(?!\d)/g;
 
+/**
+ * 텍스트에서 유효한 한국 전화번호를 등장 순서로 뽑는다(정규화·중복 제거).
+ * 라벨/줄 페어링이 실패했을 때 발주=[0]·배송=[1] 폴백 배정에 쓴다(레이아웃 무관).
+ */
+export function scanKoreanPhones(text: string): string[] {
+  const out: string[] = [];
+  const seen = new Set<string>();
+  const re = new RegExp(KOREAN_PHONE_PATTERN.source, 'g');
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(text))) {
+    const norm = normalizeKoreanPhone(m[0]);
+    if (norm && isValidKoreanPhone(norm) && !seen.has(norm)) {
+      seen.add(norm);
+      out.push(norm);
+    }
+  }
+  return out;
+}
+
 export function normalizeKoreanPhone(raw: string): string {
   const d = raw.replace(/\D/g, '');
   // 대표번호 1566-0028 등 (8자리, 1로 시작)
@@ -131,6 +150,25 @@ export function scanStrictTime(
   const value = normalizeKoreanTime(`${m[1] || ''}${m[2]}시${m[3] || '0'}분`);
   // source = 원문 매칭 span(위조 방지 provenance 유지용).
   return value ? { value, source: m[0] } : null;
+}
+
+/**
+ * "(1시 20분 식)"처럼 예식('식') 문맥의 시각을 뽑는다. 같은 줄의 배달 시간창(11:00~12:30)을
+ * 잘못 잡지 않도록 '식' 앵커를 요구한다. 오전/오후 미표기 시 예식 관례상 오후(1~8시→+12).
+ * `{value, source}` 반환(원문 매칭 span으로 provenance 유지). 실패 시 null.
+ */
+export function scanEventTime(
+  text: string,
+): { value: string; source: string } | null {
+  const m = text.match(/(오전|오후)?\s*(\d{1,2})\s*시\s*(\d{1,2})?\s*분?\s*식/);
+  if (!m) return null;
+  let hour = Number(m[2]);
+  const minute = Number(m[3] || 0);
+  if (hour > 23 || minute > 59) return null;
+  if (m[1] === '오후' && hour < 12) hour += 12;
+  else if (m[1] === '오전' && hour === 12) hour = 0;
+  else if (!m[1] && hour >= 1 && hour <= 8) hour += 12; // 예식 관례: 오후
+  return { value: `${pad2(hour)}:${pad2(minute)}`, source: m[0] };
 }
 
 /** `11:00~12:30`, `11:00 - 12시` 같은 범위에서 시작/종료 시각을 뽑는다. */

@@ -6,6 +6,8 @@ import {
   normalizeKoreanTime,
   normalizeQuantity,
   parseTimeRange,
+  scanEventTime,
+  scanKoreanPhones,
   scanStrictTime,
   scoreValueForType,
   validateFieldValue,
@@ -166,5 +168,32 @@ describe('scanStrictTime (마감시각 값-형식 회복)', () => {
   });
   test('주문 시각처럼 마감 문맥이 없으면 null', () => {
     expect(scanStrictTime('14시 43분 주문합니다')).toBeNull();
+  });
+});
+
+describe('scanEventTime (예식시간 값-형식 회복)', () => {
+  test('"(1시 20분 식)" → 13:20 (예식 관례상 오후)', () => {
+    const r = scanEventTime('11:00~12:30 (1시 20분 식)');
+    expect(r?.value).toBe('13:20');
+    expect(r?.source).toContain('식');
+  });
+  test('오후 명시를 존중', () => {
+    expect(scanEventTime('오후 2시 식')?.value).toBe('14:00');
+  });
+  test("'식' 앵커가 없으면 null(배달창과 혼동 방지)", () => {
+    expect(scanEventTime('11:00~12:30 당일배송')).toBeNull();
+  });
+});
+
+describe('scanKoreanPhones (문서순 전화 스캔)', () => {
+  test('등장 순서로 정규화·중복 제거', () => {
+    expect(
+      scanKoreanPhones('전화 070-8277-1211 전화 070-4741-0001 070-8277-1211'),
+    ).toEqual(['070-8277-1211', '070-4741-0001']);
+  });
+  test('주문번호 등 비전화 숫자는 제외', () => {
+    expect(scanKoreanPhones('주문번호 260614-03712 HP:010-4482-9119')).toEqual([
+      '010-4482-9119',
+    ]);
   });
 });

@@ -23,6 +23,8 @@ import {
   matchKoreanDate,
   normalizeKoreanPhone,
   normalizeKoreanTime,
+  scanEventTime,
+  scanKoreanPhones,
   scanStrictTime,
 } from '../ocr/fieldValidation';
 import { DEFAULT_FIELD_REGISTRY } from '../ocr/fieldRegistry';
@@ -311,14 +313,25 @@ export function parseReceiptText(
       ? { value: phone, sourceText: src.sourceText, sourceLineIds: src.sourceLineIds }
       : undefined;
   };
+  // 라벨·줄 페어링이 모두 실패하면, 문서순 전화(발주=[0]·배송=[1])로 폴백(레이아웃 무관).
+  const vendorPhones = scanKoreanPhones(text);
+  const phoneCandidate = (phone?: string) =>
+    phone ? { value: phone, sourceText: phone, sourceLineIds: undefined } : undefined;
   const orderingVendorTel =
     validatedPhoneCandidate(
       findLabeledValue(lines, ['발주화원 전화', '발주처 전화', '발주 전화']),
-    ) || vendorPhoneFromLine(orderingVendor);
+    ) ||
+    vendorPhoneFromLine(orderingVendor) ||
+    phoneCandidate(vendorPhones[0]);
   const fulfillingVendorTel =
     validatedPhoneCandidate(
       findLabeledValue(lines, ['배송화원 전화', '수주화원 전화', '배송 전화']),
-    ) || vendorPhoneFromLine(fulfillingVendor);
+    ) ||
+    vendorPhoneFromLine(fulfillingVendor) ||
+    // 발주 전화와 다른 첫 번째 전화(같은 번호를 두 업체에 중복 배정 방지).
+    phoneCandidate(
+      vendorPhones.find((p) => p !== orderingVendorTel?.value),
+    );
 
   const productSource =
     findLabeledValue(lines, ['상품명', '배송상품', '품명', '상품']) ||
@@ -389,7 +402,10 @@ export function parseReceiptText(
   const strictTime = strictSource
     ? normalizeTime(strictSource.value)
     : strictScan?.value || '';
-  const eventTime = eventSource ? normalizeTime(eventSource.value) : '';
+  // 예식시간은 같은 줄의 배달 시간창을 오선택하지 않도록 '식' 앵커 스캐너를 우선한다.
+  const eventScan = scanEventTime(text);
+  const eventTime =
+    eventScan?.value || (eventSource ? normalizeTime(eventSource.value) : '');
 
   const venueSource = findLabeledValue(lines, [
     '업체명',
@@ -604,11 +620,15 @@ export function parseReceiptText(
       'eventTime',
       eventTime,
       eventTime ? 86 : 0,
-      eventSource?.sourceText || '',
+      eventScan?.source || eventSource?.sourceText || '',
       [],
       {
         sourceLineIds: eventSource?.sourceLineIds,
-        extractionMethod: eventTime ? 'label' : undefined,
+        extractionMethod: eventScan
+          ? 'pattern'
+          : eventTime
+            ? 'label'
+            : undefined,
         forceReview: true,
       },
     ),
