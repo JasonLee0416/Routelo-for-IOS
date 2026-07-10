@@ -2,6 +2,32 @@
 
 `main` 기준 주요 변경을 시점별로 정리한다. 상세는 각 PR/이슈 참조.
 
+## 2026-07 — bare React Native 전환
+
+### 추가/변경
+- **Expo 완전 제거 → bare React Native 0.85**: 실기기 테스트를 Metro 없는
+  **배포용 Release 빌드**로 일원화. `npm run build:ios:device`(로컬 Xcode)로
+  빌드→설치→실행. `ios/` 네이티브 프로젝트를 git 추적으로 전환.
+- **네이티브 모듈 재작성**: Apple Vision OCR을 Expo 모듈에서 RCT 브리지
+  Swift 모듈(`ios/Routelo/AppleVisionOcr.swift`)로 포팅. OCR 전처리
+  crop/resize는 자체 `RouteloImageOps.swift`로 대체(expo-image-manipulator 제거).
+- **라이브러리 교체**: expo-notifications→notifee, expo-image-picker→
+  react-native-image-picker(+react-native-permissions), expo-file-system→
+  react-native-fs(호환 래퍼 `app/platform/fs.ts`), expo-blur→
+  @react-native-community/blur, @expo/vector-icons→react-native-vector-icons.
+- **OCR 모델 적재 방식 변경**: expo-asset(metro require) → Xcode 번들
+  리소스 폴더(`assets/ocr` → 앱 번들 `/ocr`) + `RNFS.MainBundlePath`.
+- **도구 체인**: jest-expo→@react-native/jest-preset, expo/metro-config→
+  @react-native/metro-config, expo/tsconfig.base→@react-native/typescript-config.
+
+### 제거/정리
+- EAS 빌드 파이프라인(eas.json)·dev-client·web 타깃(react-native-web)·
+  expo-modules-jsi 패치 제거. `validate`에서 expo-doctor·build:web 제외.
+
+### 알려진 동작 차이
+- 완료 사진 첨부의 시스템 크롭 UI(allowsEditing) 미지원 — 원본 사진 그대로 저장.
+- 사진 보관함은 PHPicker 기반으로 권한 프롬프트 없이 동작.
+
 ## 2026-06 — 실사용 준비 라운드
 
 ### 추가/변경

@@ -1,7 +1,0 @@
-{
-  "name": "apple-vision-ocr",
-  "version": "1.0.0",
-  "description": "On-device Apple Vision (VNRecognizeTextRequest) OCR bridge for Routelo receipts",
-  "main": "index.ts",
-  "private": true
-}

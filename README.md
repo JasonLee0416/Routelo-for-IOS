@@ -2,8 +2,9 @@
 
 한국 배달 기사(화훼·경조 중심)를 위한 **iOS 배달 업무 관리 앱**. 인수증 OCR,
 동선 최적화, 엄수 마감 관리, 손익·차량 회계를 하나로 묶고, 모든 데이터를
-기기에 **로컬 우선**으로 저장한다. React Native(Expo) 기반이며, iOS Liquid Glass
-철학을 재해석한 자체 디자인 시스템 **LUCENT**를 사용한다.
+기기에 **로컬 우선**으로 저장한다. **bare React Native** 기반(Expo 미사용)이며,
+iOS Liquid Glass 철학을 재해석한 자체 디자인 시스템 **LUCENT**를 사용한다.
+실기기 테스트는 Metro 없이 단독 실행되는 **배포용 Release 빌드**로만 한다.
 
 > 이 저장소는 `JasonLee0416/Routelo.version_2`(Android 우선 v2)에서 iOS로 분기했다.
 > iOS OCR 우선순위는 `Apple Vision → 동의 기반 CLOVA → PP-OCRv5(폴백) → 수동`.
@@ -51,17 +52,19 @@
 
 ## 🧱 기술 스택
 
-Expo SDK 56 · React Native 0.85 · React 19 · TypeScript 6 ·
-onnxruntime-react-native · Apple Vision(네이티브 Swift Expo 모듈) ·
-expo-blur · expo-notifications · expo-image-picker · expo-file-system ·
-AsyncStorage · Jest(jest-expo). CI: GitHub Actions · 빌드: EAS(클라우드).
+bare React Native 0.85 · React 19 · TypeScript 6 ·
+onnxruntime-react-native · Apple Vision(네이티브 Swift 브리지 모듈) ·
+@notifee/react-native · react-native-image-picker · react-native-fs ·
+@react-native-community/blur · react-native-vector-icons ·
+AsyncStorage · Jest(@react-native/jest-preset). CI: GitHub Actions ·
+빌드: 로컬 Xcode(`xcodebuild`, Release).
 
 ## 📁 프로젝트 구조
 
 ```
 Routelo-for-IOS/
 ├─ README.md                 ← 이 문서
-├─ routelo/                  ← 앱 소스 (Expo 프로젝트)
+├─ routelo/                  ← 앱 소스 (bare React Native 프로젝트)
 │  ├─ app/
 │  │  ├─ index.tsx           화면·루트 컴포넌트 (모놀리식, 분리 예정)
 │  │  ├─ theme/              LUCENT 디자인 토큰 + GlassSurface + 접근성 훅
@@ -69,12 +72,14 @@ Routelo-for-IOS/
 │  │  ├─ domain/             도메인 모델 + 어댑터 (DeliveryOrder·수동주문·달력·legacy)
 │  │  ├─ repositories/       영속 계약 + AsyncStorage 구현(배달·주유·주행·연락)
 │  │  ├─ ocr/ + platform/    PP-OCRv5 런타임 + Apple Vision 매핑 + 인식기 계약(Vision/CLOVA/PP-OCR)
+│  │  │                      + 네이티브 호환 래퍼(fs·imagePicker·imageOps·icons)
 │  │  ├─ vendor/             발주처 교차검증(카카오, PII 안전)
 │  │  ├─ settings/ account/  설정 v2 스키마 + 계정
-│  │  └─ __tests__ (모듈별)  42개 테스트 파일 · 263 테스트
-│  ├─ modules/apple-vision-ocr/  네이티브 Apple Vision Expo 모듈 (Swift, VNRecognizeTextRequest)
-│  ├─ docs/                  설계 문서 (아래 · OCR/디자인/빌드 런북)
-│  └─ eas.json               빌드 프로파일: device-test / ios-sim / preview / production
+│  │  └─ __tests__ (모듈별)  46개 테스트 파일 · 313 테스트
+│  ├─ ios/                   네이티브 Xcode 프로젝트 (git 추적)
+│  │  └─ Routelo/            AppDelegate + AppleVisionOcr.swift + RouteloImageOps.swift
+│  ├─ scripts/               빌드·검증 스크립트 (build-ios-device.sh 등)
+│  └─ docs/                  설계 문서 (아래 · OCR/디자인/빌드 런북)
 └─ docs/                     상위 히스토리 (CHANGELOG · HANDOFF · EVOLUTION · ADR)
 ```
 
@@ -96,28 +101,25 @@ Routelo-for-IOS/
 ```bash
 cd routelo
 npm install
-npm start            # Expo dev server (Expo Go 불가 — PP-OCR 네이티브 필요, dev client 사용)
+cd ios && pod install && cd ..
 ```
 
 검증(로컬 그린 게이트):
 
 ```bash
-npm run validate     # verify:no-mlkit + verify:ocr-models + test:ci + typecheck + doctor + build:web
+npm run validate     # verify:no-mlkit + verify:ocr-models + test:ci + typecheck
 ```
 
-**iOS 빌드는 EAS 클라우드에서 한다** (Windows에서도 가능):
+**iOS 빌드는 로컬 Xcode로 한다** (Mac 필요, Metro 불필요):
 
 ```bash
-# 무료 · Apple 계정 불필요 — 시뮬레이터 빌드로 컴파일 검증
-eas build --platform ios --profile ios-sim
-
-# 실기기 (유료 Apple Developer 멤버십 필요)
-npm run build:ios:device      # docs/IOS_DEVICE_TEST.md 참고
+npm run build:ios:device      # Release 빌드 → 연결된 iPhone에 설치·실행
+                              # 서명 설정은 docs/IOS_DEVICE_TEST.md 참고
 ```
 
 ## ✅ 테스트 · CI
 
-- `npm run test:ci` — 42개 테스트 파일 / 263 테스트 (순수 서비스·도메인 코어 중심)
+- `npm run test:ci` — 46개 테스트 파일 / 313 테스트 (순수 서비스·도메인 코어 중심)
 - GitHub Actions `Validate Routelo iOS` — 모든 PR·main push마다 `test:ci · typecheck · verify:no-mlkit · verify:ocr-models`
 
 ## 🗺️ 상태 · 로드맵

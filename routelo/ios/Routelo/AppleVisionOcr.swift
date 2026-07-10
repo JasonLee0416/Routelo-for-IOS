@@ -1,4 +1,4 @@
-import ExpoModulesCore
+import Foundation
 import Vision
 import CoreGraphics
 import ImageIO
@@ -7,17 +7,21 @@ import ImageIO
 // Returns raw Vision coordinates (normalized, bottom-left origin); the JS layer
 // (`app/platform/appleVision.ts`) converts them to the shared pixel/top-left
 // contract so the mapping stays unit-testable.
-public class AppleVisionOcrModule: Module {
-  public func definition() -> ModuleDefinition {
-    Name("AppleVisionOcr")
+@objc(AppleVisionOcr)
+class AppleVisionOcr: NSObject {
+  @objc static func requiresMainQueueSetup() -> Bool { false }
 
-    AsyncFunction("recognizeText") { (uri: String, promise: Promise) in
-      DispatchQueue.global(qos: .userInitiated).async {
-        do {
-          promise.resolve(try AppleVisionOcrModule.recognize(uri: uri))
-        } catch {
-          promise.reject("APPLE_VISION_OCR", error.localizedDescription)
-        }
+  @objc(recognizeText:resolver:rejecter:)
+  func recognizeText(
+    _ uri: String,
+    resolver resolve: @escaping RCTPromiseResolveBlock,
+    rejecter reject: @escaping RCTPromiseRejectBlock
+  ) {
+    DispatchQueue.global(qos: .userInitiated).async {
+      do {
+        resolve(try AppleVisionOcr.recognize(uri: uri))
+      } catch {
+        reject("APPLE_VISION_OCR", error.localizedDescription, error)
       }
     }
   }

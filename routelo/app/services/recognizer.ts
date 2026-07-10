@@ -1,4 +1,4 @@
 export {
   recognizeReceipt as recognizeReceiptWithPpOcr,
-  ReceiptRecognitionResult,
+  type ReceiptRecognitionResult,
 } from '../platform/receiptRecognition';

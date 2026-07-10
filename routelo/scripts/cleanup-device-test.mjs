@@ -5,13 +5,11 @@ import { fileURLToPath } from 'node:url';
 const root = dirname(dirname(fileURLToPath(import.meta.url)));
 const apply = process.argv.includes('--apply');
 const includeDependencies = process.argv.includes('--dependencies');
+// ios/ 자체는 소스로 추적된다 — 생성물(빌드 산출물·Pods)만 지운다.
 const targets = [
-  '.expo',
-  'dist',
-  'dist-android',
-  'dist-ios',
-  'android',
-  'ios',
+  'ios/build',
+  'ios/Pods',
+  'ios/DerivedData',
   ...(includeDependencies ? ['node_modules'] : []),
 ].map((path) => join(root, path));
 

@@ -1,6 +1,5 @@
-import { Asset } from 'expo-asset';
-import * as FileSystem from 'expo-file-system/legacy';
 import { Platform } from 'react-native';
+import RNFS from 'react-native-fs';
 
 import { decodeCtc } from './ctc';
 import { extractDbTextRegions } from './dbPostprocess';
@@ -13,9 +12,12 @@ import {
 import { PP_OCR_MODEL_VERSION } from './modelManifest';
 import type { PpOcrLine, PpOcrResult } from './types';
 
-const DETECTOR_ASSET = require('../../../assets/ocr/ch_PP-OCRv5_det_mobile.onnx');
-const RECOGNIZER_ASSET = require('../../../assets/ocr/korean_PP-OCRv5_rec_mobile.onnx');
-const DICTIONARY_ASSET = require('../../../assets/ocr/ppocrv5_korean_dict.txt');
+// 모델은 Xcode 리소스 폴더 참조(assets/ocr → 번들 /ocr)로 앱에 실린다.
+// (expo-asset 시절의 metro require 방식 대체)
+const MODEL_DIR = `${RNFS.MainBundlePath}/ocr`;
+const DETECTOR_PATH = `${MODEL_DIR}/ch_PP-OCRv5_det_mobile.onnx`;
+const RECOGNIZER_PATH = `${MODEL_DIR}/korean_PP-OCRv5_rec_mobile.onnx`;
+const DICTIONARY_PATH = `${MODEL_DIR}/ppocrv5_korean_dict.txt`;
 
 type OrtModule = typeof import('onnxruntime-react-native');
 type OrtSession = import('onnxruntime-react-native').InferenceSession;
@@ -27,16 +29,8 @@ let runtimePromise: Promise<{
   dictionary: string[];
 }> | null = null;
 
-async function localAssetUri(moduleId: number): Promise<string> {
-  const asset = Asset.fromModule(moduleId);
-  await asset.downloadAsync();
-  const uri = asset.localUri || asset.uri;
-  if (!uri) throw new Error(`Unable to resolve bundled OCR asset ${asset.name}.`);
-  return uri;
-}
-
-async function loadDictionary(uri: string) {
-  const content = await FileSystem.readAsStringAsync(uri);
+async function loadDictionary(path: string) {
+  const content = await RNFS.readFile(path, 'utf8');
   return content
     .split(/\r?\n/)
     .map((entry) => entry.trimEnd())
@@ -44,27 +38,22 @@ async function loadDictionary(uri: string) {
 }
 
 async function loadRuntime() {
-  if (Platform.OS !== 'android' && Platform.OS !== 'ios') {
-    throw new Error('PP-OCR requires an Android or iOS native build.');
+  if (Platform.OS !== 'ios') {
+    throw new Error('PP-OCR requires an iOS native build.');
   }
   if (!runtimePromise) {
     runtimePromise = (async () => {
       const ort = await import('onnxruntime-react-native');
-      const [detectorUri, recognizerUri, dictionaryUri] = await Promise.all([
-        localAssetUri(DETECTOR_ASSET),
-        localAssetUri(RECOGNIZER_ASSET),
-        localAssetUri(DICTIONARY_ASSET),
-      ]);
       const [detector, recognizer, dictionary] = await Promise.all([
-        ort.InferenceSession.create(detectorUri, {
+        ort.InferenceSession.create(DETECTOR_PATH, {
           executionProviders: ['cpu'],
           graphOptimizationLevel: 'all',
         }),
-        ort.InferenceSession.create(recognizerUri, {
+        ort.InferenceSession.create(RECOGNIZER_PATH, {
           executionProviders: ['cpu'],
           graphOptimizationLevel: 'all',
         }),
-        loadDictionary(dictionaryUri),
+        loadDictionary(DICTIONARY_PATH),
       ]);
       return { ort, detector, recognizer, dictionary };
     })();
@@ -77,7 +66,7 @@ function tensorShape(output: import('onnxruntime-react-native').Tensor) {
 }
 
 export function ppOcrCapability() {
-  const available = Platform.OS === 'android' || Platform.OS === 'ios';
+  const available = Platform.OS === 'ios';
   return {
     available,
     engine: 'ppocrv5' as const,

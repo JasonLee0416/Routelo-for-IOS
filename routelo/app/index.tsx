@@ -1,10 +1,3 @@
-import { Ionicons } from '@expo/vector-icons';
-// Classic string-path API (documentDirectory/copyAsync/…). SDK 56's default
-// entry is the new File/Directory API; the /legacy entry keeps the path-based
-// calls our completionPhoto path service is built around.
-import * as FileSystem from 'expo-file-system/legacy';
-import * as ImagePicker from 'expo-image-picker';
-import { StatusBar } from 'expo-status-bar';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   AccessibilityInfo,
@@ -21,12 +14,17 @@ import {
   Pressable,
   ScrollView,
   Share,
+  StatusBar,
   StyleSheet,
   Switch,
   Text,
   TextInput,
   View,
 } from 'react-native';
+
+import { Ionicons } from './platform/icons';
+import * as FileSystem from './platform/fs';
+import * as ImagePicker from './platform/imagePicker';
 import {
   SafeAreaView,
   useSafeAreaInsets,
@@ -3920,7 +3918,7 @@ function OcrScannerModal({
   return (
     <Modal visible={visible} animationType="slide" onRequestClose={onClose}>
       <SafeAreaView style={styles.scannerApp}>
-        <StatusBar style="dark" />
+        <StatusBar barStyle="dark-content" />
         <View style={styles.scannerHeader}>
           <Pressable style={styles.iconButton} onPress={onClose}>
             <Ionicons name="close" size={22} color={C.text} />
@@ -4778,7 +4776,7 @@ export default function RouteloApp() {
       style={styles.app}
       edges={['top', 'left', 'right']}
     >
-      <StatusBar style={darkMode ? 'light' : 'dark'} />
+      <StatusBar barStyle={darkMode ? 'light-content' : 'dark-content'} />
       <View style={styles.mainContent}>{screen}</View>
       <GlassSurface
         strength="prominent"

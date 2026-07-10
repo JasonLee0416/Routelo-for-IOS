@@ -1,4 +1,4 @@
-import * as FileSystem from 'expo-file-system/legacy';
+import * as FileSystem from '../platform/fs';
 
 import { DEFAULT_FIELD_REGISTRY, FieldDef, FIELD_REGISTRY_VERSION } from './fieldRegistry';
 import { ReceiptRecord } from './schema';
