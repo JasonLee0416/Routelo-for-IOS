@@ -23,6 +23,7 @@ export type LegacyDelivery = {
   fee: number;
   latitude: number;
   longitude: number;
+  hidden?: boolean;
 };
 
 const classifyProduct = (name: string): ProductCategory | undefined => {
@@ -97,6 +98,7 @@ export function legacyDeliveryToOrder(
     },
     customerRequests: legacy.customerRequests || undefined,
     status: legacy.status,
+    hidden: legacy.hidden,
     settlement: {
       distanceKm: Number.isFinite(legacy.distanceKm)
         ? legacy.distanceKm
@@ -136,6 +138,7 @@ export function orderToLegacyDelivery(order: DeliveryOrder): LegacyDelivery {
     fee: order.settlement.fee || 0,
     latitude: order.destination.latitude || 0,
     longitude: order.destination.longitude || 0,
+    hidden: order.hidden,
   };
 }
 

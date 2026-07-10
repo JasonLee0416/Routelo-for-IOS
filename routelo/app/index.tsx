@@ -353,17 +353,22 @@ function DeliveryCard({
 
 function DeliveryListScreen({
   deliveries,
+  hiddenDeliveries = [],
   onDeliveryPress,
+  onUnhide,
   onNotifications,
 }: {
   deliveries: Delivery[];
+  hiddenDeliveries?: Delivery[];
   onDeliveryPress: (delivery: Delivery) => void;
+  onUnhide?: (id: string) => void;
   onNotifications: () => void;
 }) {
   const { C, styles, dark } = useTheme();
   const [filter, setFilter] = useState<DeliveryFilter>('all');
   const [query, setQuery] = useState('');
   const [sortMode, setSortMode] = useState<DeliverySortMode>('urgency');
+  const [showHidden, setShowHidden] = useState(false);
   const filtered = sortDeliveries(
     filterDeliveries(deliveries, { query, status: filter }),
     sortMode,
@@ -526,6 +531,70 @@ function DeliveryListScreen({
           />
         ))}
       </View>
+      {hiddenDeliveries.length > 0 && (
+        <View style={{ marginTop: 18 }}>
+          <Pressable
+            onPress={() => setShowHidden((value) => !value)}
+            style={({ pressed }) => [
+              {
+                flexDirection: 'row',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: 6,
+                paddingVertical: 12,
+              },
+              pressed && { opacity: 0.6 },
+            ]}
+          >
+            <Ionicons
+              name={showHidden ? 'chevron-up' : 'eye-off-outline'}
+              size={16}
+              color={C.textMuted}
+            />
+            <Text style={{ color: C.textMuted, fontWeight: '600', fontSize: 13 }}>
+              숨긴 배달 {hiddenDeliveries.length}건 {showHidden ? '접기' : '보기'}
+            </Text>
+          </Pressable>
+          {showHidden && (
+            <View style={[styles.deliveryList, { opacity: 0.72 }]}>
+              {hiddenDeliveries.map((delivery) => (
+                <View key={delivery.id} style={{ position: 'relative' }}>
+                  <DeliveryCard
+                    delivery={delivery}
+                    onPress={() => onDeliveryPress(delivery)}
+                  />
+                  <Pressable
+                    onPress={() => onUnhide?.(delivery.id)}
+                    hitSlop={8}
+                    style={({ pressed }) => [
+                      {
+                        position: 'absolute',
+                        top: 10,
+                        right: 10,
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        gap: 4,
+                        paddingHorizontal: 10,
+                        paddingVertical: 6,
+                        borderRadius: 999,
+                        backgroundColor: C.primaryContainer,
+                      },
+                      pressed && { opacity: 0.6 },
+                    ]}
+                  >
+                    <Ionicons name="eye-outline" size={14} color={C.primary} />
+                    <Text
+                      style={{ color: C.primary, fontWeight: '700', fontSize: 12 }}
+                    >
+                      표시
+                    </Text>
+                  </Pressable>
+                </View>
+              ))}
+            </View>
+          )}
+        </View>
+      )}
     </ScrollView>
   );
 }
@@ -2772,6 +2841,7 @@ function DeliveryDetailSheet({
   onToggle,
   onEdit,
   onDelete,
+  onToggleHidden,
   onAttachPhoto,
   onRemovePhoto,
   onLogCall,
@@ -2784,6 +2854,7 @@ function DeliveryDetailSheet({
   onToggle: () => void;
   onEdit: () => void;
   onDelete: () => void;
+  onToggleHidden: () => void;
   onAttachPhoto: () => void;
   onRemovePhoto: () => void;
   onLogCall: (label: string, phone: string) => void;
@@ -3064,6 +3135,33 @@ function DeliveryDetailSheet({
               </Text>
             </Pressable>
           </View>
+          <Pressable
+            onPress={onToggleHidden}
+            style={({ pressed }) => [
+              {
+                flexDirection: 'row',
+                alignItems: 'center',
+                justifyContent: 'center',
+                paddingVertical: 12,
+                marginTop: 10,
+                borderRadius: 12,
+                borderWidth: 1,
+                borderColor: C.outline,
+              },
+              pressed && { opacity: 0.6 },
+            ]}
+          >
+            <Ionicons
+              name={delivery.hidden ? 'eye-outline' : 'eye-off-outline'}
+              size={18}
+              color={C.textMuted}
+            />
+            <Text
+              style={{ color: C.textMuted, fontWeight: '600', marginLeft: 6 }}
+            >
+              {delivery.hidden ? '목록에 다시 표시' : '목록에서 숨기기'}
+            </Text>
+          </Pressable>
         </GlassSurface>
       </View>
     </Modal>
@@ -3795,6 +3893,15 @@ export default function RouteloApp() {
     () => orders.map(orderToLegacyDelivery),
     [orders],
   );
+  // 숨김 처리된 배달은 홈·목록·동선에서 제외(데이터는 보존). 캘린더는 orders 전체를 받는다.
+  const activeDeliveries = useMemo(
+    () => deliveries.filter((item) => !item.hidden),
+    [deliveries],
+  );
+  const hiddenDeliveries = useMemo(
+    () => deliveries.filter((item) => item.hidden),
+    [deliveries],
+  );
   const [selectedDelivery, setSelectedDelivery] = useState<Delivery>();
   const [scannerVisible, setScannerVisible] = useState(false);
   const [formVisible, setFormVisible] = useState(false);
@@ -4042,6 +4149,22 @@ export default function RouteloApp() {
     await deliveryRepository.remove(id).catch(() => undefined);
   };
 
+  // 숨김 토글: 데이터는 보존하되 목록에서 감춘다(완료 배송 치우기). 다시 눌러 복원 가능.
+  const toggleHiddenById = async (id: string) => {
+    const currentOrder = orders.find((item) => item.id === id);
+    if (!currentOrder) return;
+    const nextOrder: DeliveryOrder = {
+      ...currentOrder,
+      hidden: !currentOrder.hidden,
+      updatedAt: new Date().toISOString(),
+    };
+    setOrders((current) =>
+      current.map((item) => (item.id === nextOrder.id ? nextOrder : item)),
+    );
+    setSelectedDelivery(undefined);
+    await deliveryRepository.save(nextOrder).catch(() => undefined);
+  };
+
   const persistOrder = (next: DeliveryOrder) => {
     setOrders((current) =>
       current.map((item) => (item.id === next.id ? next : item)),
@@ -4184,8 +4307,10 @@ export default function RouteloApp() {
     if (activeTab === 'deliveries') {
       return (
         <DeliveryListScreen
-          deliveries={deliveries}
+          deliveries={activeDeliveries}
+          hiddenDeliveries={hiddenDeliveries}
           onDeliveryPress={setSelectedDelivery}
+          onUnhide={toggleHiddenById}
           onNotifications={openNotifications}
         />
       );
@@ -4213,7 +4338,7 @@ export default function RouteloApp() {
     if (activeTab === 'route') {
       return (
         <RouteScreen
-          deliveries={deliveries}
+          deliveries={activeDeliveries}
           navApp={settings.route.navApp}
           allowReorder={settings.route.allowManualReorder}
           onDeliveryPress={setSelectedDelivery}
@@ -4234,13 +4359,22 @@ export default function RouteloApp() {
     }
     return (
       <HomeScreen
-        deliveries={deliveries}
+        deliveries={activeDeliveries}
         onDeliveryPress={setSelectedDelivery}
         onSeeAll={() => setActiveTab('deliveries')}
         onNotifications={openNotifications}
       />
     );
-  }, [account, activeTab, deliveries, fuelLogs, orders, settings]);
+  }, [
+    account,
+    activeTab,
+    activeDeliveries,
+    hiddenDeliveries,
+    deliveries,
+    fuelLogs,
+    orders,
+    settings,
+  ]);
 
   const darkMode = settings.appearance.themeMode === 'dark';
   const C = darkMode ? DARK : LIGHT;
@@ -4401,6 +4535,9 @@ export default function RouteloApp() {
         onToggle={toggleSelected}
         onEdit={editSelected}
         onDelete={deleteSelected}
+        onToggleHidden={() =>
+          selectedDelivery && toggleHiddenById(selectedDelivery.id)
+        }
         onAttachPhoto={startCompletionPhoto}
         onRemovePhoto={removeCompletionPhoto}
         onLogCall={logCall}
