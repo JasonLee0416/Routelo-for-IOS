@@ -31,6 +31,20 @@ export function scanKoreanPhones(text: string): string[] {
   return out;
 }
 
+/**
+ * 전화번호를 '확실한 연락처(direct)' vs '안심/대표번호(safe)'로 분류한다.
+ * - direct: 휴대폰(01x) 또는 지역번호(02·03x~06x) — 실제 당사자 연락 가능성 높음.
+ * - safe: 070(VoIP)·15xx/16xx/18xx(대표)·050x(안심) 등 그 외 — 안심/대표번호.
+ * 검수 UI에서 실번호↔안심번호를 구분 표시하는 데 쓴다.
+ */
+export function classifyPhoneNumber(phone: string): 'direct' | 'safe' {
+  const d = phone.replace(/\D/g, '');
+  if (/^01[016789]/.test(d) || /^02/.test(d) || /^0[3-6][0-9]/.test(d)) {
+    return 'direct';
+  }
+  return 'safe';
+}
+
 export function normalizeKoreanPhone(raw: string): string {
   const d = raw.replace(/\D/g, '');
   // 대표번호 1566-0028 등 (8자리, 1로 시작)

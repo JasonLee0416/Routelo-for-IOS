@@ -1,4 +1,5 @@
 import {
+  classifyPhoneNumber,
   detectFieldConflicts,
   isValidKoreanPhone,
   normalizeKoreanDate,
@@ -182,6 +183,19 @@ describe('scanEventTime (예식시간 값-형식 회복)', () => {
   });
   test("'식' 앵커가 없으면 null(배달창과 혼동 방지)", () => {
     expect(scanEventTime('11:00~12:30 당일배송')).toBeNull();
+  });
+});
+
+describe('classifyPhoneNumber (확실한 연락처 vs 안심번호)', () => {
+  test('01x·지역번호는 direct(확실한 연락처)', () => {
+    expect(classifyPhoneNumber('010-5898-9543')).toBe('direct');
+    expect(classifyPhoneNumber('02-408-7737')).toBe('direct');
+    expect(classifyPhoneNumber('031-282-8403')).toBe('direct');
+  });
+  test('070·15xx 대표번호는 safe(안심번호)', () => {
+    expect(classifyPhoneNumber('070-4741-0001')).toBe('safe');
+    expect(classifyPhoneNumber('1566-0028')).toBe('safe');
+    expect(classifyPhoneNumber('1599-0028')).toBe('safe');
   });
 });
 

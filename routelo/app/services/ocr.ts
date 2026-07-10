@@ -9,6 +9,7 @@ import { inferEventType, scanProductName } from '../ocr/contentClassifier';
 import {
   cleanVendorName,
   extractPersonName,
+  extractVendorName,
   pickBest,
   scanAddressSpan,
   scanCondolenceRecipient,
@@ -18,6 +19,7 @@ import {
 } from '../ocr/fieldHeuristics';
 import {
   KOREAN_PHONE_PATTERN,
+  classifyPhoneNumber,
   detectFieldConflicts,
   isValidKoreanPhone,
   matchKoreanDate,
@@ -136,6 +138,9 @@ function field(
           : confidence >= 60
             ? 'review'
             : 'warning';
+  // 전화 필드는 실번호(direct)/안심번호(safe)를 자동 분류해 검수 UI가 구분 표시할 수 있게 한다.
+  const phoneKind =
+    value && PHONE_KEYS.has(key) ? classifyPhoneNumber(value) : undefined;
   return {
     key,
     label: LABELS[key],
@@ -149,8 +154,16 @@ function field(
     validationErrors,
     alternatives,
     status,
+    phoneKind,
   };
 }
+
+// 전화번호 성격 분류를 붙일 필드(발주/배송/수령 연락처).
+const PHONE_KEYS = new Set<OcrFieldKey>([
+  'orderingVendorTel',
+  'fulfillingVendorTel',
+  'recipientTel',
+]);
 
 const compactLabel = (value: string) =>
   value.replace(/[\s:：|[\]()]/g, '').toLowerCase();
@@ -301,10 +314,11 @@ export function parseReceiptText(
   // 업체명에서 전화·라벨 잔여 제거(주소면 상호 아님 → '').
   // 폴백: 라벨 매칭이 비면 값 형식(상호 마커로 끝나는 토큰)으로 회복(등장 순서로 발주/배송 배정).
   const vendorTokens = scanVendorTokens(text);
+  // 상호는 "형식 있는 토큰"(00플라워/00화원)만 남기고 잡글자("전 화" 등)를 버린다.
   const orderingVendorName =
-    cleanVendorName(orderingVendor?.value || '') || vendorTokens[0] || '';
+    extractVendorName(orderingVendor?.value || '') || vendorTokens[0] || '';
   const fulfillingVendorName =
-    cleanVendorName(fulfillingVendor?.value || '') || vendorTokens[1] || '';
+    extractVendorName(fulfillingVendor?.value || '') || vendorTokens[1] || '';
   // 라벨 전화가 없으면 업체명 줄 자체에서 전화를 페어링(업체↔전화 쌍).
   const vendorPhoneFromLine = (src: ReturnType<typeof findLabeledValue>) => {
     if (!src) return undefined;

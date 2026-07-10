@@ -76,14 +76,35 @@ export function cleanVendorName(raw: string): string {
   return cleaned;
 }
 
+// 상호가 아니라 "라벨" 자체인 …화원 단어(발주화원/배송화원 등)는 제외.
+const VENDOR_LABEL_WORD =
+  /^(발주화원|배송화원|수주화원|발주회원|수주회원|발주처|배송처|수주처)$/;
+
+// 상호 토큰: ㈜/(주) 접두(선택) + 12자 이내 본문 + 상호 마커로 끝남.
+const VENDOR_TOKEN =
+  /((?:㈜|\(주\))?\s*[가-힣A-Za-z0-9]{1,12}(?:꽃화원|화원|플라워|플라웨|농원|화훼센터|화훼))/;
+
+/**
+ * 원시 상호 값에서 "형식 있는 상호 토큰"(00플라워/00화원…)만 뽑아 잡글자를 버린다.
+ * 예: "(주)99플라워 전 화" → "(주)99플라워", "몽플라워 / FAX" → "몽플라워".
+ * 마커 토큰이 없으면 cleanVendorName 결과로 폴백. 라벨어(발주화원 등)면 '' .
+ */
+export function extractVendorName(raw: string): string {
+  const cleaned = cleanVendorName(raw);
+  if (!cleaned) return '';
+  const m = cleaned.match(VENDOR_TOKEN);
+  if (m) {
+    const token = m[1].replace(/\s+/g, '').trim();
+    if (token.length >= 2 && !VENDOR_LABEL_WORD.test(token)) return token;
+  }
+  return VENDOR_LABEL_WORD.test(cleaned) ? '' : cleaned;
+}
+
 /**
  * 상호 마커(화원/플라워/농원…)로 끝나는 상호 토큰을 등장 순서대로 뽑는다.
  * 라벨이 값과 떨어져 병합돼도(startsWith 실패) 값 형식만으로 상호를 회복.
  * ㈜/(주) 접두는 보존. 중복 제거.
  */
-// 상호가 아니라 "라벨" 자체인 …화원 단어(발주화원/배송화원 등)는 제외.
-const VENDOR_LABEL_WORD =
-  /^(발주화원|배송화원|수주화원|발주회원|수주회원|발주처|배송처|수주처)$/;
 
 export function scanVendorTokens(text: string): string[] {
   const out: string[] = [];

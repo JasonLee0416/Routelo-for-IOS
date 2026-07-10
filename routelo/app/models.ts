@@ -95,6 +95,8 @@ export type OcrFieldResult = {
   validationErrors?: string[];
   alternatives: string[];
   status: 'confirmed' | 'review' | 'warning' | 'missing';
+  // 전화 필드 분류: 'direct'(01x·지역번호=확실한 연락처) / 'safe'(070·15xx 등=안심/대표번호).
+  phoneKind?: 'direct' | 'safe';
 };
 
 export type CaptureQuality = {

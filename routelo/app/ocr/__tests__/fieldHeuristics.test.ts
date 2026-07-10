@@ -4,6 +4,7 @@ import {
   extractPersonName,
   looksLikeAddress,
   looksLikeVendor,
+  extractVendorName,
   pickBest,
   scanAddressSpan,
   scanCondolenceRecipient,
@@ -85,6 +86,22 @@ describe('cleanVendorName', () => {
   test('rejects an address or digits-only value as a vendor name', () => {
     expect(cleanVendorName('서울 강남구 선릉로 757 3층')).toBe('');
     expect(cleanVendorName('070-4741-0001')).toBe('');
+  });
+});
+
+describe('extractVendorName (형식 있는 상호 토큰만 남기기)', () => {
+  test('상호 뒤 잡글자(전 화/라벨 잔여)를 버린다', () => {
+    expect(extractVendorName('(주)99플라워 전 화')).toBe('(주)99플라워');
+    expect(extractVendorName('몽플라워 / FAX 02-1234-5678')).toBe('몽플라워');
+    expect(extractVendorName('선유꽃화원 TEL 070-4741-0001')).toBe('선유꽃화원');
+  });
+  test('이미 깨끗한 상호는 그대로', () => {
+    expect(extractVendorName('타임플라워')).toBe('타임플라워');
+    expect(extractVendorName('용인세브란스화원')).toBe('용인세브란스화원');
+  });
+  test('라벨어/주소는 상호가 아니므로 빈 문자열', () => {
+    expect(extractVendorName('배송화원')).toBe('');
+    expect(extractVendorName('서울 강남구 선릉로 757')).toBe('');
   });
 });
 
