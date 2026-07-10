@@ -44,7 +44,17 @@
     },
     "plugins": [
       "expo-font",
-      "onnxruntime-react-native"
+      "onnxruntime-react-native",
+      [
+        "expo-notifications",
+        {
+          "sounds": [
+            "./assets/sounds/routelo_ding.wav",
+            "./assets/sounds/routelo_bell.wav",
+            "./assets/sounds/routelo_arp.wav"
+          ]
+        }
+      ]
     ],
     "extra": {
       "eas": {

@@ -59,6 +59,13 @@ export type OcrSettings = {
   onlineVendorVerification: boolean;
 };
 
+export type NotificationAlertMode = 'sound' | 'vibration' | 'both';
+export type NotificationSoundName =
+  | 'routelo_ding'
+  | 'routelo_bell'
+  | 'routelo_arp'
+  | 'default';
+
 export type NotificationSettings = {
   strictDeadlineEnabled: boolean;
   eventTimeEnabled: boolean;
@@ -66,6 +73,9 @@ export type NotificationSettings = {
   completionMissingEnabled: boolean;
   strictDeadlineLeadMinutes: number[];
   eventLeadMinutes: number[];
+  // 알림 방식(소리/진동/둘 다)과 알림음 선택.
+  alertMode: NotificationAlertMode;
+  soundName: NotificationSoundName;
 };
 
 export type AppearanceSettings = {

@@ -97,6 +97,7 @@ import { planDeliveryNotifications } from './services/notificationPlan';
 import {
   cancelAllScheduledNotifications,
   ensureNotificationPermission,
+  sendTestNotification,
   syncScheduledNotifications,
 } from './services/notifications';
 import { formatWonShort } from './services/money';
@@ -129,6 +130,10 @@ import {
   totalProfit,
 } from './services/profit';
 import { DEFAULT_ROUTELO_SETTINGS, NavApp, RouteloSettings } from './settings';
+import type {
+  NotificationAlertMode,
+  NotificationSoundName,
+} from './settings/schema';
 import { GYEONGGI_DISTRICTS, SEOUL_DISTRICTS } from './settings/districts';
 import { settingsRepository } from './settings/native';
 import { makeStyles, styles } from './theme/appStyles';
@@ -2442,6 +2447,27 @@ function SettingsScreen({
     });
   };
 
+  const alertModeOptions: Array<{
+    mode: NotificationAlertMode;
+    label: string;
+    icon: keyof typeof Ionicons.glyphMap;
+  }> = [
+    { mode: 'sound', label: '소리', icon: 'volume-high-outline' },
+    { mode: 'vibration', label: '진동', icon: 'phone-portrait-outline' },
+    { mode: 'both', label: '소리+진동', icon: 'notifications-outline' },
+  ];
+  const soundOptions: Array<{ name: NotificationSoundName; label: string }> = [
+    { name: 'routelo_ding', label: '딩동 (밝게)' },
+    { name: 'routelo_bell', label: '벨 (부드럽게)' },
+    { name: 'routelo_arp', label: '아르페지오' },
+    { name: 'default', label: '기본음' },
+  ];
+  const setNotifications = (patch: Partial<RouteloSettings['notifications']>) =>
+    updateSettings({
+      ...settings,
+      notifications: { ...settings.notifications, ...patch },
+    });
+
   return (
     <ScrollView contentContainerStyle={styles.screenContent} showsVerticalScrollIndicator={false}>
       <ScreenHeader
@@ -2538,6 +2564,146 @@ function SettingsScreen({
             />
           }
         />
+      </View>
+
+      <SectionHeader title="알림음 · 진동" />
+      <View style={styles.settingsGroup}>
+        <View style={{ padding: 14 }}>
+          <Text
+            style={{
+              color: C.textMuted,
+              fontSize: 12,
+              fontWeight: '700',
+              marginBottom: 8,
+            }}
+          >
+            알림 방식
+          </Text>
+          <View style={{ flexDirection: 'row', gap: 8 }}>
+            {alertModeOptions.map((option) => {
+              const active = settings.notifications.alertMode === option.mode;
+              return (
+                <Pressable
+                  key={option.mode}
+                  onPress={() => setNotifications({ alertMode: option.mode })}
+                  style={{
+                    flex: 1,
+                    alignItems: 'center',
+                    gap: 4,
+                    paddingVertical: 10,
+                    borderRadius: 12,
+                    borderWidth: 1,
+                    borderColor: active ? C.primary : C.outline,
+                    backgroundColor: active ? C.primaryContainer : 'transparent',
+                  }}
+                >
+                  <Ionicons
+                    name={option.icon}
+                    size={18}
+                    color={active ? C.primary : C.textMuted}
+                  />
+                  <Text
+                    style={{
+                      fontSize: 12,
+                      fontWeight: '700',
+                      color: active ? C.primary : C.textMuted,
+                    }}
+                  >
+                    {option.label}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
+        </View>
+        <View style={styles.divider} />
+        <View
+          style={{
+            padding: 14,
+            opacity: settings.notifications.alertMode === 'vibration' ? 0.4 : 1,
+          }}
+        >
+          <View
+            style={{
+              flexDirection: 'row',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              marginBottom: 6,
+            }}
+          >
+            <Text style={{ color: C.textMuted, fontSize: 12, fontWeight: '700' }}>
+              알림음
+            </Text>
+            <Pressable
+              onPress={() =>
+                sendTestNotification(settings.notifications).catch(
+                  () => undefined,
+                )
+              }
+              style={({ pressed }) => [
+                {
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  gap: 4,
+                  paddingHorizontal: 12,
+                  paddingVertical: 6,
+                  borderRadius: 999,
+                  backgroundColor: C.primaryContainer,
+                },
+                pressed && { opacity: 0.6 },
+              ]}
+            >
+              <Ionicons name="play" size={13} color={C.primary} />
+              <Text
+                style={{ color: C.primary, fontWeight: '700', fontSize: 12 }}
+              >
+                테스트
+              </Text>
+            </Pressable>
+          </View>
+          {soundOptions.map((option) => {
+            const active = settings.notifications.soundName === option.name;
+            return (
+              <Pressable
+                key={option.name}
+                disabled={settings.notifications.alertMode === 'vibration'}
+                onPress={() => setNotifications({ soundName: option.name })}
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  gap: 10,
+                  paddingVertical: 11,
+                }}
+              >
+                <Ionicons
+                  name={active ? 'radio-button-on' : 'radio-button-off'}
+                  size={18}
+                  color={active ? C.primary : C.textMuted}
+                />
+                <Text
+                  style={{
+                    fontSize: 14,
+                    color: C.text,
+                    fontWeight: active ? '700' : '500',
+                  }}
+                >
+                  {option.label}
+                </Text>
+              </Pressable>
+            );
+          })}
+          <Text
+            style={{
+              color: C.textMuted,
+              fontSize: 11,
+              marginTop: 6,
+              lineHeight: 16,
+            }}
+          >
+            iOS는 소리·진동을 시스템 설정과 함께 제어합니다. '진동'만 선택하면 무음
+            알림으로 전송돼 진동만 울립니다. 테스트는 1초 뒤 실제 알림으로 미리 들려줍니다.
+          </Text>
+        </View>
       </View>
 
       <SectionHeader title="경로 설정" />
@@ -4206,7 +4372,9 @@ export default function RouteloApp() {
     }).filter((item) =>
       item.kind === 'deadline' ? n.strictDeadlineEnabled : n.eventTimeEnabled,
     );
-    syncScheduledNotifications(plan).catch(() => undefined);
+    syncScheduledNotifications(plan, settings.notifications).catch(
+      () => undefined,
+    );
   }, [orders, settings.notifications]);
 
   const openCreateMileage = () => {

@@ -71,6 +71,8 @@ export const DEFAULT_ROUTELO_SETTINGS: RouteloSettings = {
     completionMissingEnabled: true,
     strictDeadlineLeadMinutes: [60, 30],
     eventLeadMinutes: [120, 60],
+    alertMode: 'both',
+    soundName: 'routelo_ding',
   },
   appearance: {
     themeMode: 'light',
