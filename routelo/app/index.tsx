@@ -16,6 +16,7 @@ import {
   KeyboardAvoidingView,
   Linking,
   Modal,
+  PanResponder,
   Platform,
   Pressable,
   ScrollView,
@@ -605,16 +606,152 @@ function DeliveryListScreen({
   );
 }
 
+const ROUTE_ROW_H = 66;
+
+// JS 전용(네이티브 의존성 없음) 드래그 재정렬 리스트. 배송지 행을 꾹 눌러 위아래로
+// 끌면 순서가 바뀐다. 살짝 누르면(이동<임계) 상세로 이동. PanResponder는 useRef로 한 번만
+// 생성하고 콜백은 ref로 최신값을 읽어 드래그 도중 재조정/스테일 클로저를 피한다.
+function DraggableRouteList({
+  items,
+  onReorder,
+  onPressRow,
+}: {
+  items: Delivery[];
+  onReorder: (next: Delivery[]) => void;
+  onPressRow: (delivery: Delivery) => void;
+}) {
+  const { C, styles } = useTheme();
+  const [data, setData] = useState<Delivery[]>(items);
+  const key = items.map((item) => item.id).join('|');
+  useEffect(() => setData(items), [key]);
+
+  const dataRef = useRef(data);
+  useEffect(() => {
+    dataRef.current = data;
+  }, [data]);
+  const cbRef = useRef({ onReorder, onPressRow });
+  useEffect(() => {
+    cbRef.current = { onReorder, onPressRow };
+  });
+
+  const [active, setActive] = useState<number | null>(null);
+  const dragY = useRef(new Animated.Value(0)).current;
+  const start = useRef(0);
+  const hover = useRef(0);
+  const moved = useRef(false);
+
+  const clampIndex = (value: number) =>
+    Math.max(0, Math.min(dataRef.current.length - 1, value));
+
+  const pan = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: (_e, g) => Math.abs(g.dy) > 4,
+      onPanResponderGrant: (e) => {
+        const idx = clampIndex(
+          Math.floor(e.nativeEvent.locationY / ROUTE_ROW_H),
+        );
+        start.current = idx;
+        hover.current = idx;
+        moved.current = false;
+        dragY.setValue(0);
+        setActive(idx);
+      },
+      onPanResponderMove: (_e, g) => {
+        if (Math.abs(g.dy) > 4) moved.current = true;
+        dragY.setValue(g.dy);
+        hover.current = clampIndex(start.current + Math.round(g.dy / ROUTE_ROW_H));
+      },
+      onPanResponderRelease: () => {
+        if (!moved.current) {
+          cbRef.current.onPressRow(dataRef.current[start.current]);
+        } else if (start.current !== hover.current) {
+          const copy = [...dataRef.current];
+          const [m] = copy.splice(start.current, 1);
+          copy.splice(hover.current, 0, m);
+          setData(copy);
+          cbRef.current.onReorder(copy);
+        }
+        setActive(null);
+        dragY.setValue(0);
+      },
+      onPanResponderTerminate: () => {
+        setActive(null);
+        dragY.setValue(0);
+      },
+    }),
+  ).current;
+
+  return (
+    <View
+      {...pan.panHandlers}
+      style={{ height: data.length * ROUTE_ROW_H, position: 'relative' }}
+    >
+      {data.map((delivery, index) => {
+        const isActive = index === active;
+        const RowView = isActive ? Animated.View : View;
+        return (
+          <RowView
+            key={delivery.id}
+            style={[
+              {
+                position: 'absolute',
+                left: 0,
+                right: 0,
+                top: index * ROUTE_ROW_H,
+                height: ROUTE_ROW_H,
+                flexDirection: 'row',
+                alignItems: 'center',
+                paddingRight: 8,
+              },
+              isActive && {
+                transform: [{ translateY: dragY }],
+                zIndex: 20,
+                backgroundColor: C.surface,
+                borderRadius: 12,
+                shadowColor: '#000',
+                shadowOpacity: 0.18,
+                shadowRadius: 10,
+                shadowOffset: { width: 0, height: 4 },
+                elevation: 6,
+              },
+            ]}
+          >
+            <View style={styles.routeStackOrder}>
+              <Text style={styles.routeStackOrderText}>{index + 1}</Text>
+            </View>
+            <View style={styles.routeStackBody}>
+              <Text style={styles.routeStackTitle} numberOfLines={1}>
+                {delivery.productName}
+              </Text>
+              <Text style={styles.routeStackAddress} numberOfLines={1}>
+                {delivery.deliveryAddress}
+              </Text>
+            </View>
+            <Ionicons name="reorder-three-outline" size={22} color={C.textMuted} />
+          </RowView>
+        );
+      })}
+    </View>
+  );
+}
+
 function RouteScreen({
   deliveries,
   navApp,
   allowReorder,
+  startAddress,
+  endAddress,
+  onSetLocations,
   onDeliveryPress,
   onNotifications,
 }: {
   deliveries: Delivery[];
   navApp: NavApp;
   allowReorder: boolean;
+  startAddress?: string;
+  endAddress?: string;
+  onSetLocations: (start: string, end: string) => void;
   onDeliveryPress: (delivery: Delivery) => void;
   onNotifications: () => void;
 }) {
@@ -634,15 +771,12 @@ function RouteScreen({
   const next = order[0];
   const totalDistance = order.reduce((sum, item) => sum + item.distanceKm, 0);
 
-  const move = (index: number, direction: -1 | 1) => {
-    setOrder((current) => {
-      const target = index + direction;
-      if (target < 0 || target >= current.length) return current;
-      const copy = [...current];
-      [copy[index], copy[target]] = [copy[target], copy[index]];
-      return copy;
-    });
-  };
+  // 출발지/최종 도착지 입력(설정에 저장). 편집 중에는 로컬 상태로 잡고 blur 시 저장.
+  const [startInput, setStartInput] = useState(startAddress ?? '');
+  const [endInput, setEndInput] = useState(endAddress ?? '');
+  useEffect(() => setStartInput(startAddress ?? ''), [startAddress]);
+  useEffect(() => setEndInput(endAddress ?? ''), [endAddress]);
+  const saveLocations = () => onSetLocations(startInput.trim(), endInput.trim());
 
   const startNavigation = () => {
     if (!next) return;
@@ -658,10 +792,35 @@ function RouteScreen({
       <ScreenHeader
         eyebrow="ROUTE · STACK"
         title="배달 동선"
-        subtitle="배달 순서를 직접 정하고, 맨 위 목적지로 바로 안내받으세요."
+        subtitle="출발지·도착지를 정하고, 배송지를 끌어 순서를 바꾸세요."
         notificationCount={3}
         onNotificationPress={onNotifications}
       />
+      <View style={styles.surfaceCard}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+          <Ionicons name="flag-outline" size={16} color={C.primary} />
+          <TextInput
+            value={startInput}
+            onChangeText={setStartInput}
+            onBlur={saveLocations}
+            placeholder="출발지 (예: 강남 꽃시장)"
+            placeholderTextColor={C.textMuted}
+            style={{ flex: 1, color: C.text, fontSize: 14, paddingVertical: 8 }}
+          />
+        </View>
+        <View style={styles.divider} />
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 8 }}>
+          <Ionicons name="location-outline" size={16} color={C.danger} />
+          <TextInput
+            value={endInput}
+            onChangeText={setEndInput}
+            onBlur={saveLocations}
+            placeholder="최종 도착지 (예: 자택 · 비우면 마지막 배송지)"
+            placeholderTextColor={C.textMuted}
+            style={{ flex: 1, color: C.text, fontSize: 14, paddingVertical: 8 }}
+          />
+        </View>
+      </View>
       {!!next && (
         <View style={styles.nextDestinationCard}>
           <View style={styles.nextDestinationHeader}>
@@ -717,57 +876,50 @@ function RouteScreen({
       <SectionHeader
         title="배달 순서"
         caption={`${order.length}개 목적지 · 총 ${totalDistance.toFixed(1)}km${
-          allowReorder ? ' · 위/아래로 순서 조정' : ''
+          allowReorder ? ' · 배송지를 끌어 순서 변경' : ''
         }`}
       />
       <View style={styles.surfaceCard}>
-        {order.map((delivery, index) => (
-          <View key={delivery.id}>
-            <View style={styles.routeStackRow}>
-              <View style={styles.routeStackOrder}>
-                <Text style={styles.routeStackOrderText}>{index + 1}</Text>
-              </View>
-              <Pressable
-                style={styles.routeStackBody}
-                onPress={() => onDeliveryPress(delivery)}
-              >
-                <Text style={styles.routeStackTitle} numberOfLines={1}>
-                  {delivery.productName}
-                </Text>
-                <Text style={styles.routeStackAddress} numberOfLines={1}>
-                  {delivery.deliveryAddress}
-                </Text>
-              </Pressable>
-              {allowReorder && (
-                <View style={styles.routeStackControls}>
-                  <Pressable
-                    disabled={index === 0}
-                    onPress={() => move(index, -1)}
-                    style={styles.routeStackArrow}
-                  >
-                    <Ionicons
-                      name="chevron-up"
-                      size={18}
-                      color={index === 0 ? C.outline : C.primary}
-                    />
-                  </Pressable>
-                  <Pressable
-                    disabled={index === order.length - 1}
-                    onPress={() => move(index, 1)}
-                    style={styles.routeStackArrow}
-                  >
-                    <Ionicons
-                      name="chevron-down"
-                      size={18}
-                      color={index === order.length - 1 ? C.outline : C.primary}
-                    />
-                  </Pressable>
+        {order.length === 0 ? (
+          <Text
+            style={{
+              color: C.textMuted,
+              fontSize: 13,
+              textAlign: 'center',
+              paddingVertical: 20,
+            }}
+          >
+            대기 중인 배달이 없습니다
+          </Text>
+        ) : allowReorder ? (
+          <DraggableRouteList
+            items={order}
+            onReorder={setOrder}
+            onPressRow={onDeliveryPress}
+          />
+        ) : (
+          order.map((delivery, index) => (
+            <View key={delivery.id}>
+              <View style={styles.routeStackRow}>
+                <View style={styles.routeStackOrder}>
+                  <Text style={styles.routeStackOrderText}>{index + 1}</Text>
                 </View>
-              )}
+                <Pressable
+                  style={styles.routeStackBody}
+                  onPress={() => onDeliveryPress(delivery)}
+                >
+                  <Text style={styles.routeStackTitle} numberOfLines={1}>
+                    {delivery.productName}
+                  </Text>
+                  <Text style={styles.routeStackAddress} numberOfLines={1}>
+                    {delivery.deliveryAddress}
+                  </Text>
+                </Pressable>
+              </View>
+              {index < order.length - 1 && <View style={styles.divider} />}
             </View>
-            {index < order.length - 1 && <View style={styles.divider} />}
-          </View>
-        ))}
+          ))
+        )}
       </View>
     </ScrollView>
   );
@@ -1366,7 +1518,8 @@ function CalendarScreen({
   const { C, styles } = useTheme();
   const { showFullAddressInList } = usePrivacy();
   const today = new Date();
-  const [mode, setMode] = useState<CalendarMode>('month');
+  // 월 달력만 사용(주/일 뷰 제거). mode는 'month'로 고정.
+  const mode: CalendarMode = 'month';
   const [cursor, setCursor] = useState(
     new Date(today.getFullYear(), today.getMonth(), today.getDate()),
   );
@@ -1451,27 +1604,6 @@ function CalendarScreen({
         notificationCount={3}
         onNotificationPress={onNotifications}
       />
-      <View style={styles.calendarModeRow}>
-        {(['month', 'week', 'day'] as CalendarMode[]).map((item) => (
-          <Pressable
-            key={item}
-            style={[
-              styles.calendarModeButton,
-              mode === item && styles.calendarModeButtonActive,
-            ]}
-            onPress={() => setMode(item)}
-          >
-            <Text
-              style={[
-                styles.calendarModeText,
-                mode === item && styles.calendarModeTextActive,
-              ]}
-            >
-              {item === 'month' ? '월' : item === 'week' ? '주' : '일'}
-            </Text>
-          </Pressable>
-        ))}
-      </View>
       <View style={styles.calendarCard}>
         <View style={styles.calendarToolbar}>
           <Pressable style={styles.iconButton} onPress={() => move(-1)}>
@@ -1535,23 +1667,18 @@ function CalendarScreen({
                   </View>
                 )}
                 {summary && (summary.revenue > 0 || summary.fuelCost > 0) && (
-                  <View style={styles.calendarMoneyStack}>
-                    <Text
-                      style={[
-                        styles.calendarNetText,
-                        summary.net < 0 && styles.calendarNetTextNegative,
-                        urgent && styles.calendarNetTextUrgent,
-                      ]}
-                      numberOfLines={1}
-                    >
-                      {summary.net >= 10000
-                        ? `${Math.round(summary.net / 10000)}만`
-                        : formatWon(summary.net)}
-                    </Text>
-                    <Text style={styles.calendarFuelText} numberOfLines={1}>
-                      -{formatWon(summary.fuelCost)}
-                    </Text>
-                  </View>
+                  <Text
+                    style={[
+                      styles.calendarNetText,
+                      summary.net < 0 && styles.calendarNetTextNegative,
+                    ]}
+                    numberOfLines={1}
+                  >
+                    {summary.net >= 0 ? '+' : '−'}
+                    {Math.abs(summary.net) >= 10000
+                      ? `${Math.round(Math.abs(summary.net) / 10000)}만`
+                      : formatWon(Math.abs(summary.net))}
+                  </Text>
                 )}
               </Pressable>
             );
@@ -2246,13 +2373,6 @@ function NotificationsScreen() {
           title="도착 지연 위험"
           body="송파구 목적지의 예상 도착 시간이 엄수 마감과 12분 차이입니다."
           time="10:18"
-        />
-        <NotificationCard
-          tone="info"
-          icon="swap-horizontal-outline"
-          title="추천 동선이 변경되었습니다"
-          body="교통 상황을 반영해 서초구 방문 순서가 2번으로 조정되었습니다."
-          time="09:52"
         />
       </View>
       <SectionHeader title="이전 알림" />
@@ -4429,6 +4549,16 @@ export default function RouteloApp() {
           deliveries={activeDeliveries}
           navApp={settings.route.navApp}
           allowReorder={settings.route.allowManualReorder}
+          startAddress={settings.route.startAddress}
+          endAddress={settings.route.endAddress}
+          onSetLocations={(startAddress, endAddress) => {
+            const nextSettings = {
+              ...settings,
+              route: { ...settings.route, startAddress, endAddress },
+            };
+            setSettings(nextSettings);
+            settingsRepository.save(nextSettings).catch(() => undefined);
+          }}
           onDeliveryPress={setSelectedDelivery}
           onNotifications={openNotifications}
         />

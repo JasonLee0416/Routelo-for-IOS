@@ -79,6 +79,9 @@ export type RoutePreferenceSettings = {
   routeMode: 'deadline-first' | 'distance-first' | 'profit-first' | 'manual';
   navApp: NavApp;
   allowManualReorder: boolean;
+  // 동선 계산의 출발지/최종 도착지(사용자 기입). 비어 있으면 기본 기준점 사용.
+  startAddress?: string;
+  endAddress?: string;
 };
 
 export type AccountSettings = {
