@@ -73,6 +73,12 @@ import {
   completionPhotoRelativePath,
   resolveCompletionPhotoUri,
 } from './services/completionPhoto';
+import {
+  attachReceiptPhoto,
+  receiptPhotoDir,
+  receiptPhotoRelativePath,
+  resolveReceiptPhotoUri,
+} from './services/receiptPhoto';
 import { mergeSettingsV2 } from './settings/migrations';
 import {
   DeliverySortMode,
@@ -1366,6 +1372,8 @@ function CalendarScreen({
   );
   const [restoreOpen, setRestoreOpen] = useState(false);
   const [restoreText, setRestoreText] = useState('');
+  // 인수증 원본 전체보기용(썸네일 탭 시).
+  const [receiptPreview, setReceiptPreview] = useState<string>();
   const canRestore = restoreText.trim().length > 0;
   const items = useMemo(
     () =>
@@ -2078,6 +2086,12 @@ function CalendarScreen({
             (entry) => entry.id === item.deliveryOrderId,
           );
           const delivery = order ? orderToLegacyDelivery(order) : undefined;
+          const receiptUri = order?.receiptPhotoPath
+            ? resolveReceiptPhotoUri(
+                FileSystem.documentDirectory ?? '',
+                order.receiptPhotoPath,
+              )
+            : undefined;
           const primaryTime =
             timeLabel(item.deadlineAt) ||
             timeLabel(item.startAt) ||
@@ -2135,10 +2149,62 @@ function CalendarScreen({
                   )}
                 </View>
               </View>
+              {receiptUri && (
+                <Pressable
+                  onPress={() => setReceiptPreview(receiptUri)}
+                  hitSlop={6}
+                  style={({ pressed }) => [
+                    {
+                      width: 44,
+                      height: 44,
+                      borderRadius: 10,
+                      overflow: 'hidden',
+                      borderWidth: 1,
+                      borderColor: C.outline,
+                      alignSelf: 'center',
+                    },
+                    pressed && { opacity: 0.6 },
+                  ]}
+                >
+                  <Image
+                    source={{ uri: receiptUri }}
+                    style={{ width: '100%', height: '100%' }}
+                    resizeMode="cover"
+                  />
+                </Pressable>
+              )}
             </Pressable>
           );
         })
       )}
+      <Modal
+        visible={Boolean(receiptPreview)}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setReceiptPreview(undefined)}
+      >
+        <Pressable
+          onPress={() => setReceiptPreview(undefined)}
+          style={{
+            flex: 1,
+            backgroundColor: 'rgba(0,0,0,0.9)',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: 16,
+          }}
+        >
+          {receiptPreview && (
+            <Image
+              source={{ uri: receiptPreview }}
+              style={{ width: '100%', height: '80%' }}
+              resizeMode="contain"
+            />
+          )}
+          <Text style={{ color: '#fff', marginTop: 16, opacity: 0.8 }}>
+            탭하여 닫기 · 인수증 원본
+          </Text>
+        </Pressable>
+      </Modal>
     </ScrollView>
   );
 }
@@ -3390,7 +3456,7 @@ function OcrScannerModal({
   visible: boolean;
   settings: RouteloSettings;
   onClose: () => void;
-  onRegister: (delivery: Delivery) => void;
+  onRegister: (delivery: Delivery, receiptImageUri?: string) => void;
 }) {
   const { C, styles } = useTheme();
   const [stage, setStage] = useState<ScanStage>('capture');
@@ -3558,7 +3624,7 @@ function OcrScannerModal({
       latitude: 0,
       longitude: 0,
     };
-    onRegister(delivery);
+    onRegister(delivery, imageUri);
     Alert.alert('등록 완료', '검수된 OCR 정보가 오늘의 배달 목록에 추가되었습니다.');
     onClose();
   };
@@ -4225,6 +4291,28 @@ export default function RouteloApp() {
     });
   };
 
+  // OCR 등록 직후 인수증 원본을 안정 경로로 복사하고 order에 경로를 저장한다.
+  const persistReceiptImage = async (
+    order: DeliveryOrder,
+    sourceUri: string,
+  ) => {
+    const docDir = FileSystem.documentDirectory ?? '';
+    const relativePath = receiptPhotoRelativePath(order.id, String(Date.now()));
+    const dest = resolveReceiptPhotoUri(docDir, relativePath);
+    try {
+      await FileSystem.makeDirectoryAsync(receiptPhotoDir(docDir), {
+        intermediates: true,
+      }).catch(() => undefined);
+      await FileSystem.copyAsync({ from: sourceUri, to: dest });
+    } catch {
+      return; // 사진 보존 실패는 배달 등록을 막지 않는다(부가 기능).
+    }
+    persistOrder({
+      ...attachReceiptPhoto(order, relativePath),
+      updatedAt: new Date().toISOString(),
+    });
+  };
+
   const startCompletionPhoto = () => {
     if (!selectedDelivery) return;
     const order = orders.find((item) => item.id === selectedDelivery.id);
@@ -4566,7 +4654,7 @@ export default function RouteloApp() {
         visible={scannerVisible}
         settings={settings}
         onClose={() => setScannerVisible(false)}
-        onRegister={(delivery) => {
+        onRegister={(delivery, receiptImageUri) => {
           const fee = calculateFeeByAddress(delivery.deliveryAddress, settings);
           const district = findDistrictByAddress(delivery.deliveryAddress, settings);
           const order = legacyDeliveryToOrder({
@@ -4578,6 +4666,10 @@ export default function RouteloApp() {
           setOrders((current) => [order, ...current]);
           deliveryRepository.save(order).catch(() => undefined);
           setActiveTab('deliveries');
+          // 인수증 원본 이미지를 문서 디렉터리로 복사해 캘린더/기록에서 다시 볼 수 있게 보존.
+          if (receiptImageUri) {
+            void persistReceiptImage(order, receiptImageUri);
+          }
         }}
       />
       <OnboardingModal

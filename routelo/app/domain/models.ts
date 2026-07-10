@@ -88,6 +88,9 @@ export type DeliveryOrder = {
   // dir (resolved against the current dir at read time so it survives the
   // container UUID changing across reinstall / backup-restore).
   completionPhotoPath?: string;
+  // Path of the scanned receipt (인수증) image, same relative-path scheme.
+  // Kept so the calendar/history can show the original receipt per delivery.
+  receiptPhotoPath?: string;
   source: {
     type: 'manual' | 'ocr' | 'migration' | 'sample';
     receiptId?: string;
