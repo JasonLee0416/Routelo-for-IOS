@@ -129,7 +129,7 @@ describe('OCR field extraction — PP-OCR baseline (+ Apple Vision if present)',
   const groundTruth: Record<string, Record<string, string>> | null =
     fs.existsSync(gtPath) ? JSON.parse(fs.readFileSync(gtPath, 'utf8')) : null;
   (vision && groundTruth ? test : test.skip)(
-    'ground-truth field accuracy stays >= 20/31 (Phase 1 floor)',
+    'ground-truth field accuracy stays >= 22/31 (Phase 1 floor)',
     () => {
       const byImage = new Map(vision!.map((v) => [v.image, v]));
       let total = 0;
@@ -150,7 +150,7 @@ describe('OCR field extraction — PP-OCR baseline (+ Apple Vision if present)',
       }
       // eslint-disable-next-line no-console
       console.log(`ground-truth accuracy: ${hit}/${total}`);
-      expect(hit).toBeGreaterThanOrEqual(20);
+      expect(hit).toBeGreaterThanOrEqual(22);
     },
   );
 
@@ -176,6 +176,13 @@ describe('OCR field extraction — PP-OCR baseline (+ Apple Vision if present)',
       );
       expect(val('KakaoTalk_20260621_070828835_04.jpg', 'recipientName')).toBe(
         '유기열',
+      );
+      // 주소 정제: R03 꼬리 노이즈(TEL) 제거, R04 blob → 장소유형 앵커 스팬.
+      expect(val('KakaoTalk_20260621_070828835_03.jpg', 'deliveryAddress')).toBe(
+        '서울 영등포구 선유로 101 교원예움 서서울 장례식장 201호',
+      );
+      expect(val('KakaoTalk_20260621_070828835_04.jpg', 'deliveryAddress')).toBe(
+        '고대구로병원 장례식장 105호실',
       );
     },
   );

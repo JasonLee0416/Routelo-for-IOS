@@ -5,9 +5,11 @@ import {
   looksLikeAddress,
   looksLikeVendor,
   pickBest,
+  scanAddressSpan,
   scanCondolenceRecipient,
   scanVendorTokens,
   scoreAddress,
+  stripAddressNoise,
 } from '../fieldHeuristics';
 import { pickTypedValue } from '../fieldValidation';
 
@@ -100,6 +102,33 @@ describe('scanVendorTokens', () => {
   });
   test('dedupes and skips pure label words', () => {
     expect(scanVendorTokens('발주화원 배송화원 수주화원')).toEqual([]);
+  });
+});
+
+describe('stripAddressNoise', () => {
+  test('꼬리에 병합된 라벨(TEL/전화번호/디카)을 제거', () => {
+    expect(
+      stripAddressNoise('서울 영등포구 선유로 101 교원예움 서서울 장례식장 201호 TEL'),
+    ).toBe('서울 영등포구 선유로 101 교원예움 서서울 장례식장 201호');
+    expect(stripAddressNoise('고대구로병원 장례식장 105호실 전화번호 010')).toBe(
+      '고대구로병원 장례식장 105호실',
+    );
+  });
+  test('노이즈가 없으면 그대로 둔다', () => {
+    expect(stripAddressNoise('서울 동작구 중앙대병원 장례식장 5호')).toBe(
+      '서울 동작구 중앙대병원 장례식장 5호',
+    );
+  });
+});
+
+describe('scanAddressSpan', () => {
+  test('blob에서 장소유형→N호(실) 스팬을 뽑는다', () => {
+    const blob =
+      'NAVER 발주회원 근조화환 1개 고대구로병원 장례식장 105호실 삼가 보내는분 강서구청';
+    expect(scanAddressSpan(blob)).toBe('고대구로병원 장례식장 105호실');
+  });
+  test('장소유형이 없으면 빈 문자열', () => {
+    expect(scanAddressSpan('발주회원 상품코드 배송상품 요구사항')).toBe('');
   });
 });
 

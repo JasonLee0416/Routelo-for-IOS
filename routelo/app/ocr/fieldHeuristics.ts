@@ -26,6 +26,31 @@ export function looksLikeAddress(text: string): boolean {
   return scoreAddress(text) >= 0.5;
 }
 
+// 배송 주소로 흔히 붙는 꼬리 라벨/노이즈(라벨 병합 잔여).
+const ADDRESS_TRAILING_NOISE =
+  /\s*(?:\b(?:TEL|FAX|HP)\b|T\.|전화번호|연락처|해피콜|디카사진|디카|주소|비고).*$/i;
+
+/** 주소 값 끝에 병합된 라벨/노이즈(…201호 "TEL")를 제거한다. */
+export function stripAddressNoise(value: string): string {
+  return value
+    .replace(ADDRESS_TRAILING_NOISE, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+// 장소유형 앵커(끝이 N호(실)/N층). 병원·장례식장 등 뒤 부속(별관/장례식장/N호실)까지 포함.
+const ADDRESS_SPAN =
+  /([가-힣A-Za-z0-9]*(?:병원|장례식장|예식장|웨딩홀|호텔|컨벤션|회관|아트홀)[가-힣A-Za-z0-9\s]{0,24}?\d+\s*(?:호실|호|층))/;
+
+/**
+ * 레이아웃이 붕괴돼 주소가 blob에 뭉쳤을 때, 장소유형으로 시작해 'N호(실)/N층'으로
+ * 끝나는 인접 스팬을 뽑는다(예: 거대 blob → "고대구로병원 장례식장 105호실"). 실패 시 ''.
+ */
+export function scanAddressSpan(text: string): string {
+  const m = text.match(ADDRESS_SPAN);
+  return m ? m[1].replace(/\s+/g, ' ').trim() : '';
+}
+
 // ---------- 업체(화원/예식장) ----------
 const VENDOR_MARKERS =
   /(화원|플라워|플라웨|꽃집|꽃방|꽃가게|화훼|㈜|\(주\)|주식회사|상사)/;

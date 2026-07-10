@@ -10,9 +10,11 @@ import {
   cleanVendorName,
   extractPersonName,
   pickBest,
+  scanAddressSpan,
   scanCondolenceRecipient,
   scanVendorTokens,
   scoreAddress,
+  stripAddressNoise,
 } from '../ocr/fieldHeuristics';
 import {
   KOREAN_PHONE_PATTERN,
@@ -409,6 +411,16 @@ export function parseReceiptText(
   const addressSource =
     findLabeledValue(lines, ['배송주소', '배달주소', '배송지', '배달장소', '주소']) ||
     addressFallback;
+  // 주소 값 정제: (1) 끝에 병합된 라벨/노이즈(…201호 "TEL") 제거,
+  // (2) 그래도 blob(레이아웃 붕괴로 여러 셀 병합)이면 장소유형 앵커 스팬으로 대체.
+  const deliveryAddress = (() => {
+    let value = stripAddressNoise(addressSource?.value || '');
+    if (value.length > 40) {
+      const span = scanAddressSpan(text);
+      if (span) value = span;
+    }
+    return value;
+  })();
   const recipientSource = findLabeledValue(lines, [
     '받는분',
     '받는 분',
@@ -614,13 +626,13 @@ export function parseReceiptText(
     ),
     field(
       'deliveryAddress',
-      addressSource?.value || '',
-      addressSource ? 84 : 0,
+      deliveryAddress,
+      deliveryAddress ? 84 : 0,
       addressSource?.sourceText || '',
       [],
       {
         sourceLineIds: addressSource?.sourceLineIds,
-        extractionMethod: addressSource ? 'pattern' : undefined,
+        extractionMethod: deliveryAddress ? 'pattern' : undefined,
         forceReview: true,
       },
     ),
