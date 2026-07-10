@@ -127,6 +127,7 @@ import { settingsRepository } from './settings/native';
 import { makeStyles, styles } from './theme/appStyles';
 import {
   ConfidenceBadge,
+  PhoneKindBadge,
   QualityMeter,
   StatusBadge,
 } from './components/badges';
@@ -3671,7 +3672,12 @@ function OcrScannerModal({
                         </Text>
                       </View>
                     </View>
-                    <ConfidenceBadge field={field} />
+                    <View style={styles.ocrBadgeRow}>
+                      {field.phoneKind && (
+                        <PhoneKindBadge kind={field.phoneKind} />
+                      )}
+                      <ConfidenceBadge field={field} />
+                    </View>
                   </View>
                   <TextInput
                     value={field.value}

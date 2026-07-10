@@ -855,6 +855,7 @@ export const makeStyles = (C: Palette) =>
   ocrFieldIcon: { width: 36, height: 36, borderRadius: 12, backgroundColor: C.primaryContainer, alignItems: 'center', justifyContent: 'center' },
   ocrFieldLabel: { color: C.text, fontSize: 11, fontWeight: '800' },
   ocrFieldSource: { maxWidth: 205, color: C.textMuted, fontSize: 8, marginTop: 3 },
+  ocrBadgeRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   confidenceBadge: { height: 27, paddingHorizontal: 8, borderRadius: 10, flexDirection: 'row', alignItems: 'center', gap: 4 },
   confidenceText: { fontSize: 9, fontWeight: '900' },
   ocrFieldInput: {
