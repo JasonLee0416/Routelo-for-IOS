@@ -45,6 +45,7 @@
     "plugins": [
       "expo-font",
       "onnxruntime-react-native",
+      "./plugins/withoutApsEnvironment",
       [
         "expo-notifications",
         {
