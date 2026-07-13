@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { ReactNode, useEffect, useMemo, useRef, useState } from 'react';
 import {
   AccessibilityInfo,
   ActivityIndicator,
@@ -378,12 +378,14 @@ function DeliveryListScreen({
   hiddenDeliveries = [],
   onDeliveryPress,
   onUnhide,
+  onDeleteDelivery,
   onNotifications,
 }: {
   deliveries: Delivery[];
   hiddenDeliveries?: Delivery[];
   onDeliveryPress: (delivery: Delivery) => void;
   onUnhide?: (id: string) => void;
+  onDeleteDelivery?: (delivery: Delivery) => void;
   onNotifications: () => void;
 }) {
   const { C, styles, dark } = useTheme();
@@ -545,13 +547,25 @@ function DeliveryListScreen({
         </Text>
       )}
       <View style={styles.deliveryList}>
-        {filtered.map((delivery) => (
-          <DeliveryCard
-            key={delivery.id}
-            delivery={delivery}
-            onPress={() => onDeliveryPress(delivery)}
-          />
-        ))}
+        {filtered.map((delivery) =>
+          onDeleteDelivery ? (
+            <SwipeToDeleteRow
+              key={delivery.id}
+              onDelete={() => onDeleteDelivery(delivery)}
+            >
+              <DeliveryCard
+                delivery={delivery}
+                onPress={() => onDeliveryPress(delivery)}
+              />
+            </SwipeToDeleteRow>
+          ) : (
+            <DeliveryCard
+              key={delivery.id}
+              delivery={delivery}
+              onPress={() => onDeliveryPress(delivery)}
+            />
+          ),
+        )}
       </View>
       {hiddenDeliveries.length > 0 && (
         <View style={{ marginTop: 18 }}>
@@ -621,6 +635,78 @@ function DeliveryListScreen({
   );
 }
 
+// 행을 왼쪽으로 밀면 삭제(확인 다이얼로그는 onDelete 쪽에서 띄운다). 네이티브
+// 제스처 의존성 없이 PanResponder+Animated로 구현하며, 수평 왼쪽 이동이 뚜렷할
+// 때만 제스처를 가로채 세로 스크롤과 충돌하지 않는다.
+const SWIPE_DELETE_TRIGGER = 120;
+
+function SwipeToDeleteRow({
+  onDelete,
+  children,
+}: {
+  onDelete: () => void;
+  children: ReactNode;
+}) {
+  const { C } = useTheme();
+  const translateX = useRef(new Animated.Value(0)).current;
+  const firedRef = useRef(false);
+  const resetPosition = () =>
+    Animated.spring(translateX, {
+      toValue: 0,
+      useNativeDriver: true,
+      bounciness: 0,
+    }).start();
+  const pan = useRef(
+    PanResponder.create({
+      onMoveShouldSetPanResponder: (_e, g) =>
+        g.dx < -8 && Math.abs(g.dx) > Math.abs(g.dy) * 1.5,
+      onPanResponderGrant: () => {
+        firedRef.current = false;
+      },
+      onPanResponderMove: (_e, g) => {
+        translateX.setValue(
+          Math.min(0, Math.max(g.dx, -(SWIPE_DELETE_TRIGGER + 60))),
+        );
+      },
+      onPanResponderRelease: (_e, g) => {
+        if (g.dx <= -SWIPE_DELETE_TRIGGER && !firedRef.current) {
+          firedRef.current = true;
+          onDelete();
+        }
+        resetPosition();
+      },
+      onPanResponderTerminate: resetPosition,
+    }),
+  ).current;
+  return (
+    <View style={{ position: 'relative' }}>
+      <View
+        style={{
+          position: 'absolute',
+          right: 0,
+          top: 0,
+          bottom: 0,
+          width: 96,
+          backgroundColor: C.danger,
+          borderRadius: 22,
+          alignItems: 'center',
+          justifyContent: 'center',
+          flexDirection: 'row',
+          gap: 5,
+        }}
+      >
+        <Ionicons name="trash-outline" size={18} color="#FFFFFF" />
+        <Text style={{ color: '#FFFFFF', fontWeight: '800', fontSize: 13 }}>
+          삭제
+        </Text>
+      </View>
+      <Animated.View style={{ transform: [{ translateX }] }} {...pan.panHandlers}>
+        {children}
+      </Animated.View>
+    </View>
+  );
+}
+
 const ROUTE_ROW_H = 66;
 
 // JS 전용(네이티브 의존성 없음) 드래그 재정렬 리스트. 배송지 행을 꾹 눌러 위아래로
@@ -630,10 +716,12 @@ function DraggableRouteList({
   items,
   onReorder,
   onPressRow,
+  onRequestDelete,
 }: {
   items: Delivery[];
   onReorder: (next: Delivery[]) => void;
   onPressRow: (delivery: Delivery) => void;
+  onRequestDelete?: (delivery: Delivery) => void;
 }) {
   const { C, styles } = useTheme();
   const [data, setData] = useState<Delivery[]>(items);
@@ -644,13 +732,17 @@ function DraggableRouteList({
   useEffect(() => {
     dataRef.current = data;
   }, [data]);
-  const cbRef = useRef({ onReorder, onPressRow });
+  const cbRef = useRef({ onReorder, onPressRow, onRequestDelete });
   useEffect(() => {
-    cbRef.current = { onReorder, onPressRow };
+    cbRef.current = { onReorder, onPressRow, onRequestDelete };
   });
 
   const [active, setActive] = useState<number | null>(null);
+  const [swiping, setSwiping] = useState(false);
   const dragY = useRef(new Animated.Value(0)).current;
+  const dragX = useRef(new Animated.Value(0)).current;
+  // 세로 드래그(순서 변경)와 가로 스와이프(삭제)를 한 제스처에서 구분한다.
+  const mode = useRef<'idle' | 'drag' | 'swipe'>('idle');
   const start = useRef(0);
   const hover = useRef(0);
   const moved = useRef(false);
@@ -661,7 +753,8 @@ function DraggableRouteList({
   const pan = useRef(
     PanResponder.create({
       onStartShouldSetPanResponder: () => true,
-      onMoveShouldSetPanResponder: (_e, g) => Math.abs(g.dy) > 4,
+      onMoveShouldSetPanResponder: (_e, g) =>
+        Math.abs(g.dy) > 4 || g.dx < -8,
       onPanResponderGrant: (e) => {
         const idx = clampIndex(
           Math.floor(e.nativeEvent.locationY / ROUTE_ROW_H),
@@ -669,30 +762,59 @@ function DraggableRouteList({
         start.current = idx;
         hover.current = idx;
         moved.current = false;
+        mode.current = 'idle';
         dragY.setValue(0);
+        dragX.setValue(0);
+        setSwiping(false);
         setActive(idx);
       },
       onPanResponderMove: (_e, g) => {
-        if (Math.abs(g.dy) > 4) moved.current = true;
-        dragY.setValue(g.dy);
-        hover.current = clampIndex(start.current + Math.round(g.dy / ROUTE_ROW_H));
+        // 첫 유의미한 이동으로 방향(순서변경 vs 삭제)을 확정하고 고정한다.
+        if (mode.current === 'idle') {
+          if (g.dx < -6 && Math.abs(g.dx) > Math.abs(g.dy) * 1.5) {
+            mode.current = 'swipe';
+            setSwiping(true);
+          } else if (Math.abs(g.dy) > 4) {
+            mode.current = 'drag';
+          }
+        }
+        if (mode.current === 'drag') {
+          moved.current = true;
+          dragY.setValue(g.dy);
+          hover.current = clampIndex(
+            start.current + Math.round(g.dy / ROUTE_ROW_H),
+          );
+        } else if (mode.current === 'swipe') {
+          moved.current = true;
+          dragX.setValue(Math.min(0, Math.max(g.dx, -(SWIPE_DELETE_TRIGGER + 60))));
+        }
       },
-      onPanResponderRelease: () => {
+      onPanResponderRelease: (_e, g) => {
         if (!moved.current) {
           cbRef.current.onPressRow(dataRef.current[start.current]);
-        } else if (start.current !== hover.current) {
+        } else if (mode.current === 'swipe') {
+          if (g.dx <= -SWIPE_DELETE_TRIGGER) {
+            cbRef.current.onRequestDelete?.(dataRef.current[start.current]);
+          }
+        } else if (mode.current === 'drag' && start.current !== hover.current) {
           const copy = [...dataRef.current];
           const [m] = copy.splice(start.current, 1);
           copy.splice(hover.current, 0, m);
           setData(copy);
           cbRef.current.onReorder(copy);
         }
+        mode.current = 'idle';
+        setSwiping(false);
         setActive(null);
         dragY.setValue(0);
+        dragX.setValue(0);
       },
       onPanResponderTerminate: () => {
+        mode.current = 'idle';
+        setSwiping(false);
         setActive(null);
         dragY.setValue(0);
+        dragX.setValue(0);
       },
     }),
   ).current;
@@ -702,6 +824,29 @@ function DraggableRouteList({
       {...pan.panHandlers}
       style={{ height: data.length * ROUTE_ROW_H, position: 'relative' }}
     >
+      {swiping && active !== null && (
+        <View
+          style={{
+            position: 'absolute',
+            left: 0,
+            right: 0,
+            top: active * ROUTE_ROW_H,
+            height: ROUTE_ROW_H,
+            borderRadius: 12,
+            backgroundColor: C.danger,
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'flex-end',
+            paddingRight: 20,
+            gap: 5,
+          }}
+        >
+          <Ionicons name="trash-outline" size={18} color="#FFFFFF" />
+          <Text style={{ color: '#FFFFFF', fontWeight: '800', fontSize: 13 }}>
+            삭제
+          </Text>
+        </View>
+      )}
       {data.map((delivery, index) => {
         const isActive = index === active;
         const RowView = isActive ? Animated.View : View;
@@ -718,9 +863,10 @@ function DraggableRouteList({
                 flexDirection: 'row',
                 alignItems: 'center',
                 paddingRight: 8,
+                backgroundColor: swiping && isActive ? C.surface : undefined,
               },
               isActive && {
-                transform: [{ translateY: dragY }],
+                transform: [{ translateY: dragY }, { translateX: dragX }],
                 zIndex: 20,
                 backgroundColor: C.surface,
                 borderRadius: 12,
@@ -759,6 +905,7 @@ function RouteScreen({
   endAddress,
   onSetLocations,
   onDeliveryPress,
+  onDeleteDelivery,
   onNotifications,
 }: {
   deliveries: Delivery[];
@@ -768,6 +915,7 @@ function RouteScreen({
   endAddress?: string;
   onSetLocations: (start: string, end: string) => void;
   onDeliveryPress: (delivery: Delivery) => void;
+  onDeleteDelivery?: (delivery: Delivery) => void;
   onNotifications: () => void;
 }) {
   const { C, styles } = useTheme();
@@ -911,6 +1059,7 @@ function RouteScreen({
             items={order}
             onReorder={setOrder}
             onPressRow={onDeliveryPress}
+            onRequestDelete={onDeleteDelivery}
           />
         ) : (
           order.map((delivery, index) => (
@@ -4516,6 +4665,26 @@ export default function RouteloApp() {
     await deliveryRepository.remove(id).catch(() => undefined);
   };
 
+  // 리스트에서 왼쪽 스와이프로 삭제. 실수 방지를 위해 확인 다이얼로그를 먼저 띄운다.
+  const deleteDeliveryById = async (id: string) => {
+    setOrders((current) => current.filter((item) => item.id !== id));
+    setSelectedDelivery((current) => (current?.id === id ? undefined : current));
+    await deliveryRepository.remove(id).catch(() => undefined);
+  };
+
+  const confirmDeleteDelivery = (delivery: Delivery) => {
+    Alert.alert('배송건 삭제', '정말 해당 배송건을 삭제하시겠습니까?', [
+      { text: '취소', style: 'cancel' },
+      {
+        text: '삭제',
+        style: 'destructive',
+        onPress: () => {
+          deleteDeliveryById(delivery.id);
+        },
+      },
+    ]);
+  };
+
   // 숨김 토글: 데이터는 보존하되 목록에서 감춘다(완료 배송 치우기). 다시 눌러 복원 가능.
   const toggleHiddenById = async (id: string) => {
     const currentOrder = orders.find((item) => item.id === id);
@@ -4700,6 +4869,7 @@ export default function RouteloApp() {
           hiddenDeliveries={hiddenDeliveries}
           onDeliveryPress={setSelectedDelivery}
           onUnhide={toggleHiddenById}
+          onDeleteDelivery={confirmDeleteDelivery}
           onNotifications={openNotifications}
         />
       );
@@ -4741,6 +4911,7 @@ export default function RouteloApp() {
             settingsRepository.save(nextSettings).catch(() => undefined);
           }}
           onDeliveryPress={setSelectedDelivery}
+          onDeleteDelivery={confirmDeleteDelivery}
           onNotifications={openNotifications}
         />
       );
