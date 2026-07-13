@@ -1383,14 +1383,18 @@ function FuelFormModal({
 
   return (
     <Modal visible={visible} animationType="slide" onRequestClose={onClose}>
-      <SafeAreaView style={{ flex: 1, backgroundColor: C.background }}>
+      <SafeAreaView
+        style={{ flex: 1, backgroundColor: C.background }}
+        edges={['left', 'right', 'bottom']}
+      >
         <View
           style={{
             flexDirection: 'row',
             alignItems: 'center',
             justifyContent: 'space-between',
             paddingHorizontal: 18,
-            paddingVertical: 14,
+            paddingTop: insets.top + 14,
+            paddingBottom: 14,
             borderBottomWidth: 1,
             borderBottomColor: C.outline,
           }}
@@ -1562,14 +1566,18 @@ function MileageFormModal({
 
   return (
     <Modal visible={visible} animationType="slide" onRequestClose={onClose}>
-      <SafeAreaView style={{ flex: 1, backgroundColor: C.background }}>
+      <SafeAreaView
+        style={{ flex: 1, backgroundColor: C.background }}
+        edges={['left', 'right', 'bottom']}
+      >
         <View
           style={{
             flexDirection: 'row',
             alignItems: 'center',
             justifyContent: 'space-between',
             paddingHorizontal: 18,
-            paddingVertical: 14,
+            paddingTop: insets.top + 14,
+            paddingBottom: 14,
             borderBottomWidth: 1,
             borderBottomColor: C.outline,
           }}
@@ -3977,14 +3985,20 @@ function DeliveryFormModal({
 
   return (
     <Modal visible={visible} animationType="slide" onRequestClose={onClose}>
-      <SafeAreaView style={{ flex: 1, backgroundColor: C.background }}>
+      <SafeAreaView
+        style={{ flex: 1, backgroundColor: C.background }}
+        edges={['left', 'right', 'bottom']}
+      >
         <View
           style={{
             flexDirection: 'row',
             alignItems: 'center',
             justifyContent: 'space-between',
             paddingHorizontal: 18,
-            paddingVertical: 14,
+            // Modal 안에서는 SafeAreaView 상단 인셋이 적용되지 않아 X가 노치에
+            // 파묻히므로 인셋을 직접 더해 헤더를 내린다.
+            paddingTop: insets.top + 14,
+            paddingBottom: 14,
             borderBottomWidth: 1,
             borderBottomColor: C.outline,
           }}
@@ -3992,7 +4006,7 @@ function DeliveryFormModal({
           <Text style={{ fontSize: 18, fontWeight: '800', color: C.text }}>
             {editing ? '배달 수정' : '배달 직접 추가'}
           </Text>
-          <Pressable onPress={onClose} hitSlop={8}>
+          <Pressable onPress={onClose} hitSlop={10}>
             <Ionicons name="close" size={24} color={C.text} />
           </Pressable>
         </View>
