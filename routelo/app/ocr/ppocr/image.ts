@@ -3,7 +3,7 @@ import {
   manipulateAsync,
   SaveFormat,
   type Action,
-} from 'expo-image-manipulator';
+} from '../../platform/imageOps';
 import { decode } from 'jpeg-js';
 import { Image } from 'react-native';
 

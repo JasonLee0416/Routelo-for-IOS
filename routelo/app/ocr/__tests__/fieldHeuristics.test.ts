@@ -4,8 +4,13 @@ import {
   extractPersonName,
   looksLikeAddress,
   looksLikeVendor,
+  extractVendorName,
   pickBest,
+  scanAddressSpan,
+  scanCondolenceRecipient,
+  scanVendorTokens,
   scoreAddress,
+  stripAddressNoise,
 } from '../fieldHeuristics';
 import { pickTypedValue } from '../fieldValidation';
 
@@ -81,6 +86,79 @@ describe('cleanVendorName', () => {
   test('rejects an address or digits-only value as a vendor name', () => {
     expect(cleanVendorName('서울 강남구 선릉로 757 3층')).toBe('');
     expect(cleanVendorName('070-4741-0001')).toBe('');
+  });
+});
+
+describe('extractVendorName (형식 있는 상호 토큰만 남기기)', () => {
+  test('상호 뒤 잡글자(전 화/라벨 잔여)를 버린다', () => {
+    expect(extractVendorName('(주)99플라워 전 화')).toBe('(주)99플라워');
+    expect(extractVendorName('몽플라워 / FAX 02-1234-5678')).toBe('몽플라워');
+    expect(extractVendorName('선유꽃화원 TEL 070-4741-0001')).toBe('선유꽃화원');
+  });
+  test('이미 깨끗한 상호는 그대로', () => {
+    expect(extractVendorName('타임플라워')).toBe('타임플라워');
+    expect(extractVendorName('용인세브란스화원')).toBe('용인세브란스화원');
+  });
+  test('라벨어/주소는 상호가 아니므로 빈 문자열', () => {
+    expect(extractVendorName('배송화원')).toBe('');
+    expect(extractVendorName('서울 강남구 선릉로 757')).toBe('');
+  });
+});
+
+describe('scanVendorTokens', () => {
+  test('recovers shop names by marker, in order, excluding label words', () => {
+    // 라벨(발주화원/배송화원)이 값과 떨어져 병합돼도 상호를 회복
+    expect(
+      scanVendorTokens('발주화원 배송화원 상품명 (주)99플라워 전화 선유꽃화원'),
+    ).toEqual(['(주)99플라워', '선유꽃화원']);
+  });
+  test('extracts a parenthetical shop from a combined line', () => {
+    expect(
+      scanVendorTokens('경기 의정부시 경기의정21호(타임플라워)-010-5898-9543'),
+    ).toEqual(['타임플라워']);
+  });
+  test('dedupes and skips pure label words', () => {
+    expect(scanVendorTokens('발주화원 배송화원 수주화원')).toEqual([]);
+  });
+});
+
+describe('stripAddressNoise', () => {
+  test('꼬리에 병합된 라벨(TEL/전화번호/디카)을 제거', () => {
+    expect(
+      stripAddressNoise('서울 영등포구 선유로 101 교원예움 서서울 장례식장 201호 TEL'),
+    ).toBe('서울 영등포구 선유로 101 교원예움 서서울 장례식장 201호');
+    expect(stripAddressNoise('고대구로병원 장례식장 105호실 전화번호 010')).toBe(
+      '고대구로병원 장례식장 105호실',
+    );
+  });
+  test('노이즈가 없으면 그대로 둔다', () => {
+    expect(stripAddressNoise('서울 동작구 중앙대병원 장례식장 5호')).toBe(
+      '서울 동작구 중앙대병원 장례식장 5호',
+    );
+  });
+});
+
+describe('scanAddressSpan', () => {
+  test('blob에서 장소유형→N호(실) 스팬을 뽑는다', () => {
+    const blob =
+      'NAVER 발주회원 근조화환 1개 고대구로병원 장례식장 105호실 삼가 보내는분 강서구청';
+    expect(scanAddressSpan(blob)).toBe('고대구로병원 장례식장 105호실');
+  });
+  test('장소유형이 없으면 빈 문자열', () => {
+    expect(scanAddressSpan('발주회원 상품코드 배송상품 요구사항')).toBe('');
+  });
+});
+
+describe('scanCondolenceRecipient', () => {
+  test('이름 + 상(喪) 관계호칭에서 이름만 회복', () => {
+    expect(scanCondolenceRecipient('유기열 부친상')).toBe('유기열');
+    expect(scanCondolenceRecipient('...보내는분 김철수 모친상 삼가')).toBe('김철수');
+  });
+  test('관계호칭이 없으면 빈 문자열', () => {
+    expect(scanCondolenceRecipient('보내는분 강서구청 동기생 일동')).toBe('');
+  });
+  test('업체/지시문은 이름으로 오인하지 않음', () => {
+    expect(scanCondolenceRecipient('선유꽃화원 부친상')).toBe('');
   });
 });
 

@@ -1,0 +1,46 @@
+{
+  "_note": "사용자가 실제 인수증을 읽어 확정한 필드 정답. Phase 1(값-형식 분류) 및 회귀 벤치마크의 ground truth. 추가되는 대로 확장.",
+  "KakaoTalk_20260621_070828835_01.jpg": {
+    "eventType": "축하",
+    "orderingVendorName": "(주)99플라워",
+    "orderingVendorTel": "070-8277-1211",
+    "fulfillingVendorName": "선유꽃화원",
+    "fulfillingVendorTel": "070-4741-0001",
+    "productName": "축하화환 3단",
+    "deliveryDate": "2026-06-14",
+    "deliveryWindowStart": "11:00",
+    "deliveryWindowEnd": "12:30",
+    "eventTime": "13:20",
+    "deliveryAddress": "영등포구 가마산로 538 해군호텔 W웨딩홀"
+  },
+  "KakaoTalk_20260621_070828835_02.jpg": {
+    "eventType": "근조",
+    "orderingVendorName": "타임플라워",
+    "orderingVendorTel": "010-5898-9543",
+    "productName": "착한근조",
+    "deliveryDate": "2026-06-14",
+    "deliveryAddress": "서울 동작구 중앙대병원 장례식장 5호",
+    "recipientName": "박희순"
+  },
+  "KakaoTalk_20260621_070828835_03.jpg": {
+    "eventType": "근조",
+    "orderingVendorName": "용인세브란스화원",
+    "orderingVendorTel": "010-3348-8403",
+    "productName": "근조 3단",
+    "deliveryDate": "2026-06-14",
+    "deliveryAddress": "서울 영등포구 선유로 101 교원예움 서서울 장례식장 201호",
+    "recipientName": "심명철"
+  },
+  "KakaoTalk_20260621_070828835_04.jpg": {
+    "eventType": "근조",
+    "orderingVendorName": "가든스토리제블리",
+    "orderingVendorTel": "010-4482-9119",
+    "fulfillingVendorName": "선유꽃화원",
+    "productName": "근조화환",
+    "productQuantity": "1",
+    "deliveryDate": "2026-06-14",
+    "strictTime": "17:00",
+    "deliveryAddress": "고대구로병원 장례식장 105호실",
+    "recipientName": "유기열"
+  }
+}

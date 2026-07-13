@@ -80,11 +80,17 @@ export type DeliveryOrder = {
   recipient: RecipientInfo;
   customerRequests?: string;
   status: DeliveryStatus;
+  // 목록에서 숨김(soft-hide). 데이터는 보존하되 홈·배달목록·동선에서 제외한다.
+  // 완료된 배송을 시야에서 치우기 위한 사용자 토글. 캘린더/기록에서는 계속 보인다.
+  hidden?: boolean;
   settlement: SettlementInfo;
   // Path of the delivery-completion proof photo relative to the app document
   // dir (resolved against the current dir at read time so it survives the
   // container UUID changing across reinstall / backup-restore).
   completionPhotoPath?: string;
+  // Path of the scanned receipt (인수증) image, same relative-path scheme.
+  // Kept so the calendar/history can show the original receipt per delivery.
+  receiptPhotoPath?: string;
   source: {
     type: 'manual' | 'ocr' | 'migration' | 'sample';
     receiptId?: string;

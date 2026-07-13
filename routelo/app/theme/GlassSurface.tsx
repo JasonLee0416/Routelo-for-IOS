@@ -1,4 +1,4 @@
-import { BlurView } from 'expo-blur';
+import { BlurView } from '@react-native-community/blur';
 import { ReactNode, useEffect, useState } from 'react';
 import {
   AccessibilityInfo,
@@ -128,8 +128,9 @@ export function GlassSurface({
       ]}
     >
       <BlurView
-        intensity={Math.min(100, Math.round(g.blur * 2.6))}
-        tint={dark ? 'dark' : 'light'}
+        blurAmount={Math.min(100, Math.round(g.blur))}
+        blurType={dark ? 'dark' : 'light'}
+        reducedTransparencyFallbackColor={colors.surface}
         style={StyleSheet.absoluteFill}
       />
       <View

@@ -3,14 +3,6 @@
 # dependencies
 node_modules/
 
-# Expo
-.expo/
-dist/
-dist-android/
-dist-ios/
-web-build/
-expo-env.d.ts
-
 # Native
 .kotlin/
 *.orig.*
@@ -19,6 +11,15 @@ expo-env.d.ts
 *.p12
 *.key
 *.mobileprovision
+
+# iOS (generated / local-only)
+ios/Pods/
+ios/build/
+ios/DerivedData/
+ios/.xcode.env.local
+ios/local-signing.env
+ios/*.xcworkspace/xcuserdata/
+ios/Routelo.xcodeproj/xcuserdata/
 
 # Metro
 .metro-health-check*
@@ -43,6 +44,5 @@ AGENTS.md
 # typescript
 *.tsbuildinfo
 
-# generated native folders
-/ios
+# android is not part of this repo (see JasonLee0416/Routelo.version_2)
 /android

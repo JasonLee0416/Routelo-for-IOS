@@ -1,10 +1,3 @@
-import { Ionicons } from '@expo/vector-icons';
-// Classic string-path API (documentDirectory/copyAsync/…). SDK 56's default
-// entry is the new File/Directory API; the /legacy entry keeps the path-based
-// calls our completionPhoto path service is built around.
-import * as FileSystem from 'expo-file-system/legacy';
-import * as ImagePicker from 'expo-image-picker';
-import { StatusBar } from 'expo-status-bar';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   AccessibilityInfo,
@@ -16,16 +9,22 @@ import {
   KeyboardAvoidingView,
   Linking,
   Modal,
+  PanResponder,
   Platform,
   Pressable,
   ScrollView,
   Share,
+  StatusBar,
   StyleSheet,
   Switch,
   Text,
   TextInput,
   View,
 } from 'react-native';
+
+import { Ionicons } from './platform/icons';
+import * as FileSystem from './platform/fs';
+import * as ImagePicker from './platform/imagePicker';
 import {
   SafeAreaView,
   useSafeAreaInsets,
@@ -73,6 +72,12 @@ import {
   completionPhotoRelativePath,
   resolveCompletionPhotoUri,
 } from './services/completionPhoto';
+import {
+  attachReceiptPhoto,
+  receiptPhotoDir,
+  receiptPhotoRelativePath,
+  resolveReceiptPhotoUri,
+} from './services/receiptPhoto';
 import { mergeSettingsV2 } from './settings/migrations';
 import {
   DeliverySortMode,
@@ -90,6 +95,7 @@ import { planDeliveryNotifications } from './services/notificationPlan';
 import {
   cancelAllScheduledNotifications,
   ensureNotificationPermission,
+  sendTestNotification,
   syncScheduledNotifications,
 } from './services/notifications';
 import { formatWonShort } from './services/money';
@@ -122,11 +128,16 @@ import {
   totalProfit,
 } from './services/profit';
 import { DEFAULT_ROUTELO_SETTINGS, NavApp, RouteloSettings } from './settings';
+import type {
+  NotificationAlertMode,
+  NotificationSoundName,
+} from './settings/schema';
 import { GYEONGGI_DISTRICTS, SEOUL_DISTRICTS } from './settings/districts';
 import { settingsRepository } from './settings/native';
 import { makeStyles, styles } from './theme/appStyles';
 import {
   ConfidenceBadge,
+  PhoneKindBadge,
   QualityMeter,
   StatusBadge,
 } from './components/badges';
@@ -352,17 +363,22 @@ function DeliveryCard({
 
 function DeliveryListScreen({
   deliveries,
+  hiddenDeliveries = [],
   onDeliveryPress,
+  onUnhide,
   onNotifications,
 }: {
   deliveries: Delivery[];
+  hiddenDeliveries?: Delivery[];
   onDeliveryPress: (delivery: Delivery) => void;
+  onUnhide?: (id: string) => void;
   onNotifications: () => void;
 }) {
   const { C, styles, dark } = useTheme();
   const [filter, setFilter] = useState<DeliveryFilter>('all');
   const [query, setQuery] = useState('');
   const [sortMode, setSortMode] = useState<DeliverySortMode>('urgency');
+  const [showHidden, setShowHidden] = useState(false);
   const filtered = sortDeliveries(
     filterDeliveries(deliveries, { query, status: filter }),
     sortMode,
@@ -525,7 +541,201 @@ function DeliveryListScreen({
           />
         ))}
       </View>
+      {hiddenDeliveries.length > 0 && (
+        <View style={{ marginTop: 18 }}>
+          <Pressable
+            onPress={() => setShowHidden((value) => !value)}
+            style={({ pressed }) => [
+              {
+                flexDirection: 'row',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: 6,
+                paddingVertical: 12,
+              },
+              pressed && { opacity: 0.6 },
+            ]}
+          >
+            <Ionicons
+              name={showHidden ? 'chevron-up' : 'eye-off-outline'}
+              size={16}
+              color={C.textMuted}
+            />
+            <Text style={{ color: C.textMuted, fontWeight: '600', fontSize: 13 }}>
+              숨긴 배달 {hiddenDeliveries.length}건 {showHidden ? '접기' : '보기'}
+            </Text>
+          </Pressable>
+          {showHidden && (
+            <View style={[styles.deliveryList, { opacity: 0.72 }]}>
+              {hiddenDeliveries.map((delivery) => (
+                <View key={delivery.id} style={{ position: 'relative' }}>
+                  <DeliveryCard
+                    delivery={delivery}
+                    onPress={() => onDeliveryPress(delivery)}
+                  />
+                  <Pressable
+                    onPress={() => onUnhide?.(delivery.id)}
+                    hitSlop={8}
+                    style={({ pressed }) => [
+                      {
+                        position: 'absolute',
+                        top: 10,
+                        right: 10,
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        gap: 4,
+                        paddingHorizontal: 10,
+                        paddingVertical: 6,
+                        borderRadius: 999,
+                        backgroundColor: C.primaryContainer,
+                      },
+                      pressed && { opacity: 0.6 },
+                    ]}
+                  >
+                    <Ionicons name="eye-outline" size={14} color={C.primary} />
+                    <Text
+                      style={{ color: C.primary, fontWeight: '700', fontSize: 12 }}
+                    >
+                      표시
+                    </Text>
+                  </Pressable>
+                </View>
+              ))}
+            </View>
+          )}
+        </View>
+      )}
     </ScrollView>
+  );
+}
+
+const ROUTE_ROW_H = 66;
+
+// JS 전용(네이티브 의존성 없음) 드래그 재정렬 리스트. 배송지 행을 꾹 눌러 위아래로
+// 끌면 순서가 바뀐다. 살짝 누르면(이동<임계) 상세로 이동. PanResponder는 useRef로 한 번만
+// 생성하고 콜백은 ref로 최신값을 읽어 드래그 도중 재조정/스테일 클로저를 피한다.
+function DraggableRouteList({
+  items,
+  onReorder,
+  onPressRow,
+}: {
+  items: Delivery[];
+  onReorder: (next: Delivery[]) => void;
+  onPressRow: (delivery: Delivery) => void;
+}) {
+  const { C, styles } = useTheme();
+  const [data, setData] = useState<Delivery[]>(items);
+  const key = items.map((item) => item.id).join('|');
+  useEffect(() => setData(items), [key]);
+
+  const dataRef = useRef(data);
+  useEffect(() => {
+    dataRef.current = data;
+  }, [data]);
+  const cbRef = useRef({ onReorder, onPressRow });
+  useEffect(() => {
+    cbRef.current = { onReorder, onPressRow };
+  });
+
+  const [active, setActive] = useState<number | null>(null);
+  const dragY = useRef(new Animated.Value(0)).current;
+  const start = useRef(0);
+  const hover = useRef(0);
+  const moved = useRef(false);
+
+  const clampIndex = (value: number) =>
+    Math.max(0, Math.min(dataRef.current.length - 1, value));
+
+  const pan = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: (_e, g) => Math.abs(g.dy) > 4,
+      onPanResponderGrant: (e) => {
+        const idx = clampIndex(
+          Math.floor(e.nativeEvent.locationY / ROUTE_ROW_H),
+        );
+        start.current = idx;
+        hover.current = idx;
+        moved.current = false;
+        dragY.setValue(0);
+        setActive(idx);
+      },
+      onPanResponderMove: (_e, g) => {
+        if (Math.abs(g.dy) > 4) moved.current = true;
+        dragY.setValue(g.dy);
+        hover.current = clampIndex(start.current + Math.round(g.dy / ROUTE_ROW_H));
+      },
+      onPanResponderRelease: () => {
+        if (!moved.current) {
+          cbRef.current.onPressRow(dataRef.current[start.current]);
+        } else if (start.current !== hover.current) {
+          const copy = [...dataRef.current];
+          const [m] = copy.splice(start.current, 1);
+          copy.splice(hover.current, 0, m);
+          setData(copy);
+          cbRef.current.onReorder(copy);
+        }
+        setActive(null);
+        dragY.setValue(0);
+      },
+      onPanResponderTerminate: () => {
+        setActive(null);
+        dragY.setValue(0);
+      },
+    }),
+  ).current;
+
+  return (
+    <View
+      {...pan.panHandlers}
+      style={{ height: data.length * ROUTE_ROW_H, position: 'relative' }}
+    >
+      {data.map((delivery, index) => {
+        const isActive = index === active;
+        const RowView = isActive ? Animated.View : View;
+        return (
+          <RowView
+            key={delivery.id}
+            style={[
+              {
+                position: 'absolute',
+                left: 0,
+                right: 0,
+                top: index * ROUTE_ROW_H,
+                height: ROUTE_ROW_H,
+                flexDirection: 'row',
+                alignItems: 'center',
+                paddingRight: 8,
+              },
+              isActive && {
+                transform: [{ translateY: dragY }],
+                zIndex: 20,
+                backgroundColor: C.surface,
+                borderRadius: 12,
+                shadowColor: '#000',
+                shadowOpacity: 0.18,
+                shadowRadius: 10,
+                shadowOffset: { width: 0, height: 4 },
+                elevation: 6,
+              },
+            ]}
+          >
+            <View style={styles.routeStackOrder}>
+              <Text style={styles.routeStackOrderText}>{index + 1}</Text>
+            </View>
+            <View style={styles.routeStackBody}>
+              <Text style={styles.routeStackTitle} numberOfLines={1}>
+                {delivery.productName}
+              </Text>
+              <Text style={styles.routeStackAddress} numberOfLines={1}>
+                {delivery.deliveryAddress}
+              </Text>
+            </View>
+            <Ionicons name="reorder-three-outline" size={22} color={C.textMuted} />
+          </RowView>
+        );
+      })}
+    </View>
   );
 }
 
@@ -533,12 +743,18 @@ function RouteScreen({
   deliveries,
   navApp,
   allowReorder,
+  startAddress,
+  endAddress,
+  onSetLocations,
   onDeliveryPress,
   onNotifications,
 }: {
   deliveries: Delivery[];
   navApp: NavApp;
   allowReorder: boolean;
+  startAddress?: string;
+  endAddress?: string;
+  onSetLocations: (start: string, end: string) => void;
   onDeliveryPress: (delivery: Delivery) => void;
   onNotifications: () => void;
 }) {
@@ -558,15 +774,12 @@ function RouteScreen({
   const next = order[0];
   const totalDistance = order.reduce((sum, item) => sum + item.distanceKm, 0);
 
-  const move = (index: number, direction: -1 | 1) => {
-    setOrder((current) => {
-      const target = index + direction;
-      if (target < 0 || target >= current.length) return current;
-      const copy = [...current];
-      [copy[index], copy[target]] = [copy[target], copy[index]];
-      return copy;
-    });
-  };
+  // 출발지/최종 도착지 입력(설정에 저장). 편집 중에는 로컬 상태로 잡고 blur 시 저장.
+  const [startInput, setStartInput] = useState(startAddress ?? '');
+  const [endInput, setEndInput] = useState(endAddress ?? '');
+  useEffect(() => setStartInput(startAddress ?? ''), [startAddress]);
+  useEffect(() => setEndInput(endAddress ?? ''), [endAddress]);
+  const saveLocations = () => onSetLocations(startInput.trim(), endInput.trim());
 
   const startNavigation = () => {
     if (!next) return;
@@ -582,10 +795,35 @@ function RouteScreen({
       <ScreenHeader
         eyebrow="ROUTE · STACK"
         title="배달 동선"
-        subtitle="배달 순서를 직접 정하고, 맨 위 목적지로 바로 안내받으세요."
+        subtitle="출발지·도착지를 정하고, 배송지를 끌어 순서를 바꾸세요."
         notificationCount={3}
         onNotificationPress={onNotifications}
       />
+      <View style={styles.surfaceCard}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+          <Ionicons name="flag-outline" size={16} color={C.primary} />
+          <TextInput
+            value={startInput}
+            onChangeText={setStartInput}
+            onBlur={saveLocations}
+            placeholder="출발지 (예: 강남 꽃시장)"
+            placeholderTextColor={C.textMuted}
+            style={{ flex: 1, color: C.text, fontSize: 14, paddingVertical: 8 }}
+          />
+        </View>
+        <View style={styles.divider} />
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 8 }}>
+          <Ionicons name="location-outline" size={16} color={C.danger} />
+          <TextInput
+            value={endInput}
+            onChangeText={setEndInput}
+            onBlur={saveLocations}
+            placeholder="최종 도착지 (예: 자택 · 비우면 마지막 배송지)"
+            placeholderTextColor={C.textMuted}
+            style={{ flex: 1, color: C.text, fontSize: 14, paddingVertical: 8 }}
+          />
+        </View>
+      </View>
       {!!next && (
         <View style={styles.nextDestinationCard}>
           <View style={styles.nextDestinationHeader}>
@@ -641,57 +879,50 @@ function RouteScreen({
       <SectionHeader
         title="배달 순서"
         caption={`${order.length}개 목적지 · 총 ${totalDistance.toFixed(1)}km${
-          allowReorder ? ' · 위/아래로 순서 조정' : ''
+          allowReorder ? ' · 배송지를 끌어 순서 변경' : ''
         }`}
       />
       <View style={styles.surfaceCard}>
-        {order.map((delivery, index) => (
-          <View key={delivery.id}>
-            <View style={styles.routeStackRow}>
-              <View style={styles.routeStackOrder}>
-                <Text style={styles.routeStackOrderText}>{index + 1}</Text>
-              </View>
-              <Pressable
-                style={styles.routeStackBody}
-                onPress={() => onDeliveryPress(delivery)}
-              >
-                <Text style={styles.routeStackTitle} numberOfLines={1}>
-                  {delivery.productName}
-                </Text>
-                <Text style={styles.routeStackAddress} numberOfLines={1}>
-                  {delivery.deliveryAddress}
-                </Text>
-              </Pressable>
-              {allowReorder && (
-                <View style={styles.routeStackControls}>
-                  <Pressable
-                    disabled={index === 0}
-                    onPress={() => move(index, -1)}
-                    style={styles.routeStackArrow}
-                  >
-                    <Ionicons
-                      name="chevron-up"
-                      size={18}
-                      color={index === 0 ? C.outline : C.primary}
-                    />
-                  </Pressable>
-                  <Pressable
-                    disabled={index === order.length - 1}
-                    onPress={() => move(index, 1)}
-                    style={styles.routeStackArrow}
-                  >
-                    <Ionicons
-                      name="chevron-down"
-                      size={18}
-                      color={index === order.length - 1 ? C.outline : C.primary}
-                    />
-                  </Pressable>
+        {order.length === 0 ? (
+          <Text
+            style={{
+              color: C.textMuted,
+              fontSize: 13,
+              textAlign: 'center',
+              paddingVertical: 20,
+            }}
+          >
+            대기 중인 배달이 없습니다
+          </Text>
+        ) : allowReorder ? (
+          <DraggableRouteList
+            items={order}
+            onReorder={setOrder}
+            onPressRow={onDeliveryPress}
+          />
+        ) : (
+          order.map((delivery, index) => (
+            <View key={delivery.id}>
+              <View style={styles.routeStackRow}>
+                <View style={styles.routeStackOrder}>
+                  <Text style={styles.routeStackOrderText}>{index + 1}</Text>
                 </View>
-              )}
+                <Pressable
+                  style={styles.routeStackBody}
+                  onPress={() => onDeliveryPress(delivery)}
+                >
+                  <Text style={styles.routeStackTitle} numberOfLines={1}>
+                    {delivery.productName}
+                  </Text>
+                  <Text style={styles.routeStackAddress} numberOfLines={1}>
+                    {delivery.deliveryAddress}
+                  </Text>
+                </Pressable>
+              </View>
+              {index < order.length - 1 && <View style={styles.divider} />}
             </View>
-            {index < order.length - 1 && <View style={styles.divider} />}
-          </View>
-        ))}
+          ))
+        )}
       </View>
     </ScrollView>
   );
@@ -1290,12 +1521,15 @@ function CalendarScreen({
   const { C, styles } = useTheme();
   const { showFullAddressInList } = usePrivacy();
   const today = new Date();
-  const [mode, setMode] = useState<CalendarMode>('month');
+  // 월 달력만 사용(주/일 뷰 제거). mode는 'month'로 고정.
+  const mode: CalendarMode = 'month';
   const [cursor, setCursor] = useState(
     new Date(today.getFullYear(), today.getMonth(), today.getDate()),
   );
   const [restoreOpen, setRestoreOpen] = useState(false);
   const [restoreText, setRestoreText] = useState('');
+  // 인수증 원본 전체보기용(썸네일 탭 시).
+  const [receiptPreview, setReceiptPreview] = useState<string>();
   const canRestore = restoreText.trim().length > 0;
   const items = useMemo(
     () =>
@@ -1373,27 +1607,6 @@ function CalendarScreen({
         notificationCount={3}
         onNotificationPress={onNotifications}
       />
-      <View style={styles.calendarModeRow}>
-        {(['month', 'week', 'day'] as CalendarMode[]).map((item) => (
-          <Pressable
-            key={item}
-            style={[
-              styles.calendarModeButton,
-              mode === item && styles.calendarModeButtonActive,
-            ]}
-            onPress={() => setMode(item)}
-          >
-            <Text
-              style={[
-                styles.calendarModeText,
-                mode === item && styles.calendarModeTextActive,
-              ]}
-            >
-              {item === 'month' ? '월' : item === 'week' ? '주' : '일'}
-            </Text>
-          </Pressable>
-        ))}
-      </View>
       <View style={styles.calendarCard}>
         <View style={styles.calendarToolbar}>
           <Pressable style={styles.iconButton} onPress={() => move(-1)}>
@@ -1457,23 +1670,18 @@ function CalendarScreen({
                   </View>
                 )}
                 {summary && (summary.revenue > 0 || summary.fuelCost > 0) && (
-                  <View style={styles.calendarMoneyStack}>
-                    <Text
-                      style={[
-                        styles.calendarNetText,
-                        summary.net < 0 && styles.calendarNetTextNegative,
-                        urgent && styles.calendarNetTextUrgent,
-                      ]}
-                      numberOfLines={1}
-                    >
-                      {summary.net >= 10000
-                        ? `${Math.round(summary.net / 10000)}만`
-                        : formatWon(summary.net)}
-                    </Text>
-                    <Text style={styles.calendarFuelText} numberOfLines={1}>
-                      -{formatWon(summary.fuelCost)}
-                    </Text>
-                  </View>
+                  <Text
+                    style={[
+                      styles.calendarNetText,
+                      summary.net < 0 && styles.calendarNetTextNegative,
+                    ]}
+                    numberOfLines={1}
+                  >
+                    {summary.net >= 0 ? '+' : '−'}
+                    {Math.abs(summary.net) >= 10000
+                      ? `${Math.round(Math.abs(summary.net) / 10000)}만`
+                      : formatWon(Math.abs(summary.net))}
+                  </Text>
                 )}
               </Pressable>
             );
@@ -2008,6 +2216,12 @@ function CalendarScreen({
             (entry) => entry.id === item.deliveryOrderId,
           );
           const delivery = order ? orderToLegacyDelivery(order) : undefined;
+          const receiptUri = order?.receiptPhotoPath
+            ? resolveReceiptPhotoUri(
+                FileSystem.documentDirectory ?? '',
+                order.receiptPhotoPath,
+              )
+            : undefined;
           const primaryTime =
             timeLabel(item.deadlineAt) ||
             timeLabel(item.startAt) ||
@@ -2065,10 +2279,62 @@ function CalendarScreen({
                   )}
                 </View>
               </View>
+              {receiptUri && (
+                <Pressable
+                  onPress={() => setReceiptPreview(receiptUri)}
+                  hitSlop={6}
+                  style={({ pressed }) => [
+                    {
+                      width: 44,
+                      height: 44,
+                      borderRadius: 10,
+                      overflow: 'hidden',
+                      borderWidth: 1,
+                      borderColor: C.outline,
+                      alignSelf: 'center',
+                    },
+                    pressed && { opacity: 0.6 },
+                  ]}
+                >
+                  <Image
+                    source={{ uri: receiptUri }}
+                    style={{ width: '100%', height: '100%' }}
+                    resizeMode="cover"
+                  />
+                </Pressable>
+              )}
             </Pressable>
           );
         })
       )}
+      <Modal
+        visible={Boolean(receiptPreview)}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setReceiptPreview(undefined)}
+      >
+        <Pressable
+          onPress={() => setReceiptPreview(undefined)}
+          style={{
+            flex: 1,
+            backgroundColor: 'rgba(0,0,0,0.9)',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: 16,
+          }}
+        >
+          {receiptPreview && (
+            <Image
+              source={{ uri: receiptPreview }}
+              style={{ width: '100%', height: '80%' }}
+              resizeMode="contain"
+            />
+          )}
+          <Text style={{ color: '#fff', marginTop: 16, opacity: 0.8 }}>
+            탭하여 닫기 · 인수증 원본
+          </Text>
+        </Pressable>
+      </Modal>
     </ScrollView>
   );
 }
@@ -2110,13 +2376,6 @@ function NotificationsScreen() {
           title="도착 지연 위험"
           body="송파구 목적지의 예상 도착 시간이 엄수 마감과 12분 차이입니다."
           time="10:18"
-        />
-        <NotificationCard
-          tone="info"
-          icon="swap-horizontal-outline"
-          title="추천 동선이 변경되었습니다"
-          body="교통 상황을 반영해 서초구 방문 순서가 2번으로 조정되었습니다."
-          time="09:52"
         />
       </View>
       <SectionHeader title="이전 알림" />
@@ -2185,6 +2444,27 @@ function SettingsScreen({
       },
     });
   };
+
+  const alertModeOptions: Array<{
+    mode: NotificationAlertMode;
+    label: string;
+    icon: keyof typeof Ionicons.glyphMap;
+  }> = [
+    { mode: 'sound', label: '소리', icon: 'volume-high-outline' },
+    { mode: 'vibration', label: '진동', icon: 'phone-portrait-outline' },
+    { mode: 'both', label: '소리+진동', icon: 'notifications-outline' },
+  ];
+  const soundOptions: Array<{ name: NotificationSoundName; label: string }> = [
+    { name: 'routelo_ding', label: '딩동 (밝게)' },
+    { name: 'routelo_bell', label: '벨 (부드럽게)' },
+    { name: 'routelo_arp', label: '아르페지오' },
+    { name: 'default', label: '기본음' },
+  ];
+  const setNotifications = (patch: Partial<RouteloSettings['notifications']>) =>
+    updateSettings({
+      ...settings,
+      notifications: { ...settings.notifications, ...patch },
+    });
 
   return (
     <ScrollView contentContainerStyle={styles.screenContent} showsVerticalScrollIndicator={false}>
@@ -2282,6 +2562,146 @@ function SettingsScreen({
             />
           }
         />
+      </View>
+
+      <SectionHeader title="알림음 · 진동" />
+      <View style={styles.settingsGroup}>
+        <View style={{ padding: 14 }}>
+          <Text
+            style={{
+              color: C.textMuted,
+              fontSize: 12,
+              fontWeight: '700',
+              marginBottom: 8,
+            }}
+          >
+            알림 방식
+          </Text>
+          <View style={{ flexDirection: 'row', gap: 8 }}>
+            {alertModeOptions.map((option) => {
+              const active = settings.notifications.alertMode === option.mode;
+              return (
+                <Pressable
+                  key={option.mode}
+                  onPress={() => setNotifications({ alertMode: option.mode })}
+                  style={{
+                    flex: 1,
+                    alignItems: 'center',
+                    gap: 4,
+                    paddingVertical: 10,
+                    borderRadius: 12,
+                    borderWidth: 1,
+                    borderColor: active ? C.primary : C.outline,
+                    backgroundColor: active ? C.primaryContainer : 'transparent',
+                  }}
+                >
+                  <Ionicons
+                    name={option.icon}
+                    size={18}
+                    color={active ? C.primary : C.textMuted}
+                  />
+                  <Text
+                    style={{
+                      fontSize: 12,
+                      fontWeight: '700',
+                      color: active ? C.primary : C.textMuted,
+                    }}
+                  >
+                    {option.label}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
+        </View>
+        <View style={styles.divider} />
+        <View
+          style={{
+            padding: 14,
+            opacity: settings.notifications.alertMode === 'vibration' ? 0.4 : 1,
+          }}
+        >
+          <View
+            style={{
+              flexDirection: 'row',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              marginBottom: 6,
+            }}
+          >
+            <Text style={{ color: C.textMuted, fontSize: 12, fontWeight: '700' }}>
+              알림음
+            </Text>
+            <Pressable
+              onPress={() =>
+                sendTestNotification(settings.notifications).catch(
+                  () => undefined,
+                )
+              }
+              style={({ pressed }) => [
+                {
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  gap: 4,
+                  paddingHorizontal: 12,
+                  paddingVertical: 6,
+                  borderRadius: 999,
+                  backgroundColor: C.primaryContainer,
+                },
+                pressed && { opacity: 0.6 },
+              ]}
+            >
+              <Ionicons name="play" size={13} color={C.primary} />
+              <Text
+                style={{ color: C.primary, fontWeight: '700', fontSize: 12 }}
+              >
+                테스트
+              </Text>
+            </Pressable>
+          </View>
+          {soundOptions.map((option) => {
+            const active = settings.notifications.soundName === option.name;
+            return (
+              <Pressable
+                key={option.name}
+                disabled={settings.notifications.alertMode === 'vibration'}
+                onPress={() => setNotifications({ soundName: option.name })}
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  gap: 10,
+                  paddingVertical: 11,
+                }}
+              >
+                <Ionicons
+                  name={active ? 'radio-button-on' : 'radio-button-off'}
+                  size={18}
+                  color={active ? C.primary : C.textMuted}
+                />
+                <Text
+                  style={{
+                    fontSize: 14,
+                    color: C.text,
+                    fontWeight: active ? '700' : '500',
+                  }}
+                >
+                  {option.label}
+                </Text>
+              </Pressable>
+            );
+          })}
+          <Text
+            style={{
+              color: C.textMuted,
+              fontSize: 11,
+              marginTop: 6,
+              lineHeight: 16,
+            }}
+          >
+            iOS는 소리·진동을 시스템 설정과 함께 제어합니다. '진동'만 선택하면 무음
+            알림으로 전송돼 진동만 울립니다. 테스트는 1초 뒤 실제 알림으로 미리 들려줍니다.
+          </Text>
+        </View>
       </View>
 
       <SectionHeader title="경로 설정" />
@@ -2771,6 +3191,7 @@ function DeliveryDetailSheet({
   onToggle,
   onEdit,
   onDelete,
+  onToggleHidden,
   onAttachPhoto,
   onRemovePhoto,
   onLogCall,
@@ -2783,6 +3204,7 @@ function DeliveryDetailSheet({
   onToggle: () => void;
   onEdit: () => void;
   onDelete: () => void;
+  onToggleHidden: () => void;
   onAttachPhoto: () => void;
   onRemovePhoto: () => void;
   onLogCall: (label: string, phone: string) => void;
@@ -3063,6 +3485,33 @@ function DeliveryDetailSheet({
               </Text>
             </Pressable>
           </View>
+          <Pressable
+            onPress={onToggleHidden}
+            style={({ pressed }) => [
+              {
+                flexDirection: 'row',
+                alignItems: 'center',
+                justifyContent: 'center',
+                paddingVertical: 12,
+                marginTop: 10,
+                borderRadius: 12,
+                borderWidth: 1,
+                borderColor: C.outline,
+              },
+              pressed && { opacity: 0.6 },
+            ]}
+          >
+            <Ionicons
+              name={delivery.hidden ? 'eye-outline' : 'eye-off-outline'}
+              size={18}
+              color={C.textMuted}
+            />
+            <Text
+              style={{ color: C.textMuted, fontWeight: '600', marginLeft: 6 }}
+            >
+              {delivery.hidden ? '목록에 다시 표시' : '목록에서 숨기기'}
+            </Text>
+          </Pressable>
         </GlassSurface>
       </View>
     </Modal>
@@ -3291,7 +3740,7 @@ function OcrScannerModal({
   visible: boolean;
   settings: RouteloSettings;
   onClose: () => void;
-  onRegister: (delivery: Delivery) => void;
+  onRegister: (delivery: Delivery, receiptImageUri?: string) => void;
 }) {
   const { C, styles } = useTheme();
   const [stage, setStage] = useState<ScanStage>('capture');
@@ -3349,6 +3798,7 @@ function OcrScannerModal({
       unmapped: [],
       conflicts: [],
       cloudFallback: { trigger: false, reasons: [] },
+      eventType: { type: '기타', confidence: 0 },
     });
     setStage('quality');
   };
@@ -3458,7 +3908,7 @@ function OcrScannerModal({
       latitude: 0,
       longitude: 0,
     };
-    onRegister(delivery);
+    onRegister(delivery, imageUri);
     Alert.alert('등록 완료', '검수된 OCR 정보가 오늘의 배달 목록에 추가되었습니다.');
     onClose();
   };
@@ -3468,7 +3918,7 @@ function OcrScannerModal({
   return (
     <Modal visible={visible} animationType="slide" onRequestClose={onClose}>
       <SafeAreaView style={styles.scannerApp}>
-        <StatusBar style="dark" />
+        <StatusBar barStyle="dark-content" />
         <View style={styles.scannerHeader}>
           <Pressable style={styles.iconButton} onPress={onClose}>
             <Ionicons name="close" size={22} color={C.text} />
@@ -3670,7 +4120,12 @@ function OcrScannerModal({
                         </Text>
                       </View>
                     </View>
-                    <ConfidenceBadge field={field} />
+                    <View style={styles.ocrBadgeRow}>
+                      {field.phoneKind && (
+                        <PhoneKindBadge kind={field.phoneKind} />
+                      )}
+                      <ConfidenceBadge field={field} />
+                    </View>
                   </View>
                   <TextInput
                     value={field.value}
@@ -3787,6 +4242,15 @@ export default function RouteloApp() {
   const deliveries = useMemo(
     () => orders.map(orderToLegacyDelivery),
     [orders],
+  );
+  // 숨김 처리된 배달은 홈·목록·동선에서 제외(데이터는 보존). 캘린더는 orders 전체를 받는다.
+  const activeDeliveries = useMemo(
+    () => deliveries.filter((item) => !item.hidden),
+    [deliveries],
+  );
+  const hiddenDeliveries = useMemo(
+    () => deliveries.filter((item) => item.hidden),
+    [deliveries],
   );
   const [selectedDelivery, setSelectedDelivery] = useState<Delivery>();
   const [scannerVisible, setScannerVisible] = useState(false);
@@ -3906,7 +4370,9 @@ export default function RouteloApp() {
     }).filter((item) =>
       item.kind === 'deadline' ? n.strictDeadlineEnabled : n.eventTimeEnabled,
     );
-    syncScheduledNotifications(plan).catch(() => undefined);
+    syncScheduledNotifications(plan, settings.notifications).catch(
+      () => undefined,
+    );
   }, [orders, settings.notifications]);
 
   const openCreateMileage = () => {
@@ -4035,6 +4501,22 @@ export default function RouteloApp() {
     await deliveryRepository.remove(id).catch(() => undefined);
   };
 
+  // 숨김 토글: 데이터는 보존하되 목록에서 감춘다(완료 배송 치우기). 다시 눌러 복원 가능.
+  const toggleHiddenById = async (id: string) => {
+    const currentOrder = orders.find((item) => item.id === id);
+    if (!currentOrder) return;
+    const nextOrder: DeliveryOrder = {
+      ...currentOrder,
+      hidden: !currentOrder.hidden,
+      updatedAt: new Date().toISOString(),
+    };
+    setOrders((current) =>
+      current.map((item) => (item.id === nextOrder.id ? nextOrder : item)),
+    );
+    setSelectedDelivery(undefined);
+    await deliveryRepository.save(nextOrder).catch(() => undefined);
+  };
+
   const persistOrder = (next: DeliveryOrder) => {
     setOrders((current) =>
       current.map((item) => (item.id === next.id ? next : item)),
@@ -4091,6 +4573,28 @@ export default function RouteloApp() {
     }
     persistOrder({
       ...attachCompletionPhoto(order, relativePath),
+      updatedAt: new Date().toISOString(),
+    });
+  };
+
+  // OCR 등록 직후 인수증 원본을 안정 경로로 복사하고 order에 경로를 저장한다.
+  const persistReceiptImage = async (
+    order: DeliveryOrder,
+    sourceUri: string,
+  ) => {
+    const docDir = FileSystem.documentDirectory ?? '';
+    const relativePath = receiptPhotoRelativePath(order.id, String(Date.now()));
+    const dest = resolveReceiptPhotoUri(docDir, relativePath);
+    try {
+      await FileSystem.makeDirectoryAsync(receiptPhotoDir(docDir), {
+        intermediates: true,
+      }).catch(() => undefined);
+      await FileSystem.copyAsync({ from: sourceUri, to: dest });
+    } catch {
+      return; // 사진 보존 실패는 배달 등록을 막지 않는다(부가 기능).
+    }
+    persistOrder({
+      ...attachReceiptPhoto(order, relativePath),
       updatedAt: new Date().toISOString(),
     });
   };
@@ -4177,8 +4681,10 @@ export default function RouteloApp() {
     if (activeTab === 'deliveries') {
       return (
         <DeliveryListScreen
-          deliveries={deliveries}
+          deliveries={activeDeliveries}
+          hiddenDeliveries={hiddenDeliveries}
           onDeliveryPress={setSelectedDelivery}
+          onUnhide={toggleHiddenById}
           onNotifications={openNotifications}
         />
       );
@@ -4206,9 +4712,19 @@ export default function RouteloApp() {
     if (activeTab === 'route') {
       return (
         <RouteScreen
-          deliveries={deliveries}
+          deliveries={activeDeliveries}
           navApp={settings.route.navApp}
           allowReorder={settings.route.allowManualReorder}
+          startAddress={settings.route.startAddress}
+          endAddress={settings.route.endAddress}
+          onSetLocations={(startAddress, endAddress) => {
+            const nextSettings = {
+              ...settings,
+              route: { ...settings.route, startAddress, endAddress },
+            };
+            setSettings(nextSettings);
+            settingsRepository.save(nextSettings).catch(() => undefined);
+          }}
           onDeliveryPress={setSelectedDelivery}
           onNotifications={openNotifications}
         />
@@ -4227,13 +4743,22 @@ export default function RouteloApp() {
     }
     return (
       <HomeScreen
-        deliveries={deliveries}
+        deliveries={activeDeliveries}
         onDeliveryPress={setSelectedDelivery}
         onSeeAll={() => setActiveTab('deliveries')}
         onNotifications={openNotifications}
       />
     );
-  }, [account, activeTab, deliveries, fuelLogs, orders, settings]);
+  }, [
+    account,
+    activeTab,
+    activeDeliveries,
+    hiddenDeliveries,
+    deliveries,
+    fuelLogs,
+    orders,
+    settings,
+  ]);
 
   const darkMode = settings.appearance.themeMode === 'dark';
   const C = darkMode ? DARK : LIGHT;
@@ -4251,7 +4776,7 @@ export default function RouteloApp() {
       style={styles.app}
       edges={['top', 'left', 'right']}
     >
-      <StatusBar style={darkMode ? 'light' : 'dark'} />
+      <StatusBar barStyle={darkMode ? 'light-content' : 'dark-content'} />
       <View style={styles.mainContent}>{screen}</View>
       <GlassSurface
         strength="prominent"
@@ -4394,6 +4919,9 @@ export default function RouteloApp() {
         onToggle={toggleSelected}
         onEdit={editSelected}
         onDelete={deleteSelected}
+        onToggleHidden={() =>
+          selectedDelivery && toggleHiddenById(selectedDelivery.id)
+        }
         onAttachPhoto={startCompletionPhoto}
         onRemovePhoto={removeCompletionPhoto}
         onLogCall={logCall}
@@ -4422,7 +4950,7 @@ export default function RouteloApp() {
         visible={scannerVisible}
         settings={settings}
         onClose={() => setScannerVisible(false)}
-        onRegister={(delivery) => {
+        onRegister={(delivery, receiptImageUri) => {
           const fee = calculateFeeByAddress(delivery.deliveryAddress, settings);
           const district = findDistrictByAddress(delivery.deliveryAddress, settings);
           const order = legacyDeliveryToOrder({
@@ -4434,6 +4962,10 @@ export default function RouteloApp() {
           setOrders((current) => [order, ...current]);
           deliveryRepository.save(order).catch(() => undefined);
           setActiveTab('deliveries');
+          // 인수증 원본 이미지를 문서 디렉터리로 복사해 캘린더/기록에서 다시 볼 수 있게 보존.
+          if (receiptImageUri) {
+            void persistReceiptImage(order, receiptImageUri);
+          }
         }}
       />
       <OnboardingModal

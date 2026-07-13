@@ -26,6 +26,31 @@ export function looksLikeAddress(text: string): boolean {
   return scoreAddress(text) >= 0.5;
 }
 
+// 배송 주소로 흔히 붙는 꼬리 라벨/노이즈(라벨 병합 잔여).
+const ADDRESS_TRAILING_NOISE =
+  /\s*(?:\b(?:TEL|FAX|HP)\b|T\.|전화번호|연락처|해피콜|디카사진|디카|주소|비고).*$/i;
+
+/** 주소 값 끝에 병합된 라벨/노이즈(…201호 "TEL")를 제거한다. */
+export function stripAddressNoise(value: string): string {
+  return value
+    .replace(ADDRESS_TRAILING_NOISE, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+// 장소유형 앵커(끝이 N호(실)/N층). 병원·장례식장 등 뒤 부속(별관/장례식장/N호실)까지 포함.
+const ADDRESS_SPAN =
+  /([가-힣A-Za-z0-9]*(?:병원|장례식장|예식장|웨딩홀|호텔|컨벤션|회관|아트홀)[가-힣A-Za-z0-9\s]{0,24}?\d+\s*(?:호실|호|층))/;
+
+/**
+ * 레이아웃이 붕괴돼 주소가 blob에 뭉쳤을 때, 장소유형으로 시작해 'N호(실)/N층'으로
+ * 끝나는 인접 스팬을 뽑는다(예: 거대 blob → "고대구로병원 장례식장 105호실"). 실패 시 ''.
+ */
+export function scanAddressSpan(text: string): string {
+  const m = text.match(ADDRESS_SPAN);
+  return m ? m[1].replace(/\s+/g, ' ').trim() : '';
+}
+
 // ---------- 업체(화원/예식장) ----------
 const VENDOR_MARKERS =
   /(화원|플라워|플라웨|꽃집|꽃방|꽃가게|화훼|㈜|\(주\)|주식회사|상사)/;
@@ -49,6 +74,57 @@ export function cleanVendorName(raw: string): string {
   if (looksLikeAddress(cleaned)) return '';
   if (!/[가-힣A-Za-z]/.test(cleaned)) return ''; // 숫자/기호뿐이면 상호 아님
   return cleaned;
+}
+
+// 상호가 아니라 "라벨" 자체인 …화원 단어(발주화원/배송화원 등)는 제외.
+const VENDOR_LABEL_WORD =
+  /^(발주화원|배송화원|수주화원|발주회원|수주회원|발주처|배송처|수주처)$/;
+
+// 상호 토큰: ㈜/(주) 접두(선택) + 12자 이내 본문 + 상호 마커로 끝남.
+const VENDOR_TOKEN =
+  /((?:㈜|\(주\))?\s*[가-힣A-Za-z0-9]{1,12}(?:꽃화원|화원|플라워|플라웨|농원|화훼센터|화훼))/;
+
+/**
+ * 원시 상호 값에서 "형식 있는 상호 토큰"(00플라워/00화원…)만 뽑아 잡글자를 버린다.
+ * 예: "(주)99플라워 전 화" → "(주)99플라워", "몽플라워 / FAX" → "몽플라워".
+ * 마커 토큰이 없으면 cleanVendorName 결과로 폴백. 라벨어(발주화원 등)면 '' .
+ */
+export function extractVendorName(raw: string): string {
+  const cleaned = cleanVendorName(raw);
+  if (!cleaned) return '';
+  const m = cleaned.match(VENDOR_TOKEN);
+  if (m) {
+    const token = m[1].replace(/\s+/g, '').trim();
+    if (token.length >= 2 && !VENDOR_LABEL_WORD.test(token)) return token;
+  }
+  return VENDOR_LABEL_WORD.test(cleaned) ? '' : cleaned;
+}
+
+/**
+ * 상호 마커(화원/플라워/농원…)로 끝나는 상호 토큰을 등장 순서대로 뽑는다.
+ * 라벨이 값과 떨어져 병합돼도(startsWith 실패) 값 형식만으로 상호를 회복.
+ * ㈜/(주) 접두는 보존. 중복 제거.
+ */
+
+export function scanVendorTokens(text: string): string[] {
+  const out: string[] = [];
+  const seen = new Set<string>();
+  const re =
+    /((?:㈜|\(주\))?\s*[가-힣A-Za-z0-9]{1,12}(?:꽃화원|화원|플라워|플라웨|농원))/g;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(text))) {
+    const cleaned = cleanVendorName(m[1].replace(/\s+/g, ' ').trim());
+    if (
+      cleaned &&
+      cleaned.length >= 2 &&
+      !VENDOR_LABEL_WORD.test(cleaned) &&
+      !seen.has(cleaned)
+    ) {
+      seen.add(cleaned);
+      out.push(cleaned);
+    }
+  }
+  return out;
 }
 
 // ---------- 사람 이름(수령자/담당자) ----------
@@ -89,6 +165,21 @@ export function extractPersonName(text: string): string {
 
 export function looksLikePersonName(text: string): boolean {
   return extractPersonName(text) !== '';
+}
+
+// 이름 뒤에 붙는 상(喪) 관계호칭(근조 인수증의 수령인 형식 신호).
+const CONDOLENCE_RELATION =
+  /(부친상|모친상|조부상|조모상|빙부상|빙모상|처부상|처모상|본인상|자당상|엄친상|선친상|시부상|시모상|장인상|장모상)/;
+
+/**
+ * "유기열 부친상"처럼 이름 뒤에 상(喪) 관계호칭이 붙은 근조 수령인을 값 형식으로 뽑는다.
+ * 라벨('받는분')이 병합돼 사라져도 회복. 이름만 반환(관계호칭 제거). 실패 시 ''.
+ */
+export function scanCondolenceRecipient(text: string): string {
+  const m = text.match(
+    new RegExp(`([가-힣]{2,4})\\s*${CONDOLENCE_RELATION.source}`),
+  );
+  return m ? extractPersonName(m[1]) : '';
 }
 
 /** 값의 성격을 태그로 분류(디버깅·재랭킹 보조). */

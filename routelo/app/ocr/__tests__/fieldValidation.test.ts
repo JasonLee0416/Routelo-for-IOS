@@ -1,4 +1,5 @@
 import {
+  classifyPhoneNumber,
   detectFieldConflicts,
   isValidKoreanPhone,
   normalizeKoreanDate,
@@ -6,6 +7,9 @@ import {
   normalizeKoreanTime,
   normalizeQuantity,
   parseTimeRange,
+  scanEventTime,
+  scanKoreanPhones,
+  scanStrictTime,
   scoreValueForType,
   validateFieldValue,
 } from '../fieldValidation';
@@ -147,5 +151,63 @@ describe('detectFieldConflicts', () => {
     expect(
       detectFieldConflicts({ strictTime: '11:00', eventTime: '12:00' }),
     ).toHaveLength(0);
+  });
+});
+
+describe('scanStrictTime (마감시각 값-형식 회복)', () => {
+  test('"17시 00분 까지 배송" → 17:00 + 원문 span', () => {
+    const r = scanStrictTime('2026년 06월 14일 일요일 17시 00분 까지 배송 ()');
+    expect(r?.value).toBe('17:00');
+    expect(r?.source).toContain('17시');
+    expect(r?.source).toContain('까지 배송');
+  });
+  test('"오후 5시 엄수" 지원', () => {
+    expect(scanStrictTime('오후 5시 엄수')?.value).toBe('17:00');
+  });
+  test('배달 시간창의 단순 "까지"는 잡지 않음(배송/도착/엄수 요구)', () => {
+    expect(scanStrictTime('11:00~12:30 까지')).toBeNull();
+  });
+  test('주문 시각처럼 마감 문맥이 없으면 null', () => {
+    expect(scanStrictTime('14시 43분 주문합니다')).toBeNull();
+  });
+});
+
+describe('scanEventTime (예식시간 값-형식 회복)', () => {
+  test('"(1시 20분 식)" → 13:20 (예식 관례상 오후)', () => {
+    const r = scanEventTime('11:00~12:30 (1시 20분 식)');
+    expect(r?.value).toBe('13:20');
+    expect(r?.source).toContain('식');
+  });
+  test('오후 명시를 존중', () => {
+    expect(scanEventTime('오후 2시 식')?.value).toBe('14:00');
+  });
+  test("'식' 앵커가 없으면 null(배달창과 혼동 방지)", () => {
+    expect(scanEventTime('11:00~12:30 당일배송')).toBeNull();
+  });
+});
+
+describe('classifyPhoneNumber (확실한 연락처 vs 안심번호)', () => {
+  test('01x·지역번호는 direct(확실한 연락처)', () => {
+    expect(classifyPhoneNumber('010-5898-9543')).toBe('direct');
+    expect(classifyPhoneNumber('02-408-7737')).toBe('direct');
+    expect(classifyPhoneNumber('031-282-8403')).toBe('direct');
+  });
+  test('070·15xx 대표번호는 safe(안심번호)', () => {
+    expect(classifyPhoneNumber('070-4741-0001')).toBe('safe');
+    expect(classifyPhoneNumber('1566-0028')).toBe('safe');
+    expect(classifyPhoneNumber('1599-0028')).toBe('safe');
+  });
+});
+
+describe('scanKoreanPhones (문서순 전화 스캔)', () => {
+  test('등장 순서로 정규화·중복 제거', () => {
+    expect(
+      scanKoreanPhones('전화 070-8277-1211 전화 070-4741-0001 070-8277-1211'),
+    ).toEqual(['070-8277-1211', '070-4741-0001']);
+  });
+  test('주문번호 등 비전화 숫자는 제외', () => {
+    expect(scanKoreanPhones('주문번호 260614-03712 HP:010-4482-9119')).toEqual([
+      '010-4482-9119',
+    ]);
   });
 });

@@ -5,19 +5,29 @@ import {
   OcrPipelineResult,
 } from '../models';
 import { shouldRequestCloudFallback } from '../ocr/cloudFallback';
+import { inferEventType, scanProductName } from '../ocr/contentClassifier';
 import {
   cleanVendorName,
   extractPersonName,
+  extractVendorName,
   pickBest,
+  scanAddressSpan,
+  scanCondolenceRecipient,
+  scanVendorTokens,
   scoreAddress,
+  stripAddressNoise,
 } from '../ocr/fieldHeuristics';
 import {
   KOREAN_PHONE_PATTERN,
+  classifyPhoneNumber,
   detectFieldConflicts,
   isValidKoreanPhone,
   matchKoreanDate,
   normalizeKoreanPhone,
   normalizeKoreanTime,
+  scanEventTime,
+  scanKoreanPhones,
+  scanStrictTime,
 } from '../ocr/fieldValidation';
 import { DEFAULT_FIELD_REGISTRY } from '../ocr/fieldRegistry';
 import { buildLayoutText } from '../ocr/layout';
@@ -128,6 +138,9 @@ function field(
           : confidence >= 60
             ? 'review'
             : 'warning';
+  // 전화 필드는 실번호(direct)/안심번호(safe)를 자동 분류해 검수 UI가 구분 표시할 수 있게 한다.
+  const phoneKind =
+    value && PHONE_KEYS.has(key) ? classifyPhoneNumber(value) : undefined;
   return {
     key,
     label: LABELS[key],
@@ -141,8 +154,16 @@ function field(
     validationErrors,
     alternatives,
     status,
+    phoneKind,
   };
 }
+
+// 전화번호 성격 분류를 붙일 필드(발주/배송/수령 연락처).
+const PHONE_KEYS = new Set<OcrFieldKey>([
+  'orderingVendorTel',
+  'fulfillingVendorTel',
+  'recipientTel',
+]);
 
 const compactLabel = (value: string) =>
   value.replace(/[\s:：|[\]()]/g, '').toLowerCase();
@@ -196,13 +217,24 @@ function firstMatchingLine(
   };
 }
 
+// 한 값에 전화가 여러 개면 휴대폰(01x) > VoIP(070) > 기타 순으로 고른다
+// (팩스/대표번호가 담당자 연락처로 잘못 뽑히는 것 방지).
+function pickBestPhone(raw: string): string | undefined {
+  const phones = allMatches(raw, PHONE_PATTERN)
+    .map(normalizePhone)
+    .filter((phone) => isValidKoreanPhone(phone));
+  return (
+    phones.find((p) => p.startsWith('01')) ||
+    phones.find((p) => p.startsWith('070')) ||
+    phones[0]
+  );
+}
+
 function validatedPhoneCandidate(
   candidate: ReturnType<typeof findLabeledValue>,
 ) {
   if (!candidate) return undefined;
-  const value = allMatches(candidate.value, PHONE_PATTERN)
-    .map(normalizePhone)
-    .find((phone) => isValidKoreanPhone(phone));
+  const value = pickBestPhone(candidate.value);
   return value ? { ...candidate, value } : undefined;
 }
 
@@ -280,26 +312,40 @@ export function parseReceiptText(
     '수주회원',
   ]);
   // 업체명에서 전화·라벨 잔여 제거(주소면 상호 아님 → '').
-  const orderingVendorName = cleanVendorName(orderingVendor?.value || '');
-  const fulfillingVendorName = cleanVendorName(fulfillingVendor?.value || '');
+  // 폴백: 라벨 매칭이 비면 값 형식(상호 마커로 끝나는 토큰)으로 회복(등장 순서로 발주/배송 배정).
+  const vendorTokens = scanVendorTokens(text);
+  // 상호는 "형식 있는 토큰"(00플라워/00화원)만 남기고 잡글자("전 화" 등)를 버린다.
+  const orderingVendorName =
+    extractVendorName(orderingVendor?.value || '') || vendorTokens[0] || '';
+  const fulfillingVendorName =
+    extractVendorName(fulfillingVendor?.value || '') || vendorTokens[1] || '';
   // 라벨 전화가 없으면 업체명 줄 자체에서 전화를 페어링(업체↔전화 쌍).
   const vendorPhoneFromLine = (src: ReturnType<typeof findLabeledValue>) => {
     if (!src) return undefined;
-    const phone = allMatches(src.sourceText, PHONE_PATTERN)
-      .map(normalizePhone)
-      .find((value) => isValidKoreanPhone(value));
+    const phone = pickBestPhone(src.sourceText);
     return phone
       ? { value: phone, sourceText: src.sourceText, sourceLineIds: src.sourceLineIds }
       : undefined;
   };
+  // 라벨·줄 페어링이 모두 실패하면, 문서순 전화(발주=[0]·배송=[1])로 폴백(레이아웃 무관).
+  const vendorPhones = scanKoreanPhones(text);
+  const phoneCandidate = (phone?: string) =>
+    phone ? { value: phone, sourceText: phone, sourceLineIds: undefined } : undefined;
   const orderingVendorTel =
     validatedPhoneCandidate(
       findLabeledValue(lines, ['발주화원 전화', '발주처 전화', '발주 전화']),
-    ) || vendorPhoneFromLine(orderingVendor);
+    ) ||
+    vendorPhoneFromLine(orderingVendor) ||
+    phoneCandidate(vendorPhones[0]);
   const fulfillingVendorTel =
     validatedPhoneCandidate(
       findLabeledValue(lines, ['배송화원 전화', '수주화원 전화', '배송 전화']),
-    ) || vendorPhoneFromLine(fulfillingVendor);
+    ) ||
+    vendorPhoneFromLine(fulfillingVendor) ||
+    // 발주 전화와 다른 첫 번째 전화(같은 번호를 두 업체에 중복 배정 방지).
+    phoneCandidate(
+      vendorPhones.find((p) => p !== orderingVendorTel?.value),
+    );
 
   const productSource =
     findLabeledValue(lines, ['상품명', '배송상품', '품명', '상품']) ||
@@ -312,9 +358,20 @@ export function parseReceiptText(
       ? productSource
       : undefined);
   // 상품명은 뒤에 붙은 수량("... 2개")을 떼어 순수 품목만 남긴다(수량은 별도 필드).
-  const productName = (productSource?.value || '')
+  let productName = (productSource?.value || '')
     .replace(/\s*\d+\s*개\s*$/, '')
     .trim();
+  // 라벨 값이 비었거나(∅), blob(레이아웃 붕괴로 셀 병합, 길이>16), 또는 라벨/기호 잔여가
+  // 섞였으면(예: "*착한근조- 수량") 값-형식 상품명(간결형)으로 대체한다.
+  const productScan = scanProductName(text);
+  if (
+    productScan &&
+    (!productName ||
+      productName.length > 16 ||
+      /[^가-힣0-9\s]/.test(productName))
+  ) {
+    productName = productScan;
+  }
   const ribbonSource =
     findLabeledValue(lines, [
       '리본문구',
@@ -327,7 +384,10 @@ export function parseReceiptText(
       /삼가.*(?:명복|조의)|축하.*(?:결혼|개업)|부활/.test(line),
     );
 
-  const dateMatch = matchKoreanDate(mapped.deliveryDate || text);
+  // 연도 없는 날짜("06월 14일")도 회복: 텍스트의 20YY를 우선, 없으면 현재 연도로 보정.
+  const inferredYear =
+    Number((text.match(/20\d{2}/) || [])[0]) || new Date().getFullYear();
+  const dateMatch = matchKoreanDate(mapped.deliveryDate || text, inferredYear);
   const deliveryDate = dateMatch?.value || '';
   // 재포맷된 날짜의 출처를 원본 매칭 문자열로 남겨 provenance 추적을 유지한다.
   const deliveryDateSource = dateMatch?.raw || mapped.deliveryDate || '';
@@ -350,10 +410,16 @@ export function parseReceiptText(
     firstMatchingLine(lines, (line) =>
       /\(\s*\d{1,2}시\s*\d{0,2}분?\s*식\s*\)/.test(line),
     );
+  // 라벨 매칭 실패 시, '까지 배송/도착·엄수' 문맥의 시각을 값 형식으로 회복(레이아웃 무관).
+  // 스캔 경로도 원문 매칭 span을 sourceText로 남겨 위조 방지 provenance를 유지한다.
+  const strictScan = strictSource ? null : scanStrictTime(text);
   const strictTime = strictSource
     ? normalizeTime(strictSource.value)
-    : '';
-  const eventTime = eventSource ? normalizeTime(eventSource.value) : '';
+    : strictScan?.value || '';
+  // 예식시간은 같은 줄의 배달 시간창을 오선택하지 않도록 '식' 앵커 스캐너를 우선한다.
+  const eventScan = scanEventTime(text);
+  const eventTime =
+    eventScan?.value || (eventSource ? normalizeTime(eventSource.value) : '');
 
   const venueSource = findLabeledValue(lines, [
     '업체명',
@@ -375,6 +441,16 @@ export function parseReceiptText(
   const addressSource =
     findLabeledValue(lines, ['배송주소', '배달주소', '배송지', '배달장소', '주소']) ||
     addressFallback;
+  // 주소 값 정제: (1) 끝에 병합된 라벨/노이즈(…201호 "TEL") 제거,
+  // (2) 그래도 blob(레이아웃 붕괴로 여러 셀 병합)이면 장소유형 앵커 스팬으로 대체.
+  const deliveryAddress = (() => {
+    let value = stripAddressNoise(addressSource?.value || '');
+    if (value.length > 40) {
+      const span = scanAddressSpan(text);
+      if (span) value = span;
+    }
+    return value;
+  })();
   const recipientSource = findLabeledValue(lines, [
     '받는분',
     '받는 분',
@@ -390,7 +466,9 @@ export function parseReceiptText(
     const m = text.match(
       /(?:받는\s*분|받으실분|수령인|인수자)\s*[:：]?\s*((?:고인?|故|상주|신랑|신부)?\s*[가-힣]{2,4})/,
     );
-    return m ? extractPersonName(m[1]) : '';
+    const byLabel = m ? extractPersonName(m[1]) : '';
+    // 라벨이 병합돼 사라진 근조 인수증은 "이름+관계호칭(부친상…)" 형식으로 회복.
+    return byLabel || scanCondolenceRecipient(text);
   })();
   const recipientName = recipientFromLabel || recipientFromScan;
   const recipientTelSource = validatedPhoneCandidate(
@@ -540,11 +618,15 @@ export function parseReceiptText(
       'strictTime',
       strictTime,
       strictTime ? 86 : 0,
-      strictSource?.sourceText || '',
+      strictSource?.sourceText || strictScan?.source || '',
       [],
       {
         sourceLineIds: strictSource?.sourceLineIds,
-        extractionMethod: strictTime ? 'label' : undefined,
+        extractionMethod: strictSource
+          ? 'label'
+          : strictScan
+            ? 'pattern'
+            : undefined,
         forceReview: true,
       },
     ),
@@ -552,11 +634,15 @@ export function parseReceiptText(
       'eventTime',
       eventTime,
       eventTime ? 86 : 0,
-      eventSource?.sourceText || '',
+      eventScan?.source || eventSource?.sourceText || '',
       [],
       {
         sourceLineIds: eventSource?.sourceLineIds,
-        extractionMethod: eventTime ? 'label' : undefined,
+        extractionMethod: eventScan
+          ? 'pattern'
+          : eventTime
+            ? 'label'
+            : undefined,
         forceReview: true,
       },
     ),
@@ -574,13 +660,13 @@ export function parseReceiptText(
     ),
     field(
       'deliveryAddress',
-      addressSource?.value || '',
-      addressSource ? 84 : 0,
+      deliveryAddress,
+      deliveryAddress ? 84 : 0,
       addressSource?.sourceText || '',
       [],
       {
         sourceLineIds: addressSource?.sourceLineIds,
-        extractionMethod: addressSource ? 'pattern' : undefined,
+        extractionMethod: deliveryAddress ? 'pattern' : undefined,
         forceReview: true,
       },
     ),
@@ -639,6 +725,12 @@ export function parseReceiptText(
     documentConfidence,
     conflicts,
   });
+  // 값 형식으로 경조사 종류 추론(축하/근조) — 레이아웃 무관, 상품·리본 교차검증 기반.
+  const eventInference = inferEventType(text);
+  const eventType = {
+    type: eventInference.type,
+    confidence: eventInference.confidence,
+  };
 
   return {
     engine: 'fixture',
@@ -651,6 +743,7 @@ export function parseReceiptText(
     unmapped,
     conflicts,
     cloudFallback,
+    eventType,
   };
 }
 

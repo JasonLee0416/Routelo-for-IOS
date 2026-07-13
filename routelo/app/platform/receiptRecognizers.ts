@@ -1,6 +1,6 @@
 import { Platform } from 'react-native';
 
-import { recognizeTextNative } from '../../modules/apple-vision-ocr';
+import { recognizeTextNative } from './appleVisionNative';
 import { PP_OCR_MODEL_VERSION } from '../ocr/ppocr/modelManifest';
 import type { PpOcrLine } from '../ocr/ppocr/types';
 import { AppleVisionNoTextError, mapVisionPayloadToResult } from './appleVision';

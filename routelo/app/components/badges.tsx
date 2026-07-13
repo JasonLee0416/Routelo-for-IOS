@@ -1,4 +1,4 @@
-import { Ionicons } from '@expo/vector-icons';
+import { Ionicons } from '../platform/icons';
 import { Text, View } from 'react-native';
 
 import { Delivery, OcrFieldResult } from '../models';
@@ -44,6 +44,25 @@ export function ConfidenceBadge({ field }: { field: OcrFieldResult }) {
         color={color}
       />
       <Text style={[styles.confidenceText, { color }]}>{field.confidence}%</Text>
+    </View>
+  );
+}
+
+export function PhoneKindBadge({ kind }: { kind: 'direct' | 'safe' }) {
+  const { C, styles } = useTheme();
+  const safe = kind === 'safe';
+  const color = safe ? C.warning : C.success;
+  const background = safe ? C.warningBg : C.successBg;
+  return (
+    <View style={[styles.confidenceBadge, { backgroundColor: background }]}>
+      <Ionicons
+        name={safe ? 'shield-checkmark' : 'call'}
+        size={13}
+        color={color}
+      />
+      <Text style={[styles.confidenceText, { color }]}>
+        {safe ? '안심번호' : '실번호'}
+      </Text>
     </View>
   );
 }
