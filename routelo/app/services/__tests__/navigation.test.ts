@@ -13,15 +13,20 @@ const target = {
   longitude: 127.0276,
 };
 
+const noCoords = { name: '강남 행사장', latitude: 0, longitude: 0 };
+
 describe('navigation handoff', () => {
   let openUrlSpy: jest.SpiedFunction<typeof Linking.openURL>;
+  let canOpenSpy: jest.SpiedFunction<typeof Linking.canOpenURL>;
 
   beforeEach(() => {
     openUrlSpy = jest.spyOn(Linking, 'openURL').mockResolvedValue(undefined);
+    canOpenSpy = jest.spyOn(Linking, 'canOpenURL').mockResolvedValue(true);
   });
 
   afterEach(() => {
     openUrlSpy.mockRestore();
+    canOpenSpy.mockRestore();
   });
 
   it('exposes readable navigation-app labels', () => {
@@ -32,7 +37,7 @@ describe('navigation handoff', () => {
     });
   });
 
-  it('builds native deep links for supported map apps', () => {
+  it('builds route deep links per app when coordinates are known', () => {
     const encoded = encodeURIComponent(target.name);
 
     expect(navDeepLink('tmap', target)).toBe(
@@ -46,47 +51,58 @@ describe('navigation handoff', () => {
     );
   });
 
-  it('builds web fallbacks when a native handoff cannot be used', () => {
+  it('builds address-search deep links into the SAME app when coordinates are missing', () => {
+    const encoded = encodeURIComponent(noCoords.name);
+
+    // Every app opens its own app — no silent switch to another map service.
+    expect(navDeepLink('tmap', noCoords)).toBe(`tmap://search?name=${encoded}`);
+    expect(navDeepLink('kakao', noCoords)).toBe(`kakaomap://search?q=${encoded}`);
+    expect(navDeepLink('naver', noCoords)).toBe(
+      `nmap://search?query=${encoded}&appname=com.jasonlee0312.routelo`,
+    );
+  });
+
+  it('keeps web fallbacks in-brand (tmap no longer routes to naver)', () => {
     const encoded = encodeURIComponent(target.name);
 
+    expect(navWebFallback('tmap', target)).toBe(
+      'https://apps.apple.com/kr/app/id431589174',
+    );
     expect(navWebFallback('kakao', target)).toBe(
       `https://map.kakao.com/link/to/${encoded},37.4979,127.0276`,
+    );
+    expect(navWebFallback('kakao', noCoords)).toBe(
+      `https://map.kakao.com/link/search/${encoded}`,
     );
     expect(navWebFallback('naver', target)).toBe(
       `https://map.naver.com/p/search/${encoded}`,
     );
-    expect(navWebFallback('tmap', target)).toBe(
-      `https://map.naver.com/p/search/${encoded}`,
-    );
   });
 
-  it('falls back to web search when the native app link fails', async () => {
-    openUrlSpy
-      .mockRejectedValueOnce(new Error('not installed'))
-      .mockResolvedValueOnce(undefined);
+  it('opens the selected app when it is installed', async () => {
+    await openNavigation('tmap', target);
+
+    expect(canOpenSpy).toHaveBeenCalledWith(navDeepLink('tmap', target));
+    expect(openUrlSpy).toHaveBeenCalledTimes(1);
+    expect(openUrlSpy).toHaveBeenCalledWith(navDeepLink('tmap', target));
+  });
+
+  it('falls back to the in-brand web link when the app is not installed', async () => {
+    canOpenSpy.mockResolvedValue(false);
 
     await openNavigation('tmap', target);
 
-    expect(openUrlSpy).toHaveBeenNthCalledWith(
-      1,
-      navDeepLink('tmap', target),
-    );
-    expect(openUrlSpy).toHaveBeenNthCalledWith(
-      2,
-      navWebFallback('tmap', target),
-    );
+    expect(openUrlSpy).toHaveBeenCalledTimes(1);
+    expect(openUrlSpy).toHaveBeenCalledWith(navWebFallback('tmap', target));
   });
 
-  it('uses the fallback directly when coordinates are missing', async () => {
-    await openNavigation('naver', {
-      name: target.name,
-      latitude: 0,
-      longitude: 0,
-    });
+  it('opens each chosen app distinctly even without coordinates', async () => {
+    await openNavigation('kakao', noCoords);
+    expect(openUrlSpy).toHaveBeenLastCalledWith('kakaomap://search?q=' + encodeURIComponent(noCoords.name));
 
-    expect(openUrlSpy).toHaveBeenCalledTimes(1);
-    expect(openUrlSpy).toHaveBeenCalledWith(
-      navWebFallback('naver', target),
+    await openNavigation('naver', noCoords);
+    expect(openUrlSpy).toHaveBeenLastCalledWith(
+      `nmap://search?query=${encodeURIComponent(noCoords.name)}&appname=com.jasonlee0312.routelo`,
     );
   });
 });

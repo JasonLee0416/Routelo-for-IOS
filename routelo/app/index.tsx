@@ -216,13 +216,25 @@ const tabs: Array<{
 ];
 
 
+// 온보딩 기본 플레이스홀더 이름은 개인화에서 제외 — 실제 사용자가 입력한
+// 이름일 때만 "안녕하세요, ㅇㅇㅇ 기사님"으로 부른다.
+const GREETING_PLACEHOLDER_NAMES = new Set(['게스트 기사', '업무 기사', '게스트']);
+
+function driverGreetingName(account?: AccountState): string | undefined {
+  const name = account?.profile.displayName?.trim();
+  if (!name || GREETING_PLACEHOLDER_NAMES.has(name)) return undefined;
+  return name;
+}
+
 function HomeScreen({
   deliveries,
+  greetingName,
   onDeliveryPress,
   onSeeAll,
   onNotifications,
 }: {
   deliveries: Delivery[];
+  greetingName?: string;
   onDeliveryPress: (delivery: Delivery) => void;
   onSeeAll: () => void;
   onNotifications: () => void;
@@ -239,7 +251,7 @@ function HomeScreen({
     <ScrollView contentContainerStyle={styles.screenContent} showsVerticalScrollIndicator={false}>
       <ScreenHeader
         eyebrow="ROUTELO · 오늘의 운영"
-        title="안녕하세요, 기사님"
+        title={greetingName ? `안녕하세요, ${greetingName} 기사님` : '안녕하세요, 기사님'}
         subtitle="마감 시간과 우선 배송을 먼저 확인하세요."
         notificationCount={3}
         onNotificationPress={onNotifications}
@@ -4744,6 +4756,7 @@ export default function RouteloApp() {
     return (
       <HomeScreen
         deliveries={activeDeliveries}
+        greetingName={driverGreetingName(account)}
         onDeliveryPress={setSelectedDelivery}
         onSeeAll={() => setActiveTab('deliveries')}
         onNotifications={openNotifications}
