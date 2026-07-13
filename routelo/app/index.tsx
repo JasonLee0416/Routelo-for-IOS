@@ -635,10 +635,11 @@ function DeliveryListScreen({
   );
 }
 
-// 행을 왼쪽으로 밀면 삭제(확인 다이얼로그는 onDelete 쪽에서 띄운다). 네이티브
-// 제스처 의존성 없이 PanResponder+Animated로 구현하며, 수평 왼쪽 이동이 뚜렷할
-// 때만 제스처를 가로채 세로 스크롤과 충돌하지 않는다.
-const SWIPE_DELETE_TRIGGER = 120;
+// 행을 왼쪽으로 밀면 삭제 버튼이 드러나고 그 자리에 "고정"된다. 사용자가 삭제
+// 버튼을 눌러야만 확인 다이얼로그(onDelete)가 뜨므로 실수로 지워지지 않는다.
+// 오른쪽으로 밀거나 버튼을 누르면 닫힌다. 네이티브 제스처 의존성 없이 구현하고,
+// 수평 이동이 뚜렷할 때만 제스처를 가로채 세로 스크롤과 충돌하지 않는다.
+const SWIPE_REVEAL_W = 96;
 
 function SwipeToDeleteRow({
   onDelete,
@@ -649,44 +650,48 @@ function SwipeToDeleteRow({
 }) {
   const { C } = useTheme();
   const translateX = useRef(new Animated.Value(0)).current;
-  const firedRef = useRef(false);
-  const resetPosition = () =>
+  const openRef = useRef(false);
+  const settleTo = (to: number) => {
+    openRef.current = to !== 0;
     Animated.spring(translateX, {
-      toValue: 0,
+      toValue: to,
       useNativeDriver: true,
       bounciness: 0,
+      speed: 20,
     }).start();
+  };
   const pan = useRef(
     PanResponder.create({
       onMoveShouldSetPanResponder: (_e, g) =>
-        g.dx < -8 && Math.abs(g.dx) > Math.abs(g.dy) * 1.5,
-      onPanResponderGrant: () => {
-        firedRef.current = false;
-      },
+        Math.abs(g.dx) > Math.abs(g.dy) * 1.5 && Math.abs(g.dx) > 8,
       onPanResponderMove: (_e, g) => {
+        const base = openRef.current ? -SWIPE_REVEAL_W : 0;
         translateX.setValue(
-          Math.min(0, Math.max(g.dx, -(SWIPE_DELETE_TRIGGER + 60))),
+          Math.min(0, Math.max(base + g.dx, -SWIPE_REVEAL_W - 24)),
         );
       },
       onPanResponderRelease: (_e, g) => {
-        if (g.dx <= -SWIPE_DELETE_TRIGGER && !firedRef.current) {
-          firedRef.current = true;
-          onDelete();
-        }
-        resetPosition();
+        const base = openRef.current ? -SWIPE_REVEAL_W : 0;
+        // 절반 이상 열렸으면 열린 채 고정, 아니면 닫는다.
+        settleTo(base + g.dx <= -SWIPE_REVEAL_W / 2 ? -SWIPE_REVEAL_W : 0);
       },
-      onPanResponderTerminate: resetPosition,
+      onPanResponderTerminate: () =>
+        settleTo(openRef.current ? -SWIPE_REVEAL_W : 0),
     }),
   ).current;
   return (
     <View style={{ position: 'relative' }}>
-      <View
+      <Pressable
+        onPress={() => {
+          onDelete();
+          settleTo(0);
+        }}
         style={{
           position: 'absolute',
           right: 0,
           top: 0,
           bottom: 0,
-          width: 96,
+          width: SWIPE_REVEAL_W,
           backgroundColor: C.danger,
           borderRadius: 22,
           alignItems: 'center',
@@ -699,7 +704,7 @@ function SwipeToDeleteRow({
         <Text style={{ color: '#FFFFFF', fontWeight: '800', fontSize: 13 }}>
           삭제
         </Text>
-      </View>
+      </Pressable>
       <Animated.View style={{ transform: [{ translateX }] }} {...pan.panHandlers}>
         {children}
       </Animated.View>
@@ -708,6 +713,7 @@ function SwipeToDeleteRow({
 }
 
 const ROUTE_ROW_H = 66;
+const ROUTE_DELETE_W = 96;
 
 // JS 전용(네이티브 의존성 없음) 드래그 재정렬 리스트. 배송지 행을 꾹 눌러 위아래로
 // 끌면 순서가 바뀐다. 살짝 누르면(이동<임계) 상세로 이동. PanResponder는 useRef로 한 번만
@@ -739,8 +745,16 @@ function DraggableRouteList({
 
   const [active, setActive] = useState<number | null>(null);
   const [swiping, setSwiping] = useState(false);
+  // 왼쪽으로 밀어 "열린 채 고정"된 행. 삭제 버튼을 눌러야 실제 삭제된다.
+  const [openIndex, setOpenIndex] = useState<number | null>(null);
+  const openIndexRef = useRef<number | null>(null);
+  useEffect(() => {
+    openIndexRef.current = openIndex;
+  }, [openIndex]);
+
   const dragY = useRef(new Animated.Value(0)).current;
-  const dragX = useRef(new Animated.Value(0)).current;
+  const dragX = useRef(new Animated.Value(0)).current; // 제스처 중 실시간 이동
+  const openX = useRef(new Animated.Value(0)).current; // 열린 채 고정된 행의 위치
   // 세로 드래그(순서 변경)와 가로 스와이프(삭제)를 한 제스처에서 구분한다.
   const mode = useRef<'idle' | 'drag' | 'swipe'>('idle');
   const start = useRef(0);
@@ -750,11 +764,33 @@ function DraggableRouteList({
   const clampIndex = (value: number) =>
     Math.max(0, Math.min(dataRef.current.length - 1, value));
 
+  const closeOpen = () => {
+    setOpenIndex(null);
+    openIndexRef.current = null;
+    Animated.spring(openX, {
+      toValue: 0,
+      useNativeDriver: true,
+      bounciness: 0,
+      speed: 20,
+    }).start();
+  };
+  const openRow = (idx: number) => {
+    setOpenIndex(idx);
+    openIndexRef.current = idx;
+    openX.setValue(0);
+    Animated.spring(openX, {
+      toValue: -ROUTE_DELETE_W,
+      useNativeDriver: true,
+      bounciness: 0,
+      speed: 20,
+    }).start();
+  };
+
   const pan = useRef(
     PanResponder.create({
       onStartShouldSetPanResponder: () => true,
       onMoveShouldSetPanResponder: (_e, g) =>
-        Math.abs(g.dy) > 4 || g.dx < -8,
+        Math.abs(g.dy) > 4 || Math.abs(g.dx) > 8,
       onPanResponderGrant: (e) => {
         const idx = clampIndex(
           Math.floor(e.nativeEvent.locationY / ROUTE_ROW_H),
@@ -765,17 +801,23 @@ function DraggableRouteList({
         mode.current = 'idle';
         dragY.setValue(0);
         dragX.setValue(0);
-        setSwiping(false);
         setActive(idx);
       },
       onPanResponderMove: (_e, g) => {
         // 첫 유의미한 이동으로 방향(순서변경 vs 삭제)을 확정하고 고정한다.
         if (mode.current === 'idle') {
-          if (g.dx < -6 && Math.abs(g.dx) > Math.abs(g.dy) * 1.5) {
+          if (Math.abs(g.dx) > 6 && Math.abs(g.dx) > Math.abs(g.dy) * 1.5) {
             mode.current = 'swipe';
             setSwiping(true);
+            if (
+              openIndexRef.current !== null &&
+              openIndexRef.current !== start.current
+            ) {
+              closeOpen();
+            }
           } else if (Math.abs(g.dy) > 4) {
             mode.current = 'drag';
+            if (openIndexRef.current !== null) closeOpen();
           }
         }
         if (mode.current === 'drag') {
@@ -786,16 +828,26 @@ function DraggableRouteList({
           );
         } else if (mode.current === 'swipe') {
           moved.current = true;
-          dragX.setValue(Math.min(0, Math.max(g.dx, -(SWIPE_DELETE_TRIGGER + 60))));
+          const base =
+            openIndexRef.current === start.current ? -ROUTE_DELETE_W : 0;
+          dragX.setValue(
+            Math.min(0, Math.max(base + g.dx, -ROUTE_DELETE_W - 24)),
+          );
         }
       },
       onPanResponderRelease: (_e, g) => {
+        const idx = start.current;
         if (!moved.current) {
-          cbRef.current.onPressRow(dataRef.current[start.current]);
-        } else if (mode.current === 'swipe') {
-          if (g.dx <= -SWIPE_DELETE_TRIGGER) {
-            cbRef.current.onRequestDelete?.(dataRef.current[start.current]);
+          // 탭: 열린 행이 있으면 닫고, 없으면 상세로 이동.
+          if (openIndexRef.current !== null) {
+            closeOpen();
+          } else {
+            cbRef.current.onPressRow(dataRef.current[idx]);
           }
+        } else if (mode.current === 'swipe') {
+          const base = openIndexRef.current === idx ? -ROUTE_DELETE_W : 0;
+          if (base + g.dx <= -ROUTE_DELETE_W / 2) openRow(idx);
+          else closeOpen();
         } else if (mode.current === 'drag' && start.current !== hover.current) {
           const copy = [...dataRef.current];
           const [m] = copy.splice(start.current, 1);
@@ -820,79 +872,121 @@ function DraggableRouteList({
   ).current;
 
   return (
-    <View
-      {...pan.panHandlers}
-      style={{ height: data.length * ROUTE_ROW_H, position: 'relative' }}
-    >
-      {swiping && active !== null && (
-        <View
-          style={{
-            position: 'absolute',
-            left: 0,
-            right: 0,
-            top: active * ROUTE_ROW_H,
-            height: ROUTE_ROW_H,
-            borderRadius: 12,
-            backgroundColor: C.danger,
-            flexDirection: 'row',
-            alignItems: 'center',
-            justifyContent: 'flex-end',
-            paddingRight: 20,
-            gap: 5,
-          }}
-        >
-          <Ionicons name="trash-outline" size={18} color="#FFFFFF" />
-          <Text style={{ color: '#FFFFFF', fontWeight: '800', fontSize: 13 }}>
-            삭제
-          </Text>
-        </View>
-      )}
-      {data.map((delivery, index) => {
-        const isActive = index === active;
-        const RowView = isActive ? Animated.View : View;
-        return (
-          <RowView
-            key={delivery.id}
-            style={[
-              {
+    <View style={{ position: 'relative' }}>
+      <View
+        {...pan.panHandlers}
+        style={{ height: data.length * ROUTE_ROW_H, position: 'relative' }}
+      >
+        {data.map((delivery, index) => {
+          const isActive = index === active;
+          const isOpen = index === openIndex;
+          const showDeleteBg = (swiping && isActive) || isOpen;
+          const RowView = isActive || isOpen ? Animated.View : View;
+          const transform = isActive
+            ? [{ translateY: dragY }, { translateX: dragX }]
+            : isOpen
+              ? [{ translateX: openX }]
+              : undefined;
+          return (
+            <View
+              key={delivery.id}
+              style={{
                 position: 'absolute',
                 left: 0,
                 right: 0,
                 top: index * ROUTE_ROW_H,
                 height: ROUTE_ROW_H,
-                flexDirection: 'row',
-                alignItems: 'center',
-                paddingRight: 8,
-                backgroundColor: swiping && isActive ? C.surface : undefined,
-              },
-              isActive && {
-                transform: [{ translateY: dragY }, { translateX: dragX }],
-                zIndex: 20,
-                backgroundColor: C.surface,
-                borderRadius: 12,
-                shadowColor: '#000',
-                shadowOpacity: 0.18,
-                shadowRadius: 10,
-                shadowOffset: { width: 0, height: 4 },
-                elevation: 6,
-              },
-            ]}
-          >
-            <View style={styles.routeStackOrder}>
-              <Text style={styles.routeStackOrderText}>{index + 1}</Text>
+              }}
+            >
+              {showDeleteBg && (
+                <View
+                  style={{
+                    position: 'absolute',
+                    right: 0,
+                    top: 0,
+                    bottom: 0,
+                    width: ROUTE_DELETE_W,
+                    borderRadius: 12,
+                    backgroundColor: C.danger,
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: 5,
+                  }}
+                >
+                  <Ionicons name="trash-outline" size={18} color="#FFFFFF" />
+                  <Text
+                    style={{ color: '#FFFFFF', fontWeight: '800', fontSize: 13 }}
+                  >
+                    삭제
+                  </Text>
+                </View>
+              )}
+              <RowView
+                style={[
+                  {
+                    position: 'absolute',
+                    left: 0,
+                    right: 0,
+                    top: 0,
+                    height: ROUTE_ROW_H,
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    paddingRight: 8,
+                    backgroundColor: showDeleteBg ? C.surface : undefined,
+                  },
+                  transform ? { transform } : null,
+                  isActive && {
+                    zIndex: 20,
+                    backgroundColor: C.surface,
+                    borderRadius: 12,
+                    shadowColor: '#000',
+                    shadowOpacity: 0.18,
+                    shadowRadius: 10,
+                    shadowOffset: { width: 0, height: 4 },
+                    elevation: 6,
+                  },
+                ]}
+              >
+                <View style={styles.routeStackOrder}>
+                  <Text style={styles.routeStackOrderText}>{index + 1}</Text>
+                </View>
+                <View style={styles.routeStackBody}>
+                  <Text style={styles.routeStackTitle} numberOfLines={1}>
+                    {delivery.productName}
+                  </Text>
+                  <Text style={styles.routeStackAddress} numberOfLines={1}>
+                    {delivery.deliveryAddress}
+                  </Text>
+                </View>
+                <Ionicons
+                  name="reorder-three-outline"
+                  size={22}
+                  color={C.textMuted}
+                />
+              </RowView>
             </View>
-            <View style={styles.routeStackBody}>
-              <Text style={styles.routeStackTitle} numberOfLines={1}>
-                {delivery.productName}
-              </Text>
-              <Text style={styles.routeStackAddress} numberOfLines={1}>
-                {delivery.deliveryAddress}
-              </Text>
-            </View>
-            <Ionicons name="reorder-three-outline" size={22} color={C.textMuted} />
-          </RowView>
-        );
-      })}
+          );
+        })}
+      </View>
+      {openIndex !== null && data[openIndex] && (
+        // 열린 행의 드러난 영역 위에 놓이는 탭 가능한 삭제 버튼(컨테이너 제스처와 분리).
+        <Pressable
+          onPress={() => {
+            cbRef.current.onRequestDelete?.(dataRef.current[openIndex]);
+            closeOpen();
+          }}
+          style={{
+            position: 'absolute',
+            right: 0,
+            top: openIndex * ROUTE_ROW_H,
+            height: ROUTE_ROW_H,
+            width: ROUTE_DELETE_W,
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+        />
+      )}
     </View>
   );
 }
@@ -940,6 +1034,11 @@ function RouteScreen({
   useEffect(() => setStartInput(startAddress ?? ''), [startAddress]);
   useEffect(() => setEndInput(endAddress ?? ''), [endAddress]);
   const saveLocations = () => onSetLocations(startInput.trim(), endInput.trim());
+  // 입력값이 설정에 저장된 값과 같은지(=이미 저장돼 유지 중인지) 판단.
+  const locationsSaved =
+    startInput.trim() === (startAddress ?? '').trim() &&
+    endInput.trim() === (endAddress ?? '').trim();
+  const hasAnyLocation = !!(startInput.trim() || endInput.trim());
 
   const startNavigation = () => {
     if (!next) return;
@@ -960,28 +1059,131 @@ function RouteScreen({
         onNotificationPress={onNotifications}
       />
       <View style={styles.surfaceCard}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-          <Ionicons name="flag-outline" size={16} color={C.primary} />
-          <TextInput
-            value={startInput}
-            onChangeText={setStartInput}
-            onBlur={saveLocations}
-            placeholder="출발지 (예: 강남 꽃시장)"
-            placeholderTextColor={C.textMuted}
-            style={{ flex: 1, color: C.text, fontSize: 14, paddingVertical: 8 }}
-          />
-        </View>
-        <View style={styles.divider} />
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 8 }}>
-          <Ionicons name="location-outline" size={16} color={C.danger} />
-          <TextInput
-            value={endInput}
-            onChangeText={setEndInput}
-            onBlur={saveLocations}
-            placeholder="최종 도착지 (예: 자택 · 비우면 마지막 배송지)"
-            placeholderTextColor={C.textMuted}
-            style={{ flex: 1, color: C.text, fontSize: 14, paddingVertical: 8 }}
-          />
+        <View style={{ padding: 14 }}>
+          <View
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              marginBottom: 12,
+            }}
+          >
+            <Text style={{ color: C.navy, fontSize: 14, fontWeight: '800' }}>
+              출발지 · 도착지
+            </Text>
+            {locationsSaved && hasAnyLocation && (
+              <View
+                style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}
+              >
+                <Ionicons name="checkmark-circle" size={15} color={C.success} />
+                <Text
+                  style={{ color: C.success, fontSize: 11, fontWeight: '800' }}
+                >
+                  저장됨
+                </Text>
+              </View>
+            )}
+          </View>
+
+          <Text
+            style={{
+              color: C.textMuted,
+              fontSize: 11,
+              fontWeight: '700',
+              marginBottom: 5,
+            }}
+          >
+            출발지
+          </Text>
+          <View
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              gap: 8,
+              borderWidth: 1,
+              borderColor: C.outline,
+              borderRadius: 13,
+              paddingHorizontal: 12,
+              backgroundColor: C.background,
+            }}
+          >
+            <Ionicons name="flag-outline" size={16} color={C.primary} />
+            <TextInput
+              value={startInput}
+              onChangeText={setStartInput}
+              onBlur={saveLocations}
+              placeholder="예: 강남 꽃시장"
+              placeholderTextColor={C.textMuted}
+              style={{ flex: 1, color: C.text, fontSize: 14, paddingVertical: 11 }}
+            />
+          </View>
+
+          <Text
+            style={{
+              color: C.textMuted,
+              fontSize: 11,
+              fontWeight: '700',
+              marginTop: 12,
+              marginBottom: 5,
+            }}
+          >
+            최종 도착지{'  '}
+            <Text style={{ fontWeight: '400' }}>(비우면 마지막 배송지)</Text>
+          </Text>
+          <View
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              gap: 8,
+              borderWidth: 1,
+              borderColor: C.outline,
+              borderRadius: 13,
+              paddingHorizontal: 12,
+              backgroundColor: C.background,
+            }}
+          >
+            <Ionicons name="location-outline" size={16} color={C.danger} />
+            <TextInput
+              value={endInput}
+              onChangeText={setEndInput}
+              onBlur={saveLocations}
+              placeholder="예: 자택"
+              placeholderTextColor={C.textMuted}
+              style={{ flex: 1, color: C.text, fontSize: 14, paddingVertical: 11 }}
+            />
+          </View>
+
+          <Pressable
+            onPress={saveLocations}
+            disabled={locationsSaved}
+            style={{
+              marginTop: 14,
+              minHeight: 46,
+              borderRadius: 13,
+              backgroundColor: locationsSaved ? C.surfaceAlt : C.primary,
+              alignItems: 'center',
+              justifyContent: 'center',
+              flexDirection: 'row',
+              gap: 6,
+            }}
+          >
+            <Ionicons
+              name={locationsSaved ? 'checkmark' : 'bookmark-outline'}
+              size={16}
+              color={locationsSaved ? C.textMuted : '#FFFFFF'}
+            />
+            <Text
+              style={{
+                color: locationsSaved ? C.textMuted : '#FFFFFF',
+                fontWeight: '800',
+                fontSize: 13,
+              }}
+            >
+              {locationsSaved && hasAnyLocation
+                ? '저장됨 · 다음에도 유지됩니다'
+                : '출발·도착지 저장'}
+            </Text>
+          </Pressable>
         </View>
       </View>
       {!!next && (
