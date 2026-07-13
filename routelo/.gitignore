@@ -21,6 +21,15 @@ ios/local-signing.env
 ios/*.xcworkspace/xcuserdata/
 ios/Routelo.xcodeproj/xcuserdata/
 
+# fastlane (secrets / generated)
+ios/fastlane/.env
+ios/fastlane/report.xml
+ios/fastlane/Preview.html
+ios/fastlane/screenshots/**/*.png
+ios/fastlane/test_output/
+ios/vendor/bundle/
+ios/.bundle/
+
 # Metro
 .metro-health-check*
 

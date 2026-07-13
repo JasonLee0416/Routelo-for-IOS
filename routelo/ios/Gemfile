@@ -1,0 +1,5 @@
+source "https://rubygems.org"
+
+# iOS 릴리스 자동화. `bundle install` 후 `bundle exec fastlane <lane>`으로 실행.
+gem "fastlane"
+gem "cocoapods"

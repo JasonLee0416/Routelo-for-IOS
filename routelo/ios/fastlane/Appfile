@@ -1,0 +1,8 @@
+# 앱 식별자. 최종 번들 ID가 바뀌면 PRODUCT_BUNDLE_IDENTIFIER 환경변수로 덮어쓴다.
+app_identifier(ENV["PRODUCT_BUNDLE_IDENTIFIER"] || "com.jasonlee0312.routelo.ios")
+
+# App Store Connect API 키(권장)를 쓰면 apple_id/team_id 지정이 필요 없다.
+# 개인 Apple ID 로그인을 쓸 때만 아래 값을 환경변수로 채운다.
+apple_id(ENV["APPLE_ID"]) if ENV["APPLE_ID"]
+itc_team_id(ENV["ASC_TEAM_ID"]) if ENV["ASC_TEAM_ID"]
+team_id(ENV["DEVELOPMENT_TEAM"]) if ENV["DEVELOPMENT_TEAM"]
