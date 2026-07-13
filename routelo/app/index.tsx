@@ -3755,6 +3755,9 @@ function OcrScannerModal({
   onRegister: (delivery: Delivery, receiptImageUri?: string) => void;
 }) {
   const { C, styles } = useTheme();
+  // Modal 안에서는 SafeAreaView 컴포넌트가 상단 인셋을 적용하지 못하는 경우가 있어
+  // (노치/다이나믹 아일랜드 밑으로 X가 파묻힘) 인셋을 훅으로 직접 읽어 헤더에 준다.
+  const insets = useSafeAreaInsets();
   const [stage, setStage] = useState<ScanStage>('capture');
   const [imageUri, setImageUri] = useState<string>();
   const [assetInfo, setAssetInfo] = useState<{ width?: number; height?: number; fileSize?: number }>({});
@@ -3929,10 +3932,10 @@ function OcrScannerModal({
 
   return (
     <Modal visible={visible} animationType="slide" onRequestClose={onClose}>
-      <SafeAreaView style={styles.scannerApp}>
+      <SafeAreaView style={styles.scannerApp} edges={['left', 'right', 'bottom']}>
         <StatusBar barStyle="dark-content" />
-        <View style={styles.scannerHeader}>
-          <Pressable style={styles.iconButton} onPress={onClose}>
+        <View style={[styles.scannerHeader, { paddingTop: insets.top + 12 }]}>
+          <Pressable style={styles.iconButton} onPress={onClose} hitSlop={10}>
             <Ionicons name="close" size={22} color={C.text} />
           </Pressable>
           <View style={styles.scannerHeaderCopy}>
