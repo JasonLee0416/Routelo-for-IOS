@@ -122,6 +122,11 @@ import {
 } from './services/maps';
 import { NAV_APP_LABEL, openNavigation } from './services/navigation';
 import { flush as flushTelemetry, pendingReportCount, recordScanReview } from './telemetry';
+import {
+  getDeviceId as getMembershipDeviceId,
+  isMembershipConfigured,
+  syncEntitlement,
+} from './membership';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   AppPlan,
@@ -3362,6 +3367,16 @@ function SettingsScreen({
   const [pendingReports, setPendingReports] = useState(0);
   const plan: AppPlan = resolvePlan(settings.entitlement);
   const [scanToday, setScanToday] = useState(0);
+  // 회원 관리 모드(백엔드 설정 시): 요금제는 운영자가 지정하고, 사용자는 자기
+  // 기기 ID를 운영자에게 전달해 지정받는다.
+  const membershipManaged = isMembershipConfigured();
+  const [myDeviceId, setMyDeviceId] = useState('');
+  useEffect(() => {
+    if (!membershipManaged) return;
+    getMembershipDeviceId()
+      .then(setMyDeviceId)
+      .catch(() => undefined);
+  }, [membershipManaged]);
   const [newVehicle, setNewVehicle] = useState('');
   const vehicleRegistry = dedupeVehicles(settings.costs.vehicleRegistry ?? []);
   const addFleetVehicle = () => {
@@ -3511,31 +3526,81 @@ function SettingsScreen({
               {plan === 'pro' ? 'Pro · 파운딩 멤버' : '무료 요금제'}
             </Text>
           </View>
-          <Pressable
-            onPress={() =>
-              updateSettings({
-                ...settings,
-                entitlement: { plan: plan === 'pro' ? 'free' : 'pro' },
-              })
-            }
-            style={({ pressed }) => [
-              {
-                paddingHorizontal: 12,
+          {membershipManaged ? (
+            <View
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: 4,
+                paddingHorizontal: 10,
                 minHeight: 34,
                 borderRadius: 10,
-                borderWidth: 1,
-                borderColor: C.outline,
-                alignItems: 'center',
-                justifyContent: 'center',
-              },
-              pressed && { opacity: 0.6 },
-            ]}
+                backgroundColor: C.surfaceAlt,
+              }}
+            >
+              <Ionicons name="shield-checkmark" size={13} color={C.textMuted} />
+              <Text style={{ color: C.textMuted, fontWeight: '700', fontSize: 12 }}>
+                관리자 관리
+              </Text>
+            </View>
+          ) : (
+            <Pressable
+              onPress={() =>
+                updateSettings({
+                  ...settings,
+                  entitlement: { plan: plan === 'pro' ? 'free' : 'pro' },
+                })
+              }
+              style={({ pressed }) => [
+                {
+                  paddingHorizontal: 12,
+                  minHeight: 34,
+                  borderRadius: 10,
+                  borderWidth: 1,
+                  borderColor: C.outline,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                },
+                pressed && { opacity: 0.6 },
+              ]}
+            >
+              <Text style={{ color: C.primary, fontWeight: '700', fontSize: 12 }}>
+                {plan === 'pro' ? '무료 체험 미리보기' : 'Pro로 전환'}
+              </Text>
+            </Pressable>
+          )}
+        </View>
+        {membershipManaged && (
+          <Pressable
+            onPress={() => {
+              if (myDeviceId) {
+                Alert.alert(
+                  '내 기기 ID',
+                  `${myDeviceId}\n\n이 ID를 운영자에게 전달하면 요금제를 지정받을 수 있어요. (길게 눌러 복사)`,
+                );
+              }
+            }}
+            accessibilityRole="button"
+            accessibilityLabel="내 기기 ID 보기"
+            style={{
+              padding: 10,
+              borderRadius: 10,
+              backgroundColor: C.surfaceAlt,
+              marginBottom: 12,
+            }}
           >
-            <Text style={{ color: C.primary, fontWeight: '700', fontSize: 12 }}>
-              {plan === 'pro' ? '무료 체험 미리보기' : 'Pro로 전환'}
+            <Text style={{ color: C.textMuted, fontSize: 11, fontWeight: '700' }}>
+              내 기기 ID (탭하여 보기 · 길게 눌러 복사)
+            </Text>
+            <Text
+              selectable
+              style={{ color: C.text, fontSize: 12, marginTop: 3 }}
+              numberOfLines={1}
+            >
+              {myDeviceId || '불러오는 중…'}
             </Text>
           </Pressable>
-        </View>
+        )}
         {plan === 'free' && (
           <View
             style={{
@@ -5681,6 +5746,41 @@ export default function RouteloApp() {
     });
     return () => sub.remove();
   }, [settings.telemetry?.enabled]);
+  // 회원 자격(관리 모드): 백엔드 설정이 채워졌을 때만 원격 자격을 조회해 요금제를
+  // 동기화한다. 미설정이면 완전 무동작(기존 로컬 파운딩 Pro 유지). 최신 설정은
+  // ref로 읽어 포그라운드 복귀 때도 정확한 localPlan을 넘긴다.
+  const settingsRef = useRef(settings);
+  settingsRef.current = settings;
+  useEffect(() => {
+    // 계정이 로드된 뒤 동기화해 자기등록 라벨이 실제 이름이 되도록 한다.
+    if (!isMembershipConfigured() || !account) return;
+    let mounted = true;
+    const run = () => {
+      const current = settingsRef.current;
+      const localPlan = resolvePlan(current.entitlement);
+      const label =
+        driverGreetingName(account) || account.profile.displayName || '게스트';
+      syncEntitlement({ label, localPlan })
+        .then((res) => {
+          if (!mounted || res.plan === localPlan) return;
+          setSettings((prev) => {
+            const next = { ...prev, entitlement: { plan: res.plan } };
+            settingsRepository.save(next).catch(() => undefined);
+            return next;
+          });
+        })
+        .catch(() => undefined);
+    };
+    run();
+    const sub = AppState.addEventListener('change', (state) => {
+      if (state === 'active') run();
+    });
+    return () => {
+      mounted = false;
+      sub.remove();
+    };
+    // account 신원이 정해질 때 재바인딩(온보딩 완료 등). 그 외엔 ref로 최신 설정 사용.
+  }, [account?.profile.id]);
   // 무료 티어는 하루 스캔 한도를 넘으면 스캐너 대신 업그레이드 안내를 띄운다.
   const openScanner = () => {
     if (resolvePlan(settings.entitlement) === 'pro') {

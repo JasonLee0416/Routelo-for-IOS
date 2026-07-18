@@ -17,6 +17,14 @@
 - 설정 **멤버십** 섹션: 현재 요금제 표시, 기능별 잠금/해제, **무료/Pro 미리보기 토글**,
   무료일 때 남은 스캔 수 + "Pro 알아보기"(관심 측정용 자리).
 
+## 원격 회원 관리(관리 모드) — 1단계 완료
+`settings.entitlement.plan`은 여전히 앱 내 게이팅 소스이지만, **운영자가 중앙에서**
+그 값을 통제할 수 있는 레이어를 추가했다(`app/membership/*`, Firestore REST).
+- **미설정 시 무동작** → 기존 로컬(파운딩 Pro) 그대로.
+- **설정 시**: 실행/포그라운드에 `members/{deviceId}` 조회 → 운영자 지정 plan 적용,
+  미등록은 무료 자기등록, 오류는 강등 금지. 설정 > 멤버십에서 **내 기기 ID** 노출.
+- 상세·운영법은 **[MEMBERSHIP.md](MEMBERSHIP.md)** 참고.
+
 ## 정식 유료화(Phase 2) 전환 방법
 1. `react-native-purchases`(RevenueCat) 추가, 상품/엔타이틀먼트 구성.
 2. `resolvePlan`의 소스를 RevenueCat 엔타이틀먼트(활성 구독 여부)로 교체.
