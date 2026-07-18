@@ -2,10 +2,30 @@ import { Platform, StyleSheet } from 'react-native';
 
 import { LIGHT, Palette } from './palette';
 
+// 앱 전역 글자 확대 배율. 실기기 가독성 개선을 위해 모든 명시적 fontSize를
+// 한 곳에서 일률적으로 키운다(체크/토글과의 균형은 컴포넌트 쪽에서 함께 조정).
+export const FONT_SCALE = 1.15;
+
+// StyleSheet 생성 직전에 모든 fontSize를 FONT_SCALE배로 스케일하고, 명시적
+// lineHeight도 같은 비율로 보정해 세로 리듬을 유지한다.
+function scaleTypography<T extends Record<string, any>>(defs: T): T {
+  for (const key of Object.keys(defs)) {
+    const s = defs[key];
+    if (s && typeof s.fontSize === 'number') {
+      const next = Math.round(s.fontSize * FONT_SCALE);
+      if (typeof s.lineHeight === 'number') {
+        s.lineHeight = Math.round(s.lineHeight * (next / s.fontSize));
+      }
+      s.fontSize = next;
+    }
+  }
+  return defs;
+}
+
 // LUCENT StyleSheet factory, extracted from the screen monolith. Depends only
 // on the palette + RN primitives (Platform/StyleSheet), so it stands alone.
 export const makeStyles = (C: Palette) =>
-  StyleSheet.create({
+  StyleSheet.create(scaleTypography({
   app: { flex: 1, backgroundColor: C.background },
   onboardingApp: { flex: 1, backgroundColor: C.background },
   onboardingContent: { padding: 22, paddingBottom: 40 },
@@ -905,7 +925,7 @@ export const makeStyles = (C: Palette) =>
   navLabel: { color: C.textMuted, fontSize: 9, fontWeight: '600', marginTop: 3 },
   navLabelSelected: { color: C.primary, fontWeight: '800' },
   navNotificationDot: { position: 'absolute', right: 9, top: 5, width: 7, height: 7, borderRadius: 4, backgroundColor: C.danger, borderWidth: 1, borderColor: C.surface },
-  });
+  }));
 
 export type AppStyles = ReturnType<typeof makeStyles>;
 
