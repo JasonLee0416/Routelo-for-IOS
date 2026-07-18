@@ -1,0 +1,86 @@
+# Routelo iOS 릴리스 자동화.
+#
+# 사전 준비(최초 1회):
+#   1) 유료 Apple Developer Program 가입 + App Store Connect에 앱 등록
+#   2) App Store Connect API 키 발급(Users and Access > Integrations > App Store Connect API)
+#      → .p8 파일 + Key ID + Issuer ID
+#   3) ios/에서  `bundle install`
+#   4) 아래 환경변수 설정(예: ios/fastlane/.env, git 미추적):
+#        ASC_KEY_ID, ASC_ISSUER_ID, ASC_KEY_PATH(=AuthKey_XXXX.p8 경로)
+#        DEVELOPMENT_TEAM(=10자리 팀 ID)
+#
+# 사용:
+#   bundle exec fastlane beta      # TestFlight 업로드(심사 없이 테스터 배포)
+#   bundle exec fastlane release   # App Store 업로드 + 심사 제출
+#
+# JS/네이티브 변경 모두 이 lane 하나로 빌드→서명→업로드→(release는 심사제출)까지 처리된다.
+
+default_platform(:ios)
+
+WORKSPACE = "Routelo.xcworkspace"
+SCHEME = "Routelo"
+
+platform :ios do
+  before_all do
+    setup_ci if ENV["CI"]
+    if ENV["ASC_KEY_ID"] && ENV["ASC_ISSUER_ID"]
+      app_store_connect_api_key(
+        key_id: ENV["ASC_KEY_ID"],
+        issuer_id: ENV["ASC_ISSUER_ID"],
+        key_filepath: ENV["ASC_KEY_PATH"],
+        key_content: ENV["ASC_KEY_P8"], # p8 파일 대신 내용을 직접 넘길 때
+        in_house: false,
+      )
+    end
+  end
+
+  desc "빌드 번호를 App Store Connect 최신값+1로 올린다(중복 업로드 방지)"
+  lane :bump do
+    latest = latest_testflight_build_number(initial_build_number: 0)
+    increment_build_number(
+      xcodeproj: "Routelo.xcodeproj",
+      build_number: latest + 1,
+    )
+  end
+
+  desc "Release 아카이브를 빌드한다(자동 서명, App Store 배포용)"
+  private_lane :archive do
+    build_app(
+      workspace: WORKSPACE,
+      scheme: SCHEME,
+      configuration: "Release",
+      export_method: "app-store",
+      xcargs: "-allowProvisioningUpdates",
+      export_options: { signingStyle: "automatic" },
+      output_directory: "build/fastlane",
+      clean: true,
+    )
+  end
+
+  desc "TestFlight 업로드 — 심사 없이 내부/외부 테스터에게 빠르게 배포"
+  lane :beta do
+    bump
+    archive
+    upload_to_testflight(
+      skip_waiting_for_build_processing: true,
+      distribute_external: false,
+    )
+  end
+
+  desc "App Store 정식 릴리스 — 업로드 후 심사 제출(승인 시 자동 출시)"
+  lane :release do
+    bump
+    archive
+    upload_to_app_store(
+      submit_for_review: true,
+      automatic_release_after_approval: true,
+      force: true, # 메타데이터 HTML 미리보기 단계 건너뜀
+      # 메타데이터/스크린샷은 App Store Connect UI에서 관리(초기엔 이게 안전).
+      # fastlane/metadata 트리로 옮기면 아래 두 값을 false로 바꿔 코드로 관리 가능.
+      skip_metadata: true,
+      skip_screenshots: true,
+      precheck_include_in_app_purchases: false,
+      submission_information: { add_id_info_uses_idfa: false },
+    )
+  end
+end

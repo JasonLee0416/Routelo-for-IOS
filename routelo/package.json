@@ -36,6 +36,8 @@
     "ios": "react-native run-ios",
     "build:ios:device": "sh scripts/build-ios-device.sh",
     "cleanup:device-test": "node scripts/cleanup-device-test.mjs",
+    "release:beta": "cd ios && bundle exec fastlane beta",
+    "release:appstore": "cd ios && bundle exec fastlane release",
     "test": "jest",
     "test:ci": "jest --runInBand",
     "verify:ocr-models": "node scripts/verify-ocr-models.mjs",

@@ -28,6 +28,9 @@ export type RevenueCostSettings = {
   fuelTankCapacity: number;
   fuelType: 'gasoline' | 'diesel' | 'lpg' | 'hybrid' | 'electric' | 'other';
   profitBasis: 'daily' | 'monthly';
+  // 다중 차량 관리(Pro): 주유·주행 기록에 일관된 라벨을 붙이기 위한 등록 차량 목록.
+  // 기존 저장본 호환 위해 optional.
+  vehicleRegistry?: string[];
 };
 
 export type PrivacySettings = {
@@ -100,6 +103,16 @@ export type AccountSettings = {
   syncEnabled: boolean;
 };
 
+// 품질 개선용 익명 리포트 제공 동의(옵트인, 기본 OFF). 기존 저장본 호환 위해 optional.
+export type TelemetrySettings = {
+  enabled: boolean;
+};
+
+// 요금제 자격. 베타에는 결제 없이 게이팅만 두고, 미지정은 파운딩 멤버(Pro)로 본다.
+export type EntitlementSettings = {
+  plan?: 'free' | 'pro';
+};
+
 export type RouteloSettings = {
   schemaVersion: typeof SETTINGS_SCHEMA_VERSION;
   business: BusinessRuleSettings;
@@ -112,6 +125,8 @@ export type RouteloSettings = {
   appearance: AppearanceSettings;
   route: RoutePreferenceSettings;
   account: AccountSettings;
+  telemetry?: TelemetrySettings;
+  entitlement?: EntitlementSettings;
 };
 
 export type LegacyFeeSettings = {

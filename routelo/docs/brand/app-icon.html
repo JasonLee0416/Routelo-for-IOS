@@ -1,0 +1,69 @@
+<!doctype html>
+<html>
+<head><meta charset="utf-8"><style>html,body{margin:0;padding:0}</style></head>
+<body>
+<svg id="icon" width="1024" height="1024" viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <!-- background -->
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#EAF4FF"/>
+      <stop offset="1" stop-color="#CBE4FB"/>
+    </linearGradient>
+    <radialGradient id="bgGlow" cx="0.5" cy="0.32" r="0.72">
+      <stop offset="0" stop-color="#FFFFFF" stop-opacity="0.75"/>
+      <stop offset="1" stop-color="#FFFFFF" stop-opacity="0"/>
+    </radialGradient>
+    <!-- chevron -->
+    <linearGradient id="chev" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#6FB4FF"/>
+      <stop offset="1" stop-color="#2C7CEF"/>
+    </linearGradient>
+    <!-- petals -->
+    <radialGradient id="petal" cx="0.5" cy="0.28" r="0.85">
+      <stop offset="0" stop-color="#FFD9E4"/>
+      <stop offset="0.5" stop-color="#FFA9C6"/>
+      <stop offset="1" stop-color="#F2769F"/>
+    </radialGradient>
+    <!-- flower center -->
+    <radialGradient id="pollen" cx="0.42" cy="0.38" r="0.7">
+      <stop offset="0" stop-color="#FFE9A6"/>
+      <stop offset="0.6" stop-color="#F9C55C"/>
+      <stop offset="1" stop-color="#EFA637"/>
+    </radialGradient>
+    <filter id="softShadow" x="-40%" y="-40%" width="180%" height="180%">
+      <feDropShadow dx="0" dy="14" stdDeviation="20" flood-color="#1E4E8C" flood-opacity="0.22"/>
+    </filter>
+    <filter id="flowerShadow" x="-60%" y="-60%" width="220%" height="220%">
+      <feDropShadow dx="0" dy="12" stdDeviation="16" flood-color="#B23A63" flood-opacity="0.28"/>
+    </filter>
+  </defs>
+
+  <!-- background -->
+  <rect width="1024" height="1024" fill="url(#bg)"/>
+  <rect width="1024" height="1024" fill="url(#bgGlow)"/>
+
+  <!-- chevron mark (route identity) -->
+  <path d="M 250 828 L 512 452 L 774 828"
+        fill="none" stroke="url(#chev)" stroke-width="132"
+        stroke-linecap="round" stroke-linejoin="round" filter="url(#softShadow)"/>
+  <!-- subtle top highlight on chevron -->
+  <path d="M 300 792 L 512 486 L 724 792"
+        fill="none" stroke="#FFFFFF" stroke-opacity="0.20" stroke-width="26"
+        stroke-linecap="round" stroke-linejoin="round"/>
+
+  <!-- flower blossom nestled at the apex -->
+  <g transform="translate(512,300)" filter="url(#flowerShadow)">
+    <g>
+      <ellipse cx="0" cy="-86" rx="60" ry="112" fill="url(#petal)" transform="rotate(0)"/>
+      <ellipse cx="0" cy="-86" rx="60" ry="112" fill="url(#petal)" transform="rotate(60)"/>
+      <ellipse cx="0" cy="-86" rx="60" ry="112" fill="url(#petal)" transform="rotate(120)"/>
+      <ellipse cx="0" cy="-86" rx="60" ry="112" fill="url(#petal)" transform="rotate(180)"/>
+      <ellipse cx="0" cy="-86" rx="60" ry="112" fill="url(#petal)" transform="rotate(240)"/>
+      <ellipse cx="0" cy="-86" rx="60" ry="112" fill="url(#petal)" transform="rotate(300)"/>
+    </g>
+    <circle cx="0" cy="0" r="52" fill="url(#pollen)"/>
+    <circle cx="-14" cy="-14" r="14" fill="#FFFFFF" fill-opacity="0.45"/>
+  </g>
+</svg>
+</body>
+</html>

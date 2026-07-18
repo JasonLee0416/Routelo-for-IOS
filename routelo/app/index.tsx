@@ -1,9 +1,10 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { ReactNode, useEffect, useMemo, useRef, useState } from 'react';
 import {
   AccessibilityInfo,
   ActivityIndicator,
   Alert,
   Animated,
+  AppState,
   Easing,
   Image,
   KeyboardAvoidingView,
@@ -120,6 +121,37 @@ import {
   optimizeByNearestNeighbor,
 } from './services/maps';
 import { NAV_APP_LABEL, openNavigation } from './services/navigation';
+import { flush as flushTelemetry, pendingReportCount, recordScanReview } from './telemetry';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import {
+  AppPlan,
+  FREE_DAILY_SCAN_LIMIT,
+  isFeatureEnabled,
+  PRO_FEATURES,
+  remainingFreeScans,
+  resolvePlan,
+} from './entitlements/plan';
+import { buildRevenueReport, ReportRange } from './reports/revenueReport';
+import {
+  addVehicle,
+  buildFleetSummary,
+  dedupeVehicles,
+  isValidVehicleLabel,
+  MAX_VEHICLES,
+  removeVehicle,
+} from './vehicles/registry';
+import { MAX_FONT_MULTIPLIER } from './theme/dynamicType';
+import { getTodayScanCount, incrementScanCount } from './entitlements/usage';
+import { ErrorBoundary } from './reliability/ErrorBoundary';
+import { installGlobalErrorHandler } from './reliability/errorReporting';
+import { LockGate } from './security/LockGate';
+import {
+  clearLockoutState,
+  clearPin,
+  isValidPin,
+  setPin,
+} from './security/appLock';
+import { toCsv } from './export/csv';
 import {
   bucketProfit,
   DailyProfitSummary,
@@ -216,13 +248,25 @@ const tabs: Array<{
 ];
 
 
+// 온보딩 기본 플레이스홀더 이름은 개인화에서 제외 — 실제 사용자가 입력한
+// 이름일 때만 "안녕하세요, ㅇㅇㅇ 기사님"으로 부른다.
+const GREETING_PLACEHOLDER_NAMES = new Set(['게스트 기사', '업무 기사', '게스트']);
+
+function driverGreetingName(account?: AccountState): string | undefined {
+  const name = account?.profile.displayName?.trim();
+  if (!name || GREETING_PLACEHOLDER_NAMES.has(name)) return undefined;
+  return name;
+}
+
 function HomeScreen({
   deliveries,
+  greetingName,
   onDeliveryPress,
   onSeeAll,
   onNotifications,
 }: {
   deliveries: Delivery[];
+  greetingName?: string;
   onDeliveryPress: (delivery: Delivery) => void;
   onSeeAll: () => void;
   onNotifications: () => void;
@@ -239,7 +283,7 @@ function HomeScreen({
     <ScrollView contentContainerStyle={styles.screenContent} showsVerticalScrollIndicator={false}>
       <ScreenHeader
         eyebrow="ROUTELO · 오늘의 운영"
-        title="안녕하세요, 기사님"
+        title={greetingName ? `안녕하세요, ${greetingName} 기사님` : '안녕하세요, 기사님'}
         subtitle="마감 시간과 우선 배송을 먼저 확인하세요."
         notificationCount={3}
         onNotificationPress={onNotifications}
@@ -366,12 +410,14 @@ function DeliveryListScreen({
   hiddenDeliveries = [],
   onDeliveryPress,
   onUnhide,
+  onDeleteDelivery,
   onNotifications,
 }: {
   deliveries: Delivery[];
   hiddenDeliveries?: Delivery[];
   onDeliveryPress: (delivery: Delivery) => void;
   onUnhide?: (id: string) => void;
+  onDeleteDelivery?: (delivery: Delivery) => void;
   onNotifications: () => void;
 }) {
   const { C, styles, dark } = useTheme();
@@ -533,13 +579,25 @@ function DeliveryListScreen({
         </Text>
       )}
       <View style={styles.deliveryList}>
-        {filtered.map((delivery) => (
-          <DeliveryCard
-            key={delivery.id}
-            delivery={delivery}
-            onPress={() => onDeliveryPress(delivery)}
-          />
-        ))}
+        {filtered.map((delivery) =>
+          onDeleteDelivery ? (
+            <SwipeToDeleteRow
+              key={delivery.id}
+              onDelete={() => onDeleteDelivery(delivery)}
+            >
+              <DeliveryCard
+                delivery={delivery}
+                onPress={() => onDeliveryPress(delivery)}
+              />
+            </SwipeToDeleteRow>
+          ) : (
+            <DeliveryCard
+              key={delivery.id}
+              delivery={delivery}
+              onPress={() => onDeliveryPress(delivery)}
+            />
+          ),
+        )}
       </View>
       {hiddenDeliveries.length > 0 && (
         <View style={{ marginTop: 18 }}>
@@ -609,7 +667,85 @@ function DeliveryListScreen({
   );
 }
 
+// 행을 왼쪽으로 밀면 삭제 버튼이 드러나고 그 자리에 "고정"된다. 사용자가 삭제
+// 버튼을 눌러야만 확인 다이얼로그(onDelete)가 뜨므로 실수로 지워지지 않는다.
+// 오른쪽으로 밀거나 버튼을 누르면 닫힌다. 네이티브 제스처 의존성 없이 구현하고,
+// 수평 이동이 뚜렷할 때만 제스처를 가로채 세로 스크롤과 충돌하지 않는다.
+const SWIPE_REVEAL_W = 96;
+
+function SwipeToDeleteRow({
+  onDelete,
+  children,
+}: {
+  onDelete: () => void;
+  children: ReactNode;
+}) {
+  const { C } = useTheme();
+  const translateX = useRef(new Animated.Value(0)).current;
+  const openRef = useRef(false);
+  const settleTo = (to: number) => {
+    openRef.current = to !== 0;
+    Animated.spring(translateX, {
+      toValue: to,
+      useNativeDriver: true,
+      bounciness: 0,
+      speed: 20,
+    }).start();
+  };
+  const pan = useRef(
+    PanResponder.create({
+      onMoveShouldSetPanResponder: (_e, g) =>
+        Math.abs(g.dx) > Math.abs(g.dy) * 1.5 && Math.abs(g.dx) > 8,
+      onPanResponderMove: (_e, g) => {
+        const base = openRef.current ? -SWIPE_REVEAL_W : 0;
+        translateX.setValue(
+          Math.min(0, Math.max(base + g.dx, -SWIPE_REVEAL_W - 24)),
+        );
+      },
+      onPanResponderRelease: (_e, g) => {
+        const base = openRef.current ? -SWIPE_REVEAL_W : 0;
+        // 절반 이상 열렸으면 열린 채 고정, 아니면 닫는다.
+        settleTo(base + g.dx <= -SWIPE_REVEAL_W / 2 ? -SWIPE_REVEAL_W : 0);
+      },
+      onPanResponderTerminate: () =>
+        settleTo(openRef.current ? -SWIPE_REVEAL_W : 0),
+    }),
+  ).current;
+  return (
+    <View style={{ position: 'relative' }}>
+      <Pressable
+        onPress={() => {
+          onDelete();
+          settleTo(0);
+        }}
+        style={{
+          position: 'absolute',
+          right: 0,
+          top: 0,
+          bottom: 0,
+          width: SWIPE_REVEAL_W,
+          backgroundColor: C.danger,
+          borderRadius: 22,
+          alignItems: 'center',
+          justifyContent: 'center',
+          flexDirection: 'row',
+          gap: 5,
+        }}
+      >
+        <Ionicons name="trash-outline" size={18} color="#FFFFFF" />
+        <Text style={{ color: '#FFFFFF', fontWeight: '800', fontSize: 13 }}>
+          삭제
+        </Text>
+      </Pressable>
+      <Animated.View style={{ transform: [{ translateX }] }} {...pan.panHandlers}>
+        {children}
+      </Animated.View>
+    </View>
+  );
+}
+
 const ROUTE_ROW_H = 66;
+const ROUTE_DELETE_W = 96;
 
 // JS 전용(네이티브 의존성 없음) 드래그 재정렬 리스트. 배송지 행을 꾹 눌러 위아래로
 // 끌면 순서가 바뀐다. 살짝 누르면(이동<임계) 상세로 이동. PanResponder는 useRef로 한 번만
@@ -618,10 +754,12 @@ function DraggableRouteList({
   items,
   onReorder,
   onPressRow,
+  onRequestDelete,
 }: {
   items: Delivery[];
   onReorder: (next: Delivery[]) => void;
   onPressRow: (delivery: Delivery) => void;
+  onRequestDelete?: (delivery: Delivery) => void;
 }) {
   const { C, styles } = useTheme();
   const [data, setData] = useState<Delivery[]>(items);
@@ -632,13 +770,25 @@ function DraggableRouteList({
   useEffect(() => {
     dataRef.current = data;
   }, [data]);
-  const cbRef = useRef({ onReorder, onPressRow });
+  const cbRef = useRef({ onReorder, onPressRow, onRequestDelete });
   useEffect(() => {
-    cbRef.current = { onReorder, onPressRow };
+    cbRef.current = { onReorder, onPressRow, onRequestDelete };
   });
 
   const [active, setActive] = useState<number | null>(null);
+  const [swiping, setSwiping] = useState(false);
+  // 왼쪽으로 밀어 "열린 채 고정"된 행. 삭제 버튼을 눌러야 실제 삭제된다.
+  const [openIndex, setOpenIndex] = useState<number | null>(null);
+  const openIndexRef = useRef<number | null>(null);
+  useEffect(() => {
+    openIndexRef.current = openIndex;
+  }, [openIndex]);
+
   const dragY = useRef(new Animated.Value(0)).current;
+  const dragX = useRef(new Animated.Value(0)).current; // 제스처 중 실시간 이동
+  const openX = useRef(new Animated.Value(0)).current; // 열린 채 고정된 행의 위치
+  // 세로 드래그(순서 변경)와 가로 스와이프(삭제)를 한 제스처에서 구분한다.
+  const mode = useRef<'idle' | 'drag' | 'swipe'>('idle');
   const start = useRef(0);
   const hover = useRef(0);
   const moved = useRef(false);
@@ -646,10 +796,33 @@ function DraggableRouteList({
   const clampIndex = (value: number) =>
     Math.max(0, Math.min(dataRef.current.length - 1, value));
 
+  const closeOpen = () => {
+    setOpenIndex(null);
+    openIndexRef.current = null;
+    Animated.spring(openX, {
+      toValue: 0,
+      useNativeDriver: true,
+      bounciness: 0,
+      speed: 20,
+    }).start();
+  };
+  const openRow = (idx: number) => {
+    setOpenIndex(idx);
+    openIndexRef.current = idx;
+    openX.setValue(0);
+    Animated.spring(openX, {
+      toValue: -ROUTE_DELETE_W,
+      useNativeDriver: true,
+      bounciness: 0,
+      speed: 20,
+    }).start();
+  };
+
   const pan = useRef(
     PanResponder.create({
       onStartShouldSetPanResponder: () => true,
-      onMoveShouldSetPanResponder: (_e, g) => Math.abs(g.dy) > 4,
+      onMoveShouldSetPanResponder: (_e, g) =>
+        Math.abs(g.dy) > 4 || Math.abs(g.dx) > 8,
       onPanResponderGrant: (e) => {
         const idx = clampIndex(
           Math.floor(e.nativeEvent.locationY / ROUTE_ROW_H),
@@ -657,84 +830,195 @@ function DraggableRouteList({
         start.current = idx;
         hover.current = idx;
         moved.current = false;
+        mode.current = 'idle';
         dragY.setValue(0);
+        dragX.setValue(0);
         setActive(idx);
       },
       onPanResponderMove: (_e, g) => {
-        if (Math.abs(g.dy) > 4) moved.current = true;
-        dragY.setValue(g.dy);
-        hover.current = clampIndex(start.current + Math.round(g.dy / ROUTE_ROW_H));
+        // 첫 유의미한 이동으로 방향(순서변경 vs 삭제)을 확정하고 고정한다.
+        if (mode.current === 'idle') {
+          if (Math.abs(g.dx) > 6 && Math.abs(g.dx) > Math.abs(g.dy) * 1.5) {
+            mode.current = 'swipe';
+            setSwiping(true);
+            if (
+              openIndexRef.current !== null &&
+              openIndexRef.current !== start.current
+            ) {
+              closeOpen();
+            }
+          } else if (Math.abs(g.dy) > 4) {
+            mode.current = 'drag';
+            if (openIndexRef.current !== null) closeOpen();
+          }
+        }
+        if (mode.current === 'drag') {
+          moved.current = true;
+          dragY.setValue(g.dy);
+          hover.current = clampIndex(
+            start.current + Math.round(g.dy / ROUTE_ROW_H),
+          );
+        } else if (mode.current === 'swipe') {
+          moved.current = true;
+          const base =
+            openIndexRef.current === start.current ? -ROUTE_DELETE_W : 0;
+          dragX.setValue(
+            Math.min(0, Math.max(base + g.dx, -ROUTE_DELETE_W - 24)),
+          );
+        }
       },
-      onPanResponderRelease: () => {
+      onPanResponderRelease: (_e, g) => {
+        const idx = start.current;
         if (!moved.current) {
-          cbRef.current.onPressRow(dataRef.current[start.current]);
-        } else if (start.current !== hover.current) {
+          // 탭: 열린 행이 있으면 닫고, 없으면 상세로 이동.
+          if (openIndexRef.current !== null) {
+            closeOpen();
+          } else {
+            cbRef.current.onPressRow(dataRef.current[idx]);
+          }
+        } else if (mode.current === 'swipe') {
+          const base = openIndexRef.current === idx ? -ROUTE_DELETE_W : 0;
+          if (base + g.dx <= -ROUTE_DELETE_W / 2) openRow(idx);
+          else closeOpen();
+        } else if (mode.current === 'drag' && start.current !== hover.current) {
           const copy = [...dataRef.current];
           const [m] = copy.splice(start.current, 1);
           copy.splice(hover.current, 0, m);
           setData(copy);
           cbRef.current.onReorder(copy);
         }
+        mode.current = 'idle';
+        setSwiping(false);
         setActive(null);
         dragY.setValue(0);
+        dragX.setValue(0);
       },
       onPanResponderTerminate: () => {
+        mode.current = 'idle';
+        setSwiping(false);
         setActive(null);
         dragY.setValue(0);
+        dragX.setValue(0);
       },
     }),
   ).current;
 
   return (
-    <View
-      {...pan.panHandlers}
-      style={{ height: data.length * ROUTE_ROW_H, position: 'relative' }}
-    >
-      {data.map((delivery, index) => {
-        const isActive = index === active;
-        const RowView = isActive ? Animated.View : View;
-        return (
-          <RowView
-            key={delivery.id}
-            style={[
-              {
+    <View style={{ position: 'relative' }}>
+      <View
+        {...pan.panHandlers}
+        style={{ height: data.length * ROUTE_ROW_H, position: 'relative' }}
+      >
+        {data.map((delivery, index) => {
+          const isActive = index === active;
+          const isOpen = index === openIndex;
+          const showDeleteBg = (swiping && isActive) || isOpen;
+          const RowView = isActive || isOpen ? Animated.View : View;
+          const transform = isActive
+            ? [{ translateY: dragY }, { translateX: dragX }]
+            : isOpen
+              ? [{ translateX: openX }]
+              : undefined;
+          return (
+            <View
+              key={delivery.id}
+              style={{
                 position: 'absolute',
                 left: 0,
                 right: 0,
                 top: index * ROUTE_ROW_H,
                 height: ROUTE_ROW_H,
-                flexDirection: 'row',
-                alignItems: 'center',
-                paddingRight: 8,
-              },
-              isActive && {
-                transform: [{ translateY: dragY }],
-                zIndex: 20,
-                backgroundColor: C.surface,
-                borderRadius: 12,
-                shadowColor: '#000',
-                shadowOpacity: 0.18,
-                shadowRadius: 10,
-                shadowOffset: { width: 0, height: 4 },
-                elevation: 6,
-              },
-            ]}
-          >
-            <View style={styles.routeStackOrder}>
-              <Text style={styles.routeStackOrderText}>{index + 1}</Text>
+              }}
+            >
+              {showDeleteBg && (
+                <View
+                  style={{
+                    position: 'absolute',
+                    right: 0,
+                    top: 0,
+                    bottom: 0,
+                    width: ROUTE_DELETE_W,
+                    borderRadius: 12,
+                    backgroundColor: C.danger,
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: 5,
+                  }}
+                >
+                  <Ionicons name="trash-outline" size={18} color="#FFFFFF" />
+                  <Text
+                    style={{ color: '#FFFFFF', fontWeight: '800', fontSize: 13 }}
+                  >
+                    삭제
+                  </Text>
+                </View>
+              )}
+              <RowView
+                style={[
+                  {
+                    position: 'absolute',
+                    left: 0,
+                    right: 0,
+                    top: 0,
+                    height: ROUTE_ROW_H,
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    paddingRight: 8,
+                    backgroundColor: showDeleteBg ? C.surface : undefined,
+                  },
+                  transform ? { transform } : null,
+                  isActive && {
+                    zIndex: 20,
+                    backgroundColor: C.surface,
+                    borderRadius: 12,
+                    shadowColor: '#000',
+                    shadowOpacity: 0.18,
+                    shadowRadius: 10,
+                    shadowOffset: { width: 0, height: 4 },
+                    elevation: 6,
+                  },
+                ]}
+              >
+                <View style={styles.routeStackOrder}>
+                  <Text style={styles.routeStackOrderText}>{index + 1}</Text>
+                </View>
+                <View style={styles.routeStackBody}>
+                  <Text style={styles.routeStackTitle} numberOfLines={1}>
+                    {delivery.productName}
+                  </Text>
+                  <Text style={styles.routeStackAddress} numberOfLines={1}>
+                    {delivery.deliveryAddress}
+                  </Text>
+                </View>
+                <Ionicons
+                  name="reorder-three-outline"
+                  size={22}
+                  color={C.textMuted}
+                />
+              </RowView>
             </View>
-            <View style={styles.routeStackBody}>
-              <Text style={styles.routeStackTitle} numberOfLines={1}>
-                {delivery.productName}
-              </Text>
-              <Text style={styles.routeStackAddress} numberOfLines={1}>
-                {delivery.deliveryAddress}
-              </Text>
-            </View>
-            <Ionicons name="reorder-three-outline" size={22} color={C.textMuted} />
-          </RowView>
-        );
-      })}
+          );
+        })}
+      </View>
+      {openIndex !== null && data[openIndex] && (
+        // 열린 행의 드러난 영역 위에 놓이는 탭 가능한 삭제 버튼(컨테이너 제스처와 분리).
+        <Pressable
+          onPress={() => {
+            cbRef.current.onRequestDelete?.(dataRef.current[openIndex]);
+            closeOpen();
+          }}
+          style={{
+            position: 'absolute',
+            right: 0,
+            top: openIndex * ROUTE_ROW_H,
+            height: ROUTE_ROW_H,
+            width: ROUTE_DELETE_W,
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+        />
+      )}
     </View>
   );
 }
@@ -747,6 +1031,7 @@ function RouteScreen({
   endAddress,
   onSetLocations,
   onDeliveryPress,
+  onDeleteDelivery,
   onNotifications,
 }: {
   deliveries: Delivery[];
@@ -756,6 +1041,7 @@ function RouteScreen({
   endAddress?: string;
   onSetLocations: (start: string, end: string) => void;
   onDeliveryPress: (delivery: Delivery) => void;
+  onDeleteDelivery?: (delivery: Delivery) => void;
   onNotifications: () => void;
 }) {
   const { C, styles } = useTheme();
@@ -780,6 +1066,11 @@ function RouteScreen({
   useEffect(() => setStartInput(startAddress ?? ''), [startAddress]);
   useEffect(() => setEndInput(endAddress ?? ''), [endAddress]);
   const saveLocations = () => onSetLocations(startInput.trim(), endInput.trim());
+  // 입력값이 설정에 저장된 값과 같은지(=이미 저장돼 유지 중인지) 판단.
+  const locationsSaved =
+    startInput.trim() === (startAddress ?? '').trim() &&
+    endInput.trim() === (endAddress ?? '').trim();
+  const hasAnyLocation = !!(startInput.trim() || endInput.trim());
 
   const startNavigation = () => {
     if (!next) return;
@@ -800,28 +1091,131 @@ function RouteScreen({
         onNotificationPress={onNotifications}
       />
       <View style={styles.surfaceCard}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-          <Ionicons name="flag-outline" size={16} color={C.primary} />
-          <TextInput
-            value={startInput}
-            onChangeText={setStartInput}
-            onBlur={saveLocations}
-            placeholder="출발지 (예: 강남 꽃시장)"
-            placeholderTextColor={C.textMuted}
-            style={{ flex: 1, color: C.text, fontSize: 14, paddingVertical: 8 }}
-          />
-        </View>
-        <View style={styles.divider} />
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 8 }}>
-          <Ionicons name="location-outline" size={16} color={C.danger} />
-          <TextInput
-            value={endInput}
-            onChangeText={setEndInput}
-            onBlur={saveLocations}
-            placeholder="최종 도착지 (예: 자택 · 비우면 마지막 배송지)"
-            placeholderTextColor={C.textMuted}
-            style={{ flex: 1, color: C.text, fontSize: 14, paddingVertical: 8 }}
-          />
+        <View style={{ padding: 14 }}>
+          <View
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              marginBottom: 12,
+            }}
+          >
+            <Text style={{ color: C.navy, fontSize: 14, fontWeight: '800' }}>
+              출발지 · 도착지
+            </Text>
+            {locationsSaved && hasAnyLocation && (
+              <View
+                style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}
+              >
+                <Ionicons name="checkmark-circle" size={15} color={C.success} />
+                <Text
+                  style={{ color: C.success, fontSize: 11, fontWeight: '800' }}
+                >
+                  저장됨
+                </Text>
+              </View>
+            )}
+          </View>
+
+          <Text
+            style={{
+              color: C.textMuted,
+              fontSize: 11,
+              fontWeight: '700',
+              marginBottom: 5,
+            }}
+          >
+            출발지
+          </Text>
+          <View
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              gap: 8,
+              borderWidth: 1,
+              borderColor: C.outline,
+              borderRadius: 13,
+              paddingHorizontal: 12,
+              backgroundColor: C.background,
+            }}
+          >
+            <Ionicons name="flag-outline" size={16} color={C.primary} />
+            <TextInput
+              value={startInput}
+              onChangeText={setStartInput}
+              onBlur={saveLocations}
+              placeholder="예: 강남 꽃시장"
+              placeholderTextColor={C.textMuted}
+              style={{ flex: 1, color: C.text, fontSize: 14, paddingVertical: 11 }}
+            />
+          </View>
+
+          <Text
+            style={{
+              color: C.textMuted,
+              fontSize: 11,
+              fontWeight: '700',
+              marginTop: 12,
+              marginBottom: 5,
+            }}
+          >
+            최종 도착지{'  '}
+            <Text style={{ fontWeight: '400' }}>(비우면 마지막 배송지)</Text>
+          </Text>
+          <View
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              gap: 8,
+              borderWidth: 1,
+              borderColor: C.outline,
+              borderRadius: 13,
+              paddingHorizontal: 12,
+              backgroundColor: C.background,
+            }}
+          >
+            <Ionicons name="location-outline" size={16} color={C.danger} />
+            <TextInput
+              value={endInput}
+              onChangeText={setEndInput}
+              onBlur={saveLocations}
+              placeholder="예: 자택"
+              placeholderTextColor={C.textMuted}
+              style={{ flex: 1, color: C.text, fontSize: 14, paddingVertical: 11 }}
+            />
+          </View>
+
+          <Pressable
+            onPress={saveLocations}
+            disabled={locationsSaved}
+            style={{
+              marginTop: 14,
+              minHeight: 46,
+              borderRadius: 13,
+              backgroundColor: locationsSaved ? C.surfaceAlt : C.primary,
+              alignItems: 'center',
+              justifyContent: 'center',
+              flexDirection: 'row',
+              gap: 6,
+            }}
+          >
+            <Ionicons
+              name={locationsSaved ? 'checkmark' : 'bookmark-outline'}
+              size={16}
+              color={locationsSaved ? C.textMuted : '#FFFFFF'}
+            />
+            <Text
+              style={{
+                color: locationsSaved ? C.textMuted : '#FFFFFF',
+                fontWeight: '800',
+                fontSize: 13,
+              }}
+            >
+              {locationsSaved && hasAnyLocation
+                ? '저장됨 · 다음에도 유지됩니다'
+                : '출발·도착지 저장'}
+            </Text>
+          </Pressable>
         </View>
       </View>
       {!!next && (
@@ -899,6 +1293,7 @@ function RouteScreen({
             items={order}
             onReorder={setOrder}
             onPressRow={onDeliveryPress}
+            onRequestDelete={onDeleteDelivery}
           />
         ) : (
           order.map((delivery, index) => (
@@ -953,12 +1348,14 @@ function FuelFormModal({
   visible,
   initial,
   defaultVehicle,
+  vehicleRegistry = [],
   onClose,
   onSubmit,
 }: {
   visible: boolean;
   initial?: FuelLog;
   defaultVehicle?: string;
+  vehicleRegistry?: string[];
   onClose: () => void;
   onSubmit: (log: FuelLog) => void;
 }) {
@@ -1020,14 +1417,18 @@ function FuelFormModal({
 
   return (
     <Modal visible={visible} animationType="slide" onRequestClose={onClose}>
-      <SafeAreaView style={{ flex: 1, backgroundColor: C.background }}>
+      <SafeAreaView
+        style={{ flex: 1, backgroundColor: C.background }}
+        edges={['left', 'right', 'bottom']}
+      >
         <View
           style={{
             flexDirection: 'row',
             alignItems: 'center',
             justifyContent: 'space-between',
             paddingHorizontal: 18,
-            paddingVertical: 14,
+            paddingTop: insets.top + 14,
+            paddingBottom: 14,
             borderBottomWidth: 1,
             borderBottomColor: C.outline,
           }}
@@ -1082,6 +1483,52 @@ function FuelFormModal({
                     color: C.text,
                   }}
                 />
+                {field.key === 'vehicle' && vehicleRegistry.length > 0 && (
+                  <View
+                    style={{
+                      flexDirection: 'row',
+                      flexWrap: 'wrap',
+                      gap: 6,
+                      marginTop: 8,
+                    }}
+                  >
+                    {vehicleRegistry.map((label) => {
+                      const active =
+                        (values.vehicle ?? '').trim() === label;
+                      return (
+                        <Pressable
+                          key={label}
+                          onPress={() =>
+                            setValues((current) => ({
+                              ...current,
+                              vehicle: active ? '' : label,
+                            }))
+                          }
+                          accessibilityRole="button"
+                          accessibilityState={{ selected: active }}
+                          style={{
+                            paddingHorizontal: 12,
+                            paddingVertical: 6,
+                            borderRadius: 16,
+                            borderWidth: 1,
+                            borderColor: active ? C.primary : C.outline,
+                            backgroundColor: active ? C.primary : C.surfaceAlt,
+                          }}
+                        >
+                          <Text
+                            style={{
+                              fontSize: 12,
+                              fontWeight: '700',
+                              color: active ? '#FFFFFF' : C.textMuted,
+                            }}
+                          >
+                            {label}
+                          </Text>
+                        </Pressable>
+                      );
+                    })}
+                  </View>
+                )}
               </View>
             ))}
             <Text style={{ fontSize: 11, color: C.textMuted, marginTop: 2 }}>
@@ -1134,12 +1581,14 @@ function MileageFormModal({
   visible,
   initial,
   defaultVehicle,
+  vehicleRegistry = [],
   onClose,
   onSubmit,
 }: {
   visible: boolean;
   initial?: MileageLog;
   defaultVehicle?: string;
+  vehicleRegistry?: string[];
   onClose: () => void;
   onSubmit: (log: MileageLog) => void;
 }) {
@@ -1199,14 +1648,18 @@ function MileageFormModal({
 
   return (
     <Modal visible={visible} animationType="slide" onRequestClose={onClose}>
-      <SafeAreaView style={{ flex: 1, backgroundColor: C.background }}>
+      <SafeAreaView
+        style={{ flex: 1, backgroundColor: C.background }}
+        edges={['left', 'right', 'bottom']}
+      >
         <View
           style={{
             flexDirection: 'row',
             alignItems: 'center',
             justifyContent: 'space-between',
             paddingHorizontal: 18,
-            paddingVertical: 14,
+            paddingTop: insets.top + 14,
+            paddingBottom: 14,
             borderBottomWidth: 1,
             borderBottomColor: C.outline,
           }}
@@ -1261,6 +1714,51 @@ function MileageFormModal({
                     color: C.text,
                   }}
                 />
+                {field.key === 'vehicle' && vehicleRegistry.length > 0 && (
+                  <View
+                    style={{
+                      flexDirection: 'row',
+                      flexWrap: 'wrap',
+                      gap: 6,
+                      marginTop: 8,
+                    }}
+                  >
+                    {vehicleRegistry.map((label) => {
+                      const active = (values.vehicle ?? '').trim() === label;
+                      return (
+                        <Pressable
+                          key={label}
+                          onPress={() =>
+                            setValues((current) => ({
+                              ...current,
+                              vehicle: active ? '' : label,
+                            }))
+                          }
+                          accessibilityRole="button"
+                          accessibilityState={{ selected: active }}
+                          style={{
+                            paddingHorizontal: 12,
+                            paddingVertical: 6,
+                            borderRadius: 16,
+                            borderWidth: 1,
+                            borderColor: active ? C.primary : C.outline,
+                            backgroundColor: active ? C.primary : C.surfaceAlt,
+                          }}
+                        >
+                          <Text
+                            style={{
+                              fontSize: 12,
+                              fontWeight: '700',
+                              color: active ? '#FFFFFF' : C.textMuted,
+                            }}
+                          >
+                            {label}
+                          </Text>
+                        </Pressable>
+                      );
+                    })}
+                  </View>
+                )}
               </View>
             ))}
           </ScrollView>
@@ -1487,6 +1985,368 @@ function ProfitTrendCard({
   );
 }
 
+// 상세 수익 리포트(Pro). 손익 추이 위에 기간 비교·분류/지역/거래처 분해·평균/완료율을
+// 얹는다. 계산은 순수 함수(buildRevenueReport), 무료 사용자는 잠금 미리보기를 본다.
+type ReportPeriodKey = 'month' | 'last30' | 'all';
+
+function RevenueReportCard({
+  orders,
+  fuelLogs,
+  settings,
+  plan,
+  onUpgrade,
+}: {
+  orders: DeliveryOrder[];
+  fuelLogs: FuelLog[];
+  settings: RouteloSettings;
+  plan: AppPlan;
+  onUpgrade?: () => void;
+}) {
+  const { C } = useTheme();
+  const [periodKey, setPeriodKey] = useState<ReportPeriodKey>('month');
+  const enabled = isFeatureEnabled(plan, 'detailedRevenueReport');
+
+  const range = useMemo<ReportRange | undefined>(() => {
+    if (periodKey === 'all') return undefined;
+    const today = new Date();
+    const end = formatDateKey(today);
+    if (periodKey === 'month') {
+      const first = new Date(today.getFullYear(), today.getMonth(), 1);
+      return { start: formatDateKey(first), end };
+    }
+    const from = new Date(today);
+    from.setDate(today.getDate() - 29);
+    return { start: formatDateKey(from), end };
+  }, [periodKey]);
+
+  const report = useMemo(
+    () => (enabled ? buildRevenueReport(orders, fuelLogs, settings, range) : null),
+    [enabled, orders, fuelLogs, settings, range],
+  );
+
+  const won = (value: number) => {
+    const sign = value < 0 ? '-' : '';
+    const abs = Math.abs(Math.round(value))
+      .toString()
+      .replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+    return `${sign}${abs}`;
+  };
+
+  const cardBase = {
+    backgroundColor: C.surface,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: C.outline,
+    padding: 14,
+    marginBottom: 12,
+  } as const;
+
+  const header = (
+    <View
+      style={{
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        marginBottom: 12,
+      }}
+    >
+      <Text style={{ fontSize: 14, fontWeight: '800', color: C.text }}>
+        상세 수익 리포트
+      </Text>
+      <View
+        style={{
+          flexDirection: 'row',
+          alignItems: 'center',
+          gap: 3,
+          paddingHorizontal: 7,
+          paddingVertical: 2,
+          borderRadius: 6,
+          backgroundColor: C.warning + '22',
+        }}
+      >
+        <Ionicons name="star" size={10} color={C.warning} />
+        <Text style={{ fontSize: 10, fontWeight: '800', color: C.warning }}>
+          PRO
+        </Text>
+      </View>
+    </View>
+  );
+
+  if (!enabled) {
+    return (
+      <Pressable
+        onPress={onUpgrade}
+        accessibilityRole="button"
+        accessibilityLabel="상세 수익 리포트 · Pro 전용"
+        style={cardBase}
+      >
+        {header}
+        <View
+          style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}
+        >
+          <Ionicons name="lock-closed" size={18} color={C.textMuted} />
+          <View style={{ flex: 1 }}>
+            <Text style={{ fontSize: 13, fontWeight: '700', color: C.text }}>
+              기간 비교 · 분류/지역/거래처별 분석
+            </Text>
+            <Text style={{ fontSize: 11, color: C.textMuted, marginTop: 2 }}>
+              Pro로 전환하면 상세 리포트를 볼 수 있어요
+            </Text>
+          </View>
+          <Ionicons name="chevron-forward" size={16} color={C.textMuted} />
+        </View>
+      </Pressable>
+    );
+  }
+
+  if (!report) return null;
+
+  const periods: Array<{ key: ReportPeriodKey; label: string }> = [
+    { key: 'month', label: '이번 달' },
+    { key: 'last30', label: '지난 30일' },
+    { key: 'all', label: '전체' },
+  ];
+
+  const stat = (label: string, value: string, sub?: string) => (
+    <View style={{ flex: 1 }}>
+      <Text style={{ fontSize: 10, color: C.textMuted }}>{label}</Text>
+      <Text
+        style={{ fontSize: 15, fontWeight: '800', color: C.text, marginTop: 2 }}
+        numberOfLines={1}
+      >
+        {value}
+      </Text>
+      {sub ? (
+        <Text style={{ fontSize: 10, color: C.textMuted, marginTop: 1 }}>
+          {sub}
+        </Text>
+      ) : null}
+    </View>
+  );
+
+  const breakdownBlock = (
+    title: string,
+    rows: typeof report.byCategory,
+  ) => {
+    const top = rows.slice(0, 4);
+    return (
+      <View style={{ marginTop: 12 }}>
+        <Text
+          style={{
+            fontSize: 11,
+            fontWeight: '800',
+            color: C.textMuted,
+            marginBottom: 6,
+          }}
+        >
+          {title}
+        </Text>
+        {top.length === 0 ? (
+          <Text style={{ fontSize: 11, color: C.textMuted }}>데이터 없음</Text>
+        ) : (
+          top.map((row) => (
+            <View key={row.key} style={{ marginBottom: 6 }}>
+              <View
+                style={{
+                  flexDirection: 'row',
+                  justifyContent: 'space-between',
+                  marginBottom: 3,
+                }}
+              >
+                <Text style={{ fontSize: 12, color: C.text }} numberOfLines={1}>
+                  {row.label}{' '}
+                  <Text style={{ color: C.textMuted, fontSize: 10 }}>
+                    · {row.count}건
+                  </Text>
+                </Text>
+                <Text style={{ fontSize: 12, fontWeight: '700', color: C.text }}>
+                  {won(row.revenue)}원 ({Math.round(row.share * 100)}%)
+                </Text>
+              </View>
+              <View
+                style={{
+                  height: 4,
+                  borderRadius: 2,
+                  backgroundColor: C.surfaceAlt,
+                  overflow: 'hidden',
+                }}
+              >
+                <View
+                  style={{
+                    width: `${Math.max(2, Math.round(row.share * 100))}%`,
+                    height: 4,
+                    borderRadius: 2,
+                    backgroundColor: C.primary,
+                  }}
+                />
+              </View>
+            </View>
+          ))
+        )}
+      </View>
+    );
+  };
+
+  const cmp = report.comparison;
+  const cmpPct = cmp?.netDeltaPct;
+
+  return (
+    <View style={cardBase}>
+      <View
+        style={{
+          flexDirection: 'row',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          marginBottom: 12,
+        }}
+      >
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+          <Text style={{ fontSize: 14, fontWeight: '800', color: C.text }}>
+            상세 수익 리포트
+          </Text>
+          <View
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              gap: 3,
+              paddingHorizontal: 7,
+              paddingVertical: 2,
+              borderRadius: 6,
+              backgroundColor: C.warning + '22',
+            }}
+          >
+            <Ionicons name="star" size={10} color={C.warning} />
+            <Text style={{ fontSize: 10, fontWeight: '800', color: C.warning }}>
+              PRO
+            </Text>
+          </View>
+        </View>
+        <View style={{ flexDirection: 'row', gap: 4 }}>
+          {periods.map((item) => {
+            const active = periodKey === item.key;
+            return (
+              <Pressable
+                key={item.key}
+                onPress={() => setPeriodKey(item.key)}
+                accessibilityRole="button"
+                accessibilityState={{ selected: active }}
+                style={{
+                  paddingHorizontal: 10,
+                  paddingVertical: 5,
+                  borderRadius: 8,
+                  backgroundColor: active ? C.primary : C.surfaceAlt,
+                }}
+              >
+                <Text
+                  style={{
+                    fontSize: 11,
+                    fontWeight: '700',
+                    color: active ? '#FFFFFF' : C.textMuted,
+                  }}
+                >
+                  {item.label}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </View>
+      </View>
+
+      {report.totals.count === 0 ? (
+        <Text
+          style={{
+            fontSize: 12,
+            color: C.textMuted,
+            textAlign: 'center',
+            paddingVertical: 20,
+          }}
+        >
+          이 기간에는 배달 기록이 없습니다
+        </Text>
+      ) : (
+        <>
+          <View style={{ flexDirection: 'row', gap: 10 }}>
+            {stat('매출', `${won(report.totals.revenue)}원`, `${report.totals.count}건`)}
+            {stat(
+              '순이익',
+              `${won(report.totals.net)}원`,
+              report.averages.netMarginPct !== null
+                ? `마진 ${report.averages.netMarginPct}%`
+                : undefined,
+            )}
+          </View>
+          {cmp ? (
+            <View
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: 6,
+                marginTop: 10,
+                paddingTop: 10,
+                borderTopWidth: 1,
+                borderTopColor: C.outline,
+              }}
+            >
+              <Ionicons
+                name={cmp.netDelta >= 0 ? 'trending-up' : 'trending-down'}
+                size={14}
+                color={cmp.netDelta >= 0 ? C.success : C.danger}
+              />
+              <Text style={{ fontSize: 11, color: C.textMuted }}>
+                직전 기간 대비 순이익{' '}
+                <Text
+                  style={{
+                    fontWeight: '800',
+                    color: cmp.netDelta >= 0 ? C.success : C.danger,
+                  }}
+                >
+                  {cmp.netDelta >= 0 ? '+' : '−'}
+                  {won(Math.abs(cmp.netDelta))}원
+                  {cmpPct !== null ? ` (${cmp.netDelta >= 0 ? '+' : ''}${cmpPct}%)` : ''}
+                </Text>
+              </Text>
+            </View>
+          ) : null}
+
+          <View
+            style={{
+              flexDirection: 'row',
+              gap: 10,
+              marginTop: 12,
+              paddingTop: 10,
+              borderTopWidth: 1,
+              borderTopColor: C.outline,
+            }}
+          >
+            {stat('건당 평균', `${won(report.averages.revenuePerDelivery)}원`)}
+            {stat('활동일 평균', `${won(report.averages.revenuePerActiveDay)}원`)}
+            {stat('완료율', `${report.completion.rate}%`, `${report.completion.completed}/${report.completion.total}`)}
+          </View>
+
+          {breakdownBlock('분류별', report.byCategory)}
+          {breakdownBlock('지역별', report.byRegion)}
+          {breakdownBlock('거래처별', report.byVendor)}
+
+          {report.topDay ? (
+            <Text
+              style={{
+                fontSize: 11,
+                color: C.textMuted,
+                marginTop: 12,
+                paddingTop: 10,
+                borderTopWidth: 1,
+                borderTopColor: C.outline,
+              }}
+            >
+              최고 순익일 · {report.topDay.date} ({won(report.topDay.net)}원)
+            </Text>
+          ) : null}
+        </>
+      )}
+    </View>
+  );
+}
+
 function CalendarScreen({
   orders,
   fuelLogs,
@@ -1567,6 +2427,7 @@ function CalendarScreen({
     () => summarizeDailyProfit(orders, fuelLogs, settings),
     [fuelLogs, orders, settings],
   );
+  const reportPlan = resolvePlan(settings.entitlement);
   const selectedSummary = dailySummaries.get(selectedDate) || {
     revenue: 0,
     fuelCost: 0,
@@ -1714,6 +2575,18 @@ function CalendarScreen({
         </View>
       </View>
       <ProfitTrendCard daily={dailySummaries} />
+      <RevenueReportCard
+        orders={orders}
+        fuelLogs={fuelLogs}
+        settings={settings}
+        plan={reportPlan}
+        onUpgrade={() =>
+          Alert.alert(
+            'Pro 기능',
+            '상세 수익 리포트는 Pro 요금제에서 제공됩니다.\n설정 > 요금제에서 전환할 수 있어요.',
+          )
+        }
+      />
       <View
         style={{
           backgroundColor: C.surface,
@@ -1938,9 +2811,20 @@ function CalendarScreen({
       {(fuelLogs.length > 0 || mileageLogs.length > 0) &&
         (() => {
           const eff = summarizeEfficiency(fuelLogs, mileageLogs);
+          const defaultVehicleLabel =
+            settings.costs.vehicleModel?.trim() || '기본 차량';
           const byVehicle = summarizeEfficiencyByVehicle(fuelLogs, mileageLogs, {
-            defaultLabel: settings.costs.vehicleModel?.trim() || '기본 차량',
+            defaultLabel: defaultVehicleLabel,
           });
+          const isPro = reportPlan === 'pro';
+          const fleet = isPro
+            ? buildFleetSummary(
+                settings.costs.vehicleRegistry ?? [],
+                fuelLogs,
+                mileageLogs,
+                defaultVehicleLabel,
+              )
+            : [];
           const metrics: Array<[string, string]> = [
             ['연비', eff.kmPerLiter != null ? `${eff.kmPerLiter} km/L` : '-'],
             [
@@ -1992,7 +2876,77 @@ function CalendarScreen({
                   </View>
                 ))}
               </View>
-              {byVehicle.length > 1 && (
+              {isPro && fleet.length > 1 ? (
+                <View
+                  style={{
+                    marginTop: 12,
+                    borderTopWidth: 1,
+                    borderTopColor: C.outline,
+                    paddingTop: 10,
+                    gap: 8,
+                  }}
+                >
+                  <View
+                    style={{
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      gap: 5,
+                      marginBottom: 2,
+                    }}
+                  >
+                    <Text style={{ fontSize: 11, color: C.textMuted }}>
+                      차량별 비용
+                    </Text>
+                    <Ionicons name="star" size={9} color={C.warning} />
+                  </View>
+                  {fleet.map((row) => (
+                    <View key={row.label} style={{ gap: 3 }}>
+                      <View
+                        style={{
+                          flexDirection: 'row',
+                          justifyContent: 'space-between',
+                          alignItems: 'center',
+                        }}
+                      >
+                        <Text
+                          style={{
+                            fontSize: 12,
+                            fontWeight: '700',
+                            color: row.hasLogs ? C.text : C.textMuted,
+                          }}
+                          numberOfLines={1}
+                        >
+                          {row.label}
+                          {!row.hasLogs ? ' · 기록 없음' : ''}
+                        </Text>
+                        <Text style={{ fontSize: 12, color: C.textMuted }}>
+                          {formatWon(row.fuelCost)}원
+                          {row.kmPerLiter != null
+                            ? ` · ${row.kmPerLiter} km/L`
+                            : ''}
+                        </Text>
+                      </View>
+                      <View
+                        style={{
+                          height: 4,
+                          borderRadius: 2,
+                          backgroundColor: C.surfaceAlt,
+                          overflow: 'hidden',
+                        }}
+                      >
+                        <View
+                          style={{
+                            width: `${Math.max(2, Math.round(row.share * 100))}%`,
+                            height: 4,
+                            borderRadius: 2,
+                            backgroundColor: C.primary,
+                          }}
+                        />
+                      </View>
+                    </View>
+                  ))}
+                </View>
+              ) : byVehicle.length > 1 ? (
                 <View
                   style={{
                     marginTop: 12,
@@ -2031,7 +2985,7 @@ function CalendarScreen({
                     </View>
                   ))}
                 </View>
-              )}
+              ) : null}
             </View>
           );
         })()}
@@ -2395,14 +3349,59 @@ function SettingsScreen({
   settings,
   onSettingsChange,
   onEditAccount,
+  onExportCsv,
 }: {
   account?: AccountState;
   settings: RouteloSettings;
   onSettingsChange: (settings: RouteloSettings) => void;
   onEditAccount: () => void;
+  onExportCsv?: () => void;
 }) {
   const { C, styles } = useTheme();
   const [districtQuery, setDistrictQuery] = useState('');
+  const [pendingReports, setPendingReports] = useState(0);
+  const plan: AppPlan = resolvePlan(settings.entitlement);
+  const [scanToday, setScanToday] = useState(0);
+  const [newVehicle, setNewVehicle] = useState('');
+  const vehicleRegistry = dedupeVehicles(settings.costs.vehicleRegistry ?? []);
+  const addFleetVehicle = () => {
+    if (!isValidVehicleLabel(newVehicle)) {
+      Alert.alert('차량 이름 확인', '1~24자 이내로 입력해주세요.');
+      return;
+    }
+    const next = addVehicle(vehicleRegistry, newVehicle);
+    if (next.length === vehicleRegistry.length) {
+      Alert.alert(
+        '추가할 수 없음',
+        vehicleRegistry.length >= MAX_VEHICLES
+          ? `차량은 최대 ${MAX_VEHICLES}대까지 등록할 수 있어요.`
+          : '이미 등록된 차량입니다.',
+      );
+      return;
+    }
+    updateSettings({
+      ...settings,
+      costs: { ...settings.costs, vehicleRegistry: next },
+    });
+    setNewVehicle('');
+  };
+  const removeFleetVehicle = (label: string) => {
+    updateSettings({
+      ...settings,
+      costs: {
+        ...settings.costs,
+        vehicleRegistry: removeVehicle(vehicleRegistry, label),
+      },
+    });
+  };
+  useEffect(() => {
+    pendingReportCount()
+      .then(setPendingReports)
+      .catch(() => undefined);
+    getTodayScanCount(AsyncStorage, new Date())
+      .then(setScanToday)
+      .catch(() => undefined);
+  }, []);
   const [openRegions, setOpenRegions] = useState<{
     Seoul: boolean;
     Gyeonggi: boolean;
@@ -2490,6 +3489,332 @@ function SettingsScreen({
         <Pressable style={styles.iconButton} onPress={onEditAccount}>
           <Ionicons name="pencil-outline" size={19} color={C.primary} />
         </Pressable>
+      </View>
+
+      <SectionHeader title="멤버십" />
+      <View style={[styles.settingsGroup, { padding: 14 }]}>
+        <View
+          style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            marginBottom: 12,
+          }}
+        >
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+            <Ionicons
+              name={plan === 'pro' ? 'star' : 'star-outline'}
+              size={18}
+              color={plan === 'pro' ? C.warning : C.textMuted}
+            />
+            <Text style={{ color: C.navy, fontSize: 15, fontWeight: '800' }}>
+              {plan === 'pro' ? 'Pro · 파운딩 멤버' : '무료 요금제'}
+            </Text>
+          </View>
+          <Pressable
+            onPress={() =>
+              updateSettings({
+                ...settings,
+                entitlement: { plan: plan === 'pro' ? 'free' : 'pro' },
+              })
+            }
+            style={({ pressed }) => [
+              {
+                paddingHorizontal: 12,
+                minHeight: 34,
+                borderRadius: 10,
+                borderWidth: 1,
+                borderColor: C.outline,
+                alignItems: 'center',
+                justifyContent: 'center',
+              },
+              pressed && { opacity: 0.6 },
+            ]}
+          >
+            <Text style={{ color: C.primary, fontWeight: '700', fontSize: 12 }}>
+              {plan === 'pro' ? '무료 체험 미리보기' : 'Pro로 전환'}
+            </Text>
+          </Pressable>
+        </View>
+        {plan === 'free' && (
+          <View
+            style={{
+              padding: 10,
+              borderRadius: 10,
+              backgroundColor: C.surfaceAlt,
+              marginBottom: 12,
+            }}
+          >
+            <Text style={{ color: C.textMuted, fontSize: 12, fontWeight: '600' }}>
+              오늘 무료 스캔 {remainingFreeScans('free', scanToday)}/
+              {FREE_DAILY_SCAN_LIMIT}건 남음
+            </Text>
+          </View>
+        )}
+        {PRO_FEATURES.map((feature) => (
+          <View
+            key={feature.id}
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              gap: 10,
+              paddingVertical: 8,
+            }}
+          >
+            <Ionicons
+              name={plan === 'pro' ? 'checkmark-circle' : 'lock-closed'}
+              size={18}
+              color={plan === 'pro' ? C.success : C.textMuted}
+            />
+            <View style={{ flex: 1 }}>
+              <Text style={{ color: C.text, fontSize: 13, fontWeight: '700' }}>
+                {feature.label}
+              </Text>
+              <Text style={{ color: C.textMuted, fontSize: 11, marginTop: 2 }}>
+                {feature.desc}
+              </Text>
+            </View>
+          </View>
+        ))}
+        {plan === 'free' && (
+          <Pressable
+            onPress={() =>
+              Alert.alert(
+                'Pro 곧 출시',
+                'Pro 구독은 준비 중입니다. 관심 감사합니다! 베타 파운딩 멤버에게는 특별 혜택을 드립니다.',
+              )
+            }
+            style={({ pressed }) => [
+              {
+                marginTop: 10,
+                minHeight: 44,
+                borderRadius: 12,
+                backgroundColor: C.primary,
+                alignItems: 'center',
+                justifyContent: 'center',
+                flexDirection: 'row',
+                gap: 6,
+              },
+              pressed && { opacity: 0.85 },
+            ]}
+          >
+            <Ionicons name="star" size={16} color="#FFFFFF" />
+            <Text style={{ color: '#FFFFFF', fontWeight: '800', fontSize: 13 }}>
+              Pro 알아보기
+            </Text>
+          </Pressable>
+        )}
+      </View>
+
+      <SectionHeader title="보안" />
+      <View style={styles.settingsGroup}>
+        <SettingRow
+          icon="lock-closed-outline"
+          title="앱 잠금 (PIN)"
+          caption="앱을 열 때 PIN을 요구해 민감한 배송 정보를 보호합니다"
+          trailing={
+            <Switch
+              value={settings.security.appLockEnabled}
+              onValueChange={(on) => {
+                if (on) {
+                  Alert.prompt(
+                    '앱 잠금 PIN 설정',
+                    '4~6자리 숫자를 입력하세요',
+                    (pin?: string) => {
+                      if (pin && isValidPin(pin)) {
+                        setPin(pin).catch(() => undefined);
+                        clearLockoutState().catch(() => undefined);
+                        updateSettings({
+                          ...settings,
+                          security: {
+                            ...settings.security,
+                            appLockEnabled: true,
+                          },
+                        });
+                      } else {
+                        Alert.alert('PIN 오류', '4~6자리 숫자를 입력해주세요.');
+                      }
+                    },
+                    'secure-text',
+                  );
+                } else {
+                  clearPin().catch(() => undefined);
+                  clearLockoutState().catch(() => undefined);
+                  updateSettings({
+                    ...settings,
+                    security: { ...settings.security, appLockEnabled: false },
+                  });
+                }
+              }}
+              trackColor={{ true: C.primary }}
+            />
+          }
+        />
+      </View>
+
+      <SectionHeader title="데이터" />
+      <View style={styles.settingsGroup}>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="배달 기록 CSV 내보내기"
+          style={styles.settingRow}
+          onPress={() => {
+            if (plan === 'pro') onExportCsv?.();
+            else
+              Alert.alert(
+                'Pro 기능',
+                'CSV 내보내기는 Pro에서 사용할 수 있어요.',
+              );
+          }}
+        >
+          <View style={styles.settingIcon}>
+            <Ionicons name="download-outline" size={21} color={C.primary} />
+          </View>
+          <View style={styles.flex}>
+            <Text style={styles.settingTitle}>배달 기록 CSV 내보내기</Text>
+            <Text style={styles.settingCaption}>
+              {plan === 'pro' ? '엑셀에서 열 수 있는 CSV로 공유' : 'Pro 전용'}
+            </Text>
+          </View>
+          <Ionicons
+            name={plan === 'pro' ? 'chevron-forward' : 'lock-closed'}
+            size={18}
+            color={C.textMuted}
+          />
+        </Pressable>
+      </View>
+
+      <SectionHeader title="차량 관리" />
+      <View style={styles.settingsGroup}>
+        {plan !== 'pro' ? (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="다중 차량 관리 · Pro 전용"
+            style={styles.settingRow}
+            onPress={() =>
+              Alert.alert(
+                'Pro 기능',
+                '다중 차량 관리는 Pro에서 사용할 수 있어요.\n차량별 주유·연비·비용을 분리해서 볼 수 있습니다.',
+              )
+            }
+          >
+            <View style={styles.settingIcon}>
+              <Ionicons name="car-sport-outline" size={21} color={C.primary} />
+            </View>
+            <View style={styles.flex}>
+              <Text style={styles.settingTitle}>다중 차량 관리</Text>
+              <Text style={styles.settingCaption}>Pro 전용 · 차량별 비용 분리</Text>
+            </View>
+            <Ionicons name="lock-closed" size={18} color={C.textMuted} />
+          </Pressable>
+        ) : (
+          <View style={{ padding: 14 }}>
+            <Text
+              style={{
+                color: C.textMuted,
+                fontSize: 12,
+                fontWeight: '700',
+                marginBottom: 8,
+              }}
+            >
+              등록 차량 ({vehicleRegistry.length}/{MAX_VEHICLES})
+            </Text>
+            {vehicleRegistry.length === 0 ? (
+              <Text style={{ fontSize: 12, color: C.textMuted, marginBottom: 10 }}>
+                차량을 등록하면 주유·주행 기록에서 칩으로 빠르게 선택할 수 있어요.
+              </Text>
+            ) : (
+              <View
+                style={{
+                  flexDirection: 'row',
+                  flexWrap: 'wrap',
+                  gap: 8,
+                  marginBottom: 10,
+                }}
+              >
+                {vehicleRegistry.map((label) => (
+                  <View
+                    key={label}
+                    style={{
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      gap: 6,
+                      paddingLeft: 12,
+                      paddingRight: 8,
+                      paddingVertical: 6,
+                      borderRadius: 16,
+                      borderWidth: 1,
+                      borderColor: C.outline,
+                      backgroundColor: C.surfaceAlt,
+                    }}
+                  >
+                    <Text
+                      style={{ fontSize: 13, fontWeight: '700', color: C.text }}
+                    >
+                      {label}
+                    </Text>
+                    <Pressable
+                      onPress={() =>
+                        Alert.alert('차량 삭제', `'${label}'을(를) 목록에서 뺄까요?\n(기존 기록은 유지됩니다)`, [
+                          { text: '취소', style: 'cancel' },
+                          {
+                            text: '삭제',
+                            style: 'destructive',
+                            onPress: () => removeFleetVehicle(label),
+                          },
+                        ])
+                      }
+                      hitSlop={6}
+                      accessibilityRole="button"
+                      accessibilityLabel={`${label} 삭제`}
+                    >
+                      <Ionicons name="close-circle" size={18} color={C.textMuted} />
+                    </Pressable>
+                  </View>
+                ))}
+              </View>
+            )}
+            <View style={{ flexDirection: 'row', gap: 8 }}>
+              <TextInput
+                value={newVehicle}
+                onChangeText={setNewVehicle}
+                placeholder="예: 포터2 · 봉고3 · 전기트럭"
+                placeholderTextColor={C.textMuted}
+                onSubmitEditing={addFleetVehicle}
+                returnKeyType="done"
+                style={{
+                  flex: 1,
+                  backgroundColor: C.surfaceAlt,
+                  borderWidth: 1,
+                  borderColor: C.outline,
+                  borderRadius: 12,
+                  paddingHorizontal: 14,
+                  paddingVertical: 10,
+                  fontSize: 14,
+                  color: C.text,
+                }}
+              />
+              <Pressable
+                onPress={addFleetVehicle}
+                accessibilityRole="button"
+                accessibilityLabel="차량 추가"
+                style={({ pressed }) => [
+                  {
+                    paddingHorizontal: 16,
+                    justifyContent: 'center',
+                    borderRadius: 12,
+                    backgroundColor: C.primary,
+                  },
+                  pressed && { opacity: 0.85 },
+                ]}
+              >
+                <Text style={{ color: '#FFFFFF', fontSize: 14, fontWeight: '800' }}>
+                  추가
+                </Text>
+              </Pressable>
+            </View>
+          </View>
+        )}
       </View>
 
       <SectionHeader title="알림 설정" />
@@ -2818,6 +4143,73 @@ function SettingsScreen({
           }
         />
       </View>
+
+      <SectionHeader title="품질 개선" />
+      <View style={styles.settingsGroup}>
+        <SettingRow
+          icon="shield-checkmark-outline"
+          title="익명 품질 리포트 제공"
+          caption="OCR 인식 정확도 개선에 익명 데이터를 제공합니다 (선택)"
+          trailing={
+            <Switch
+              value={!!settings.telemetry?.enabled}
+              onValueChange={(enabled) => {
+                updateSettings({ ...settings, telemetry: { enabled } });
+                if (enabled) {
+                  flushTelemetry({ enabled: true })
+                    .then(() => pendingReportCount())
+                    .then(setPendingReports)
+                    .catch(() => undefined);
+                }
+              }}
+              trackColor={{ true: C.primary }}
+            />
+          }
+        />
+      </View>
+      <Text
+        style={{
+          color: C.textMuted,
+          fontSize: 11,
+          lineHeight: 17,
+          marginTop: 8,
+          paddingHorizontal: 4,
+        }}
+      >
+        켜면 인식 결과와 사용자가 고친 값의 차이를 익명으로 수집해 정확도 개선에
+        사용합니다. 이름·전화·주소 같은 개인정보는 형태만 남기고 마스킹하며(예:
+        홍길동→○○○, 010-…→NNN-…), 영수증 사진은 전송하지 않습니다. 언제든 끌 수
+        있습니다.
+      </Text>
+      {!!settings.telemetry?.enabled && (
+        <Pressable
+          onPress={() => {
+            flushTelemetry({ enabled: true })
+              .then(() => pendingReportCount())
+              .then(setPendingReports)
+              .catch(() => undefined);
+          }}
+          style={({ pressed }) => [
+            {
+              marginTop: 10,
+              minHeight: 42,
+              borderRadius: 12,
+              borderWidth: 1,
+              borderColor: C.outline,
+              alignItems: 'center',
+              justifyContent: 'center',
+              flexDirection: 'row',
+              gap: 6,
+            },
+            pressed && { opacity: 0.6 },
+          ]}
+        >
+          <Ionicons name="cloud-upload-outline" size={16} color={C.primary} />
+          <Text style={{ color: C.primary, fontWeight: '700', fontSize: 13 }}>
+            지금 보내기{pendingReports > 0 ? ` (대기 ${pendingReports}건)` : ''}
+          </Text>
+        </Pressable>
+      )}
 
       <SectionHeader title="앱 설정" />
       <View style={styles.settingsGroup}>
@@ -3614,14 +5006,20 @@ function DeliveryFormModal({
 
   return (
     <Modal visible={visible} animationType="slide" onRequestClose={onClose}>
-      <SafeAreaView style={{ flex: 1, backgroundColor: C.background }}>
+      <SafeAreaView
+        style={{ flex: 1, backgroundColor: C.background }}
+        edges={['left', 'right', 'bottom']}
+      >
         <View
           style={{
             flexDirection: 'row',
             alignItems: 'center',
             justifyContent: 'space-between',
             paddingHorizontal: 18,
-            paddingVertical: 14,
+            // Modal 안에서는 SafeAreaView 상단 인셋이 적용되지 않아 X가 노치에
+            // 파묻히므로 인셋을 직접 더해 헤더를 내린다.
+            paddingTop: insets.top + 14,
+            paddingBottom: 14,
             borderBottomWidth: 1,
             borderBottomColor: C.outline,
           }}
@@ -3629,7 +5027,7 @@ function DeliveryFormModal({
           <Text style={{ fontSize: 18, fontWeight: '800', color: C.text }}>
             {editing ? '배달 수정' : '배달 직접 추가'}
           </Text>
-          <Pressable onPress={onClose} hitSlop={8}>
+          <Pressable onPress={onClose} hitSlop={10}>
             <Ionicons name="close" size={24} color={C.text} />
           </Pressable>
         </View>
@@ -3743,6 +5141,9 @@ function OcrScannerModal({
   onRegister: (delivery: Delivery, receiptImageUri?: string) => void;
 }) {
   const { C, styles } = useTheme();
+  // Modal 안에서는 SafeAreaView 컴포넌트가 상단 인셋을 적용하지 못하는 경우가 있어
+  // (노치/다이나믹 아일랜드 밑으로 X가 파묻힘) 인셋을 훅으로 직접 읽어 헤더에 준다.
+  const insets = useSafeAreaInsets();
   const [stage, setStage] = useState<ScanStage>('capture');
   const [imageUri, setImageUri] = useState<string>();
   const [assetInfo, setAssetInfo] = useState<{ width?: number; height?: number; fileSize?: number }>({});
@@ -3909,6 +5310,12 @@ function OcrScannerModal({
       longitude: 0,
     };
     onRegister(delivery, imageUri);
+    // 품질 리포트(옵트인): OCR 원본↔사용자 확정 교정쌍을 익명·비식별로 수집.
+    if (result) {
+      recordScanReview(result, fields, {
+        enabled: !!settings.telemetry?.enabled,
+      }).catch(() => undefined);
+    }
     Alert.alert('등록 완료', '검수된 OCR 정보가 오늘의 배달 목록에 추가되었습니다.');
     onClose();
   };
@@ -3917,10 +5324,10 @@ function OcrScannerModal({
 
   return (
     <Modal visible={visible} animationType="slide" onRequestClose={onClose}>
-      <SafeAreaView style={styles.scannerApp}>
+      <SafeAreaView style={styles.scannerApp} edges={['left', 'right', 'bottom']}>
         <StatusBar barStyle="dark-content" />
-        <View style={styles.scannerHeader}>
-          <Pressable style={styles.iconButton} onPress={onClose}>
+        <View style={[styles.scannerHeader, { paddingTop: insets.top + 12 }]}>
+          <Pressable style={styles.iconButton} onPress={onClose} hitSlop={10}>
             <Ionicons name="close" size={22} color={C.text} />
           </Pressable>
           <View style={styles.scannerHeaderCopy}>
@@ -4263,6 +5670,83 @@ export default function RouteloApp() {
   const [settings, setSettings] = useState<RouteloSettings>(
     DEFAULT_ROUTELO_SETTINGS,
   );
+  // 품질 리포트(옵트인): 앱이 포그라운드로 돌아올 때 밀린 리포트를 전송 시도.
+  useEffect(() => {
+    if (!settings.telemetry?.enabled) return;
+    flushTelemetry({ enabled: true }).catch(() => undefined);
+    const sub = AppState.addEventListener('change', (state) => {
+      if (state === 'active') {
+        flushTelemetry({ enabled: true }).catch(() => undefined);
+      }
+    });
+    return () => sub.remove();
+  }, [settings.telemetry?.enabled]);
+  // 무료 티어는 하루 스캔 한도를 넘으면 스캐너 대신 업그레이드 안내를 띄운다.
+  const openScanner = () => {
+    if (resolvePlan(settings.entitlement) === 'pro') {
+      setScannerVisible(true);
+      return;
+    }
+    getTodayScanCount(AsyncStorage, new Date())
+      .then((used) => {
+        if (used >= FREE_DAILY_SCAN_LIMIT) {
+          Alert.alert(
+            '무료 스캔 소진',
+            `무료 요금제는 하루 ${FREE_DAILY_SCAN_LIMIT}건까지 스캔할 수 있어요. Pro로 올리면 무제한입니다.`,
+            [{ text: '확인' }],
+          );
+        } else {
+          setScannerVisible(true);
+        }
+      })
+      .catch(() => setScannerVisible(true));
+  };
+  // Pro 기능: 배달 기록을 CSV로 내보내 공유(엑셀/한글 호환 BOM). 본인 데이터 export.
+  // 다중 차량 관리(Pro)에서만 등록 차량 칩을 노출한다. 무료는 빈 목록 →
+  // 기존처럼 기본 차량/자유 입력으로 동작.
+  const fleetRegistry =
+    resolvePlan(settings.entitlement) === 'pro'
+      ? dedupeVehicles(settings.costs.vehicleRegistry ?? [])
+      : [];
+
+  const exportDeliveriesCsv = async () => {
+    const headers = [
+      '배송일',
+      '상품',
+      '수량',
+      '배송지',
+      '발주처',
+      '수령인 연락처',
+      '예식시간',
+      '금액(원)',
+      '상태',
+    ];
+    const rows = orders.map((o) => {
+      const d = orderToLegacyDelivery(o);
+      return [
+        d.deliveryDt,
+        d.productName,
+        d.productQuantity,
+        d.deliveryAddress,
+        d.orderVendor,
+        d.recipientTel,
+        d.eventTime,
+        d.fee,
+        d.status === 'completed' ? '완료' : '대기',
+      ];
+    });
+    try {
+      const dir = `${FileSystem.documentDirectory ?? ''}exports/`;
+      await FileSystem.makeDirectoryAsync(dir, { intermediates: true }).catch(
+        () => undefined,
+      );
+      const uri = `${dir}routelo-deliveries.csv`;
+      await FileSystem.writeAsStringAsync(uri, toCsv(headers, rows, { bom: true }));
+      await Share.share({ url: uri });
+    } catch {
+      Alert.alert('내보내기 실패', '파일을 만드는 중 문제가 발생했습니다.');
+    }
+  };
   const [fuelLogs, setFuelLogs] = useState<FuelLog[]>([]);
   const [fuelFormVisible, setFuelFormVisible] = useState(false);
   const [fuelFormLog, setFuelFormLog] = useState<FuelLog | undefined>(undefined);
@@ -4501,6 +5985,26 @@ export default function RouteloApp() {
     await deliveryRepository.remove(id).catch(() => undefined);
   };
 
+  // 리스트에서 왼쪽 스와이프로 삭제. 실수 방지를 위해 확인 다이얼로그를 먼저 띄운다.
+  const deleteDeliveryById = async (id: string) => {
+    setOrders((current) => current.filter((item) => item.id !== id));
+    setSelectedDelivery((current) => (current?.id === id ? undefined : current));
+    await deliveryRepository.remove(id).catch(() => undefined);
+  };
+
+  const confirmDeleteDelivery = (delivery: Delivery) => {
+    Alert.alert('배송건 삭제', '정말 해당 배송건을 삭제하시겠습니까?', [
+      { text: '취소', style: 'cancel' },
+      {
+        text: '삭제',
+        style: 'destructive',
+        onPress: () => {
+          deleteDeliveryById(delivery.id);
+        },
+      },
+    ]);
+  };
+
   // 숨김 토글: 데이터는 보존하되 목록에서 감춘다(완료 배송 치우기). 다시 눌러 복원 가능.
   const toggleHiddenById = async (id: string) => {
     const currentOrder = orders.find((item) => item.id === id);
@@ -4685,6 +6189,7 @@ export default function RouteloApp() {
           hiddenDeliveries={hiddenDeliveries}
           onDeliveryPress={setSelectedDelivery}
           onUnhide={toggleHiddenById}
+          onDeleteDelivery={confirmDeleteDelivery}
           onNotifications={openNotifications}
         />
       );
@@ -4726,6 +6231,7 @@ export default function RouteloApp() {
             settingsRepository.save(nextSettings).catch(() => undefined);
           }}
           onDeliveryPress={setSelectedDelivery}
+          onDeleteDelivery={confirmDeleteDelivery}
           onNotifications={openNotifications}
         />
       );
@@ -4738,12 +6244,14 @@ export default function RouteloApp() {
           settings={settings}
           onSettingsChange={setSettings}
           onEditAccount={() => setOnboardingVisible(true)}
+          onExportCsv={exportDeliveriesCsv}
         />
       );
     }
     return (
       <HomeScreen
         deliveries={activeDeliveries}
+        greetingName={driverGreetingName(account)}
         onDeliveryPress={setSelectedDelivery}
         onSeeAll={() => setActiveTab('deliveries')}
         onNotifications={openNotifications}
@@ -4764,7 +6272,12 @@ export default function RouteloApp() {
   const C = darkMode ? DARK : LIGHT;
   const styles = useMemo(() => makeStyles(C), [C]);
 
+  useEffect(() => {
+    installGlobalErrorHandler();
+  }, []);
+
   return (
+    <ErrorBoundary>
     <ThemeContext.Provider value={{ C, styles, dark: darkMode }}>
     <PrivacyContext.Provider
       value={{
@@ -4772,6 +6285,7 @@ export default function RouteloApp() {
         showFullAddressInList: settings.privacy.showFullAddressInList,
       }}
     >
+    <LockGate enabled={settings.security.appLockEnabled}>
     <SafeAreaView
       style={styles.app}
       edges={['top', 'left', 'right']}
@@ -4792,6 +6306,8 @@ export default function RouteloApp() {
       >
         <Pressable
           testID="open-manual-delivery"
+          accessibilityRole="button"
+          accessibilityLabel="배달 직접 추가"
           onPress={openCreateForm}
           style={{
             minHeight: 48,
@@ -4803,18 +6319,30 @@ export default function RouteloApp() {
           }}
         >
           <Ionicons name="add" size={20} color={C.primary} />
-          <Text style={{ color: C.primary, fontSize: 12, fontWeight: '800' }}>
+          <Text
+            style={{ color: C.primary, fontSize: 12, fontWeight: '800' }}
+            numberOfLines={1}
+            maxFontSizeMultiplier={MAX_FONT_MULTIPLIER}
+          >
             직접 추가
           </Text>
         </Pressable>
       </GlassSurface>
       <Pressable
         testID="open-ocr-scanner"
+        accessibilityRole="button"
+        accessibilityLabel="인수증 스캔"
         style={[styles.scanFab, { bottom: 78 + insets.bottom }]}
-        onPress={() => setScannerVisible(true)}
+        onPress={openScanner}
       >
         <Ionicons name="scan-outline" size={23} color="#FFFFFF" />
-        <Text style={styles.scanFabText}>인수증 스캔</Text>
+        <Text
+          style={styles.scanFabText}
+          numberOfLines={1}
+          maxFontSizeMultiplier={MAX_FONT_MULTIPLIER}
+        >
+          인수증 스캔
+        </Text>
       </Pressable>
       <GlassSurface
         strength="prominent"
@@ -4839,6 +6367,9 @@ export default function RouteloApp() {
               <Pressable
                 key={tab.key}
                 testID={`nav-${tab.key}`}
+                accessibilityRole="tab"
+                accessibilityState={{ selected }}
+                accessibilityLabel={tab.label}
                 style={styles.navItem}
                 onPress={() => {
                   setActiveTab(tab.key);
@@ -4889,7 +6420,11 @@ export default function RouteloApp() {
                     <View style={styles.navNotificationDot} />
                   )}
                 </View>
-                <Text style={[styles.navLabel, selected && styles.navLabelSelected]}>
+                <Text
+                  style={[styles.navLabel, selected && styles.navLabelSelected]}
+                  numberOfLines={1}
+                  maxFontSizeMultiplier={MAX_FONT_MULTIPLIER}
+                >
                   {tab.label}
                 </Text>
               </Pressable>
@@ -4936,6 +6471,7 @@ export default function RouteloApp() {
         visible={fuelFormVisible}
         initial={fuelFormLog}
         defaultVehicle={settings.costs.vehicleModel}
+        vehicleRegistry={fleetRegistry}
         onClose={() => setFuelFormVisible(false)}
         onSubmit={submitFuel}
       />
@@ -4943,6 +6479,7 @@ export default function RouteloApp() {
         visible={mileageFormVisible}
         initial={mileageFormLog}
         defaultVehicle={settings.costs.vehicleModel}
+        vehicleRegistry={fleetRegistry}
         onClose={() => setMileageFormVisible(false)}
         onSubmit={submitMileage}
       />
@@ -4962,6 +6499,8 @@ export default function RouteloApp() {
           setOrders((current) => [order, ...current]);
           deliveryRepository.save(order).catch(() => undefined);
           setActiveTab('deliveries');
+          // 무료 티어 한도 계산용 오늘 스캔 횟수 누적(Pro는 한도 무의미).
+          incrementScanCount(AsyncStorage, new Date()).catch(() => undefined);
           // 인수증 원본 이미지를 문서 디렉터리로 복사해 캘린더/기록에서 다시 볼 수 있게 보존.
           if (receiptImageUri) {
             void persistReceiptImage(order, receiptImageUri);
@@ -4978,8 +6517,10 @@ export default function RouteloApp() {
         }}
       />
     </SafeAreaView>
+    </LockGate>
     </PrivacyContext.Provider>
     </ThemeContext.Provider>
+    </ErrorBoundary>
   );
 }
 

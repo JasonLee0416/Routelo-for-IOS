@@ -1,0 +1,90 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><style>
+ html,body{margin:0;padding:0;background:#4a4f5a}
+ .ladder{display:flex;align-items:flex-end;gap:38px;padding:60px}
+ .cell{display:flex;flex-direction:column;align-items:center;gap:12px}
+ .art{overflow:hidden;box-shadow:0 8px 22px rgba(0,0,0,.35)}
+ .lbl{color:#e8ecf2;font:600 16px -apple-system,Segoe UI,Roboto}
+</style></head>
+<body>
+<div id="root"></div>
+<script>
+const cx=512, cy=515, R=292, D=Math.PI/180;
+function leaf(x,y,rot,s,fill,vein){return `<g transform="translate(${x},${y}) rotate(${rot}) scale(${s})"><path d="M0 0 C 17 -22 17 -60 0 -90 C -17 -60 -17 -22 0 0 Z" fill="${fill}"/><path d="M0 -8 L0 -80" stroke="${vein}" stroke-width="2.6" fill="none" stroke-linecap="round"/></g>`;}
+function bloom(x,y,s){let p='';for(let i=0;i<5;i++){const a=i*72;p+=`<ellipse cx="0" cy="-12" rx="9" ry="14" fill="#FCF8EE" stroke="#E6D6AC" stroke-width="1" transform="rotate(${a})"/>`;}return `<g transform="translate(${x},${y}) scale(${s})">${p}<circle r="6" fill="#CFA53C"/></g>`;}
+function berry(x,y,s){return `<g transform="translate(${x},${y}) scale(${s})"><circle r="4.5" fill="#C9A24E"/></g>`;}
+
+function art(){
+  let leaves='', accents='';
+  const N=42;
+  for(let k=0;k<N;k++){
+    const a=k*(360/N), rad=a*D, tan=a+90, dark=k%2===0;
+    const fill=dark?'#5C7C57':'#7E9A77', vein=dark?'#44604A':'#5A7654';
+    const ox=cx+R*Math.cos(rad), oy=cy+R*Math.sin(rad);
+    leaves+=leaf(ox,oy,tan+46,1.06,fill,vein);
+    leaves+=leaf(ox,oy,tan+18,0.84,dark?'#7E9A77':'#6C8C66',vein);
+    const ix=cx+(R-34)*Math.cos(rad), iy=cy+(R-34)*Math.sin(rad);
+    leaves+=leaf(ix,iy,tan+52,0.64,'#8AA682',vein);
+  }
+  [30,90,150,210,270,330].forEach((a,idx)=>{
+    const rad=a*D, x=cx+R*Math.cos(rad), y=cy+R*Math.sin(rad), t=(a+90)*D;
+    accents+=bloom(x,y,1.08+(idx%3)*0.12)+berry(x+22*Math.cos(t),y+22*Math.sin(t),0.9)+berry(x-20*Math.cos(t),y-20*Math.sin(t),0.75);
+  });
+  const root=`<g filter="url(#gsh)">
+    <path d="M 396 503 C 418 486 436 493 447 526 L 480 616 C 489 636 506 634 514 610 L 596 380 C 604 356 628 350 660 360"
+          fill="none" stroke="url(#gold)" stroke-width="37" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M 645 359 C 683 352 704 365 710 344" fill="none" stroke="url(#gold)" stroke-width="19" stroke-linecap="round"/>
+    <path d="M 486 606 L 552 428" fill="none" stroke="#FBEBC2" stroke-opacity="0.55" stroke-width="7" stroke-linecap="round"/>
+  </g>`;
+  // HIG: 여백 확보 위해 전체를 중심 기준 0.9배
+  return `<g transform="translate(512 512) scale(0.9) translate(-512 -512)"><g>${leaves}</g><g>${accents}</g>${root}</g>`;
+}
+
+function svg(px){return `
+<svg width="${px}" height="${px}" viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg">
+ <defs>
+   <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+     <stop offset="0" stop-color="#FCFAF3"/><stop offset="1" stop-color="#EADFC8"/>
+   </linearGradient>
+   <radialGradient id="halo" cx="0.5" cy="0.47" r="0.44">
+     <stop offset="0" stop-color="#FFF7E1" stop-opacity="0.95"/><stop offset="1" stop-color="#FFF7E1" stop-opacity="0"/>
+   </radialGradient>
+   <radialGradient id="vig" cx="0.5" cy="0.5" r="0.66">
+     <stop offset="0.68" stop-color="#ffffff" stop-opacity="0"/><stop offset="1" stop-color="#C9B893" stop-opacity="0.42"/>
+   </radialGradient>
+   <linearGradient id="gold" x1="0" y1="0" x2="1" y2="1">
+     <stop offset="0" stop-color="#BE8E2E"/><stop offset="0.45" stop-color="#EFD48A"/>
+     <stop offset="0.7" stop-color="#C79A38"/><stop offset="1" stop-color="#A87C24"/>
+   </linearGradient>
+   <linearGradient id="sheen" x1="0" y1="0" x2="0" y2="1">
+     <stop offset="0" stop-color="#FFFFFF" stop-opacity="0.12"/><stop offset="0.5" stop-color="#FFFFFF" stop-opacity="0"/>
+     <stop offset="1" stop-color="#2E2510" stop-opacity="0.06"/>
+   </linearGradient>
+   <filter id="gsh" x="-30%" y="-30%" width="160%" height="160%">
+     <feDropShadow dx="0" dy="7" stdDeviation="8" flood-color="#6E521A" flood-opacity="0.3"/>
+   </filter>
+ </defs>
+ <rect width="1024" height="1024" fill="url(#bg)"/>
+ <rect width="1024" height="1024" fill="url(#halo)"/>
+ <rect width="1024" height="1024" fill="url(#vig)"/>
+ ${art()}
+ <rect width="1024" height="1024" fill="url(#sheen)"/>
+</svg>`;}
+
+const params=new URLSearchParams(location.search);
+const root=document.getElementById('root');
+if(params.has('ladder')){
+  const sizes=[220,180,120,87,60,40];
+  const wrap=document.createElement('div'); wrap.className='ladder';
+  sizes.forEach(px=>{
+    const c=document.createElement('div'); c.className='cell';
+    const r=Math.round(px*0.2237);
+    c.innerHTML=`<div class="art" style="width:${px}px;height:${px}px;border-radius:${r}px">${svg(px)}</div><div class="lbl">${px}px</div>`;
+    wrap.appendChild(c);
+  });
+  root.appendChild(wrap);
+}else{
+  root.innerHTML=svg(1024);
+}
+</script>
+</body></html>

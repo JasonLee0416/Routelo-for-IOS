@@ -35,11 +35,14 @@ export const LIGHT: Palette = {
   outline: '#D8DADF',
   text: '#1C1C1E',
   textMuted: '#6B6B70',
-  success: '#34C759',
+  // 라이트 모드에서 밝은 systemGreen/Red는 흰 배경 텍스트 대비가 WCAG AA에
+  // 미달(2.2/3.4)해, 텍스트로 쓰이는 손익 수치·오류 문구가 야외(햇빛)에서 잘 안
+  // 보인다. AA(4.5) 이상을 만족하는 진한 변형으로 교체(대비 자동검증 테스트로 고정).
+  success: '#207A33',
   successBg: '#E3F8EA',
   warning: '#FF9F0A',
   warningBg: '#FFF1DD',
-  danger: '#FF453A',
+  danger: '#D70015',
   dangerBg: '#FFE5E3',
 };
 
