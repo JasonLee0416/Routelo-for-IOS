@@ -140,6 +140,7 @@ import {
   MAX_VEHICLES,
   removeVehicle,
 } from './vehicles/registry';
+import { MAX_FONT_MULTIPLIER } from './theme/dynamicType';
 import { getTodayScanCount, incrementScanCount } from './entitlements/usage';
 import { ErrorBoundary } from './reliability/ErrorBoundary';
 import { installGlobalErrorHandler } from './reliability/errorReporting';
@@ -6305,6 +6306,8 @@ export default function RouteloApp() {
       >
         <Pressable
           testID="open-manual-delivery"
+          accessibilityRole="button"
+          accessibilityLabel="배달 직접 추가"
           onPress={openCreateForm}
           style={{
             minHeight: 48,
@@ -6316,7 +6319,11 @@ export default function RouteloApp() {
           }}
         >
           <Ionicons name="add" size={20} color={C.primary} />
-          <Text style={{ color: C.primary, fontSize: 12, fontWeight: '800' }}>
+          <Text
+            style={{ color: C.primary, fontSize: 12, fontWeight: '800' }}
+            numberOfLines={1}
+            maxFontSizeMultiplier={MAX_FONT_MULTIPLIER}
+          >
             직접 추가
           </Text>
         </Pressable>
@@ -6329,7 +6336,13 @@ export default function RouteloApp() {
         onPress={openScanner}
       >
         <Ionicons name="scan-outline" size={23} color="#FFFFFF" />
-        <Text style={styles.scanFabText}>인수증 스캔</Text>
+        <Text
+          style={styles.scanFabText}
+          numberOfLines={1}
+          maxFontSizeMultiplier={MAX_FONT_MULTIPLIER}
+        >
+          인수증 스캔
+        </Text>
       </Pressable>
       <GlassSurface
         strength="prominent"
@@ -6407,7 +6420,11 @@ export default function RouteloApp() {
                     <View style={styles.navNotificationDot} />
                   )}
                 </View>
-                <Text style={[styles.navLabel, selected && styles.navLabelSelected]}>
+                <Text
+                  style={[styles.navLabel, selected && styles.navLabelSelected]}
+                  numberOfLines={1}
+                  maxFontSizeMultiplier={MAX_FONT_MULTIPLIER}
+                >
                   {tab.label}
                 </Text>
               </Pressable>
