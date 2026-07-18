@@ -126,10 +126,12 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   AppPlan,
   FREE_DAILY_SCAN_LIMIT,
+  isFeatureEnabled,
   PRO_FEATURES,
   remainingFreeScans,
   resolvePlan,
 } from './entitlements/plan';
+import { buildRevenueReport, ReportRange } from './reports/revenueReport';
 import { getTodayScanCount, incrementScanCount } from './entitlements/usage';
 import { ErrorBoundary } from './reliability/ErrorBoundary';
 import { installGlobalErrorHandler } from './reliability/errorReporting';
@@ -1874,6 +1876,368 @@ function ProfitTrendCard({
   );
 }
 
+// 상세 수익 리포트(Pro). 손익 추이 위에 기간 비교·분류/지역/거래처 분해·평균/완료율을
+// 얹는다. 계산은 순수 함수(buildRevenueReport), 무료 사용자는 잠금 미리보기를 본다.
+type ReportPeriodKey = 'month' | 'last30' | 'all';
+
+function RevenueReportCard({
+  orders,
+  fuelLogs,
+  settings,
+  plan,
+  onUpgrade,
+}: {
+  orders: DeliveryOrder[];
+  fuelLogs: FuelLog[];
+  settings: RouteloSettings;
+  plan: AppPlan;
+  onUpgrade?: () => void;
+}) {
+  const { C } = useTheme();
+  const [periodKey, setPeriodKey] = useState<ReportPeriodKey>('month');
+  const enabled = isFeatureEnabled(plan, 'detailedRevenueReport');
+
+  const range = useMemo<ReportRange | undefined>(() => {
+    if (periodKey === 'all') return undefined;
+    const today = new Date();
+    const end = formatDateKey(today);
+    if (periodKey === 'month') {
+      const first = new Date(today.getFullYear(), today.getMonth(), 1);
+      return { start: formatDateKey(first), end };
+    }
+    const from = new Date(today);
+    from.setDate(today.getDate() - 29);
+    return { start: formatDateKey(from), end };
+  }, [periodKey]);
+
+  const report = useMemo(
+    () => (enabled ? buildRevenueReport(orders, fuelLogs, settings, range) : null),
+    [enabled, orders, fuelLogs, settings, range],
+  );
+
+  const won = (value: number) => {
+    const sign = value < 0 ? '-' : '';
+    const abs = Math.abs(Math.round(value))
+      .toString()
+      .replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+    return `${sign}${abs}`;
+  };
+
+  const cardBase = {
+    backgroundColor: C.surface,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: C.outline,
+    padding: 14,
+    marginBottom: 12,
+  } as const;
+
+  const header = (
+    <View
+      style={{
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        marginBottom: 12,
+      }}
+    >
+      <Text style={{ fontSize: 14, fontWeight: '800', color: C.text }}>
+        상세 수익 리포트
+      </Text>
+      <View
+        style={{
+          flexDirection: 'row',
+          alignItems: 'center',
+          gap: 3,
+          paddingHorizontal: 7,
+          paddingVertical: 2,
+          borderRadius: 6,
+          backgroundColor: C.warning + '22',
+        }}
+      >
+        <Ionicons name="star" size={10} color={C.warning} />
+        <Text style={{ fontSize: 10, fontWeight: '800', color: C.warning }}>
+          PRO
+        </Text>
+      </View>
+    </View>
+  );
+
+  if (!enabled) {
+    return (
+      <Pressable
+        onPress={onUpgrade}
+        accessibilityRole="button"
+        accessibilityLabel="상세 수익 리포트 · Pro 전용"
+        style={cardBase}
+      >
+        {header}
+        <View
+          style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}
+        >
+          <Ionicons name="lock-closed" size={18} color={C.textMuted} />
+          <View style={{ flex: 1 }}>
+            <Text style={{ fontSize: 13, fontWeight: '700', color: C.text }}>
+              기간 비교 · 분류/지역/거래처별 분석
+            </Text>
+            <Text style={{ fontSize: 11, color: C.textMuted, marginTop: 2 }}>
+              Pro로 전환하면 상세 리포트를 볼 수 있어요
+            </Text>
+          </View>
+          <Ionicons name="chevron-forward" size={16} color={C.textMuted} />
+        </View>
+      </Pressable>
+    );
+  }
+
+  if (!report) return null;
+
+  const periods: Array<{ key: ReportPeriodKey; label: string }> = [
+    { key: 'month', label: '이번 달' },
+    { key: 'last30', label: '지난 30일' },
+    { key: 'all', label: '전체' },
+  ];
+
+  const stat = (label: string, value: string, sub?: string) => (
+    <View style={{ flex: 1 }}>
+      <Text style={{ fontSize: 10, color: C.textMuted }}>{label}</Text>
+      <Text
+        style={{ fontSize: 15, fontWeight: '800', color: C.text, marginTop: 2 }}
+        numberOfLines={1}
+      >
+        {value}
+      </Text>
+      {sub ? (
+        <Text style={{ fontSize: 10, color: C.textMuted, marginTop: 1 }}>
+          {sub}
+        </Text>
+      ) : null}
+    </View>
+  );
+
+  const breakdownBlock = (
+    title: string,
+    rows: typeof report.byCategory,
+  ) => {
+    const top = rows.slice(0, 4);
+    return (
+      <View style={{ marginTop: 12 }}>
+        <Text
+          style={{
+            fontSize: 11,
+            fontWeight: '800',
+            color: C.textMuted,
+            marginBottom: 6,
+          }}
+        >
+          {title}
+        </Text>
+        {top.length === 0 ? (
+          <Text style={{ fontSize: 11, color: C.textMuted }}>데이터 없음</Text>
+        ) : (
+          top.map((row) => (
+            <View key={row.key} style={{ marginBottom: 6 }}>
+              <View
+                style={{
+                  flexDirection: 'row',
+                  justifyContent: 'space-between',
+                  marginBottom: 3,
+                }}
+              >
+                <Text style={{ fontSize: 12, color: C.text }} numberOfLines={1}>
+                  {row.label}{' '}
+                  <Text style={{ color: C.textMuted, fontSize: 10 }}>
+                    · {row.count}건
+                  </Text>
+                </Text>
+                <Text style={{ fontSize: 12, fontWeight: '700', color: C.text }}>
+                  {won(row.revenue)}원 ({Math.round(row.share * 100)}%)
+                </Text>
+              </View>
+              <View
+                style={{
+                  height: 4,
+                  borderRadius: 2,
+                  backgroundColor: C.surfaceAlt,
+                  overflow: 'hidden',
+                }}
+              >
+                <View
+                  style={{
+                    width: `${Math.max(2, Math.round(row.share * 100))}%`,
+                    height: 4,
+                    borderRadius: 2,
+                    backgroundColor: C.primary,
+                  }}
+                />
+              </View>
+            </View>
+          ))
+        )}
+      </View>
+    );
+  };
+
+  const cmp = report.comparison;
+  const cmpPct = cmp?.netDeltaPct;
+
+  return (
+    <View style={cardBase}>
+      <View
+        style={{
+          flexDirection: 'row',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          marginBottom: 12,
+        }}
+      >
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+          <Text style={{ fontSize: 14, fontWeight: '800', color: C.text }}>
+            상세 수익 리포트
+          </Text>
+          <View
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              gap: 3,
+              paddingHorizontal: 7,
+              paddingVertical: 2,
+              borderRadius: 6,
+              backgroundColor: C.warning + '22',
+            }}
+          >
+            <Ionicons name="star" size={10} color={C.warning} />
+            <Text style={{ fontSize: 10, fontWeight: '800', color: C.warning }}>
+              PRO
+            </Text>
+          </View>
+        </View>
+        <View style={{ flexDirection: 'row', gap: 4 }}>
+          {periods.map((item) => {
+            const active = periodKey === item.key;
+            return (
+              <Pressable
+                key={item.key}
+                onPress={() => setPeriodKey(item.key)}
+                accessibilityRole="button"
+                accessibilityState={{ selected: active }}
+                style={{
+                  paddingHorizontal: 10,
+                  paddingVertical: 5,
+                  borderRadius: 8,
+                  backgroundColor: active ? C.primary : C.surfaceAlt,
+                }}
+              >
+                <Text
+                  style={{
+                    fontSize: 11,
+                    fontWeight: '700',
+                    color: active ? '#FFFFFF' : C.textMuted,
+                  }}
+                >
+                  {item.label}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </View>
+      </View>
+
+      {report.totals.count === 0 ? (
+        <Text
+          style={{
+            fontSize: 12,
+            color: C.textMuted,
+            textAlign: 'center',
+            paddingVertical: 20,
+          }}
+        >
+          이 기간에는 배달 기록이 없습니다
+        </Text>
+      ) : (
+        <>
+          <View style={{ flexDirection: 'row', gap: 10 }}>
+            {stat('매출', `${won(report.totals.revenue)}원`, `${report.totals.count}건`)}
+            {stat(
+              '순이익',
+              `${won(report.totals.net)}원`,
+              report.averages.netMarginPct !== null
+                ? `마진 ${report.averages.netMarginPct}%`
+                : undefined,
+            )}
+          </View>
+          {cmp ? (
+            <View
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: 6,
+                marginTop: 10,
+                paddingTop: 10,
+                borderTopWidth: 1,
+                borderTopColor: C.outline,
+              }}
+            >
+              <Ionicons
+                name={cmp.netDelta >= 0 ? 'trending-up' : 'trending-down'}
+                size={14}
+                color={cmp.netDelta >= 0 ? C.success : C.danger}
+              />
+              <Text style={{ fontSize: 11, color: C.textMuted }}>
+                직전 기간 대비 순이익{' '}
+                <Text
+                  style={{
+                    fontWeight: '800',
+                    color: cmp.netDelta >= 0 ? C.success : C.danger,
+                  }}
+                >
+                  {cmp.netDelta >= 0 ? '+' : '−'}
+                  {won(Math.abs(cmp.netDelta))}원
+                  {cmpPct !== null ? ` (${cmp.netDelta >= 0 ? '+' : ''}${cmpPct}%)` : ''}
+                </Text>
+              </Text>
+            </View>
+          ) : null}
+
+          <View
+            style={{
+              flexDirection: 'row',
+              gap: 10,
+              marginTop: 12,
+              paddingTop: 10,
+              borderTopWidth: 1,
+              borderTopColor: C.outline,
+            }}
+          >
+            {stat('건당 평균', `${won(report.averages.revenuePerDelivery)}원`)}
+            {stat('활동일 평균', `${won(report.averages.revenuePerActiveDay)}원`)}
+            {stat('완료율', `${report.completion.rate}%`, `${report.completion.completed}/${report.completion.total}`)}
+          </View>
+
+          {breakdownBlock('분류별', report.byCategory)}
+          {breakdownBlock('지역별', report.byRegion)}
+          {breakdownBlock('거래처별', report.byVendor)}
+
+          {report.topDay ? (
+            <Text
+              style={{
+                fontSize: 11,
+                color: C.textMuted,
+                marginTop: 12,
+                paddingTop: 10,
+                borderTopWidth: 1,
+                borderTopColor: C.outline,
+              }}
+            >
+              최고 순익일 · {report.topDay.date} ({won(report.topDay.net)}원)
+            </Text>
+          ) : null}
+        </>
+      )}
+    </View>
+  );
+}
+
 function CalendarScreen({
   orders,
   fuelLogs,
@@ -1954,6 +2318,7 @@ function CalendarScreen({
     () => summarizeDailyProfit(orders, fuelLogs, settings),
     [fuelLogs, orders, settings],
   );
+  const reportPlan = resolvePlan(settings.entitlement);
   const selectedSummary = dailySummaries.get(selectedDate) || {
     revenue: 0,
     fuelCost: 0,
@@ -2101,6 +2466,18 @@ function CalendarScreen({
         </View>
       </View>
       <ProfitTrendCard daily={dailySummaries} />
+      <RevenueReportCard
+        orders={orders}
+        fuelLogs={fuelLogs}
+        settings={settings}
+        plan={reportPlan}
+        onUpgrade={() =>
+          Alert.alert(
+            'Pro 기능',
+            '상세 수익 리포트는 Pro 요금제에서 제공됩니다.\n설정 > 요금제에서 전환할 수 있어요.',
+          )
+        }
+      />
       <View
         style={{
           backgroundColor: C.surface,
