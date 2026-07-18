@@ -144,7 +144,12 @@ import { getTodayScanCount, incrementScanCount } from './entitlements/usage';
 import { ErrorBoundary } from './reliability/ErrorBoundary';
 import { installGlobalErrorHandler } from './reliability/errorReporting';
 import { LockGate } from './security/LockGate';
-import { clearPin, isValidPin, setPin } from './security/appLock';
+import {
+  clearLockoutState,
+  clearPin,
+  isValidPin,
+  setPin,
+} from './security/appLock';
 import { toCsv } from './export/csv';
 import {
   bucketProfit,
@@ -3617,6 +3622,7 @@ function SettingsScreen({
                     (pin?: string) => {
                       if (pin && isValidPin(pin)) {
                         setPin(pin).catch(() => undefined);
+                        clearLockoutState().catch(() => undefined);
                         updateSettings({
                           ...settings,
                           security: {
@@ -3632,6 +3638,7 @@ function SettingsScreen({
                   );
                 } else {
                   clearPin().catch(() => undefined);
+                  clearLockoutState().catch(() => undefined);
                   updateSettings({
                     ...settings,
                     security: { ...settings.security, appLockEnabled: false },

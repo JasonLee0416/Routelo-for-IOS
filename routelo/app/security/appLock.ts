@@ -3,6 +3,12 @@
 //
 // 순수 함수(hashPin/verifyPin/isValidPin)만 임포트해도 네이티브 모듈이 로드되지 않도록
 // AsyncStorage는 저장이 필요한 시점에만 지연 로드한다.
+import {
+  LockoutState,
+  initialLockoutState,
+  normalizeLockoutState,
+} from './lockout';
+
 type AsyncStoreLike = {
   getItem(key: string): Promise<string | null>;
   setItem(key: string, value: string): Promise<void>;
@@ -13,6 +19,7 @@ function store(): AsyncStoreLike {
 }
 
 const KEY = 'routelo.appLock.pinHash.v1';
+const LOCKOUT_KEY = 'routelo.appLock.lockout.v1';
 
 export function hashPin(pin: string): string {
   let h = 5381;
@@ -44,4 +51,24 @@ export async function clearPin(): Promise<void> {
 
 export async function hasPin(): Promise<boolean> {
   return (await getPinHash()) !== null;
+}
+
+// 잠금 시도 상태(무차별 대입 방지) 영속화. 정책 계산은 lockout.ts(순수)에서 하고,
+// 여기서는 저장/복원만 담당한다.
+export async function getLockoutState(): Promise<LockoutState> {
+  const raw = await store().getItem(LOCKOUT_KEY);
+  if (!raw) return initialLockoutState();
+  try {
+    return normalizeLockoutState(JSON.parse(raw));
+  } catch {
+    return initialLockoutState();
+  }
+}
+
+export async function saveLockoutState(state: LockoutState): Promise<void> {
+  await store().setItem(LOCKOUT_KEY, JSON.stringify(state));
+}
+
+export async function clearLockoutState(): Promise<void> {
+  await store().removeItem(LOCKOUT_KEY);
 }
