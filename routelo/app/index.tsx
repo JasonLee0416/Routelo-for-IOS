@@ -120,6 +120,15 @@ import {
   optimizeByNearestNeighbor,
 } from './services/maps';
 import { NAV_APP_LABEL, openNavigation } from './services/navigation';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import {
+  AppPlan,
+  FREE_DAILY_SCAN_LIMIT,
+  PRO_FEATURES,
+  remainingFreeScans,
+  resolvePlan,
+} from './entitlements/plan';
+import { getTodayScanCount, incrementScanCount } from './entitlements/usage';
 import {
   bucketProfit,
   DailyProfitSummary,
@@ -2403,6 +2412,13 @@ function SettingsScreen({
 }) {
   const { C, styles } = useTheme();
   const [districtQuery, setDistrictQuery] = useState('');
+  const plan: AppPlan = resolvePlan(settings.entitlement);
+  const [scanToday, setScanToday] = useState(0);
+  useEffect(() => {
+    getTodayScanCount(AsyncStorage, new Date())
+      .then(setScanToday)
+      .catch(() => undefined);
+  }, []);
   const [openRegions, setOpenRegions] = useState<{
     Seoul: boolean;
     Gyeonggi: boolean;
@@ -2490,6 +2506,121 @@ function SettingsScreen({
         <Pressable style={styles.iconButton} onPress={onEditAccount}>
           <Ionicons name="pencil-outline" size={19} color={C.primary} />
         </Pressable>
+      </View>
+
+      <SectionHeader title="멤버십" />
+      <View style={[styles.settingsGroup, { padding: 14 }]}>
+        <View
+          style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            marginBottom: 12,
+          }}
+        >
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+            <Ionicons
+              name={plan === 'pro' ? 'star' : 'star-outline'}
+              size={18}
+              color={plan === 'pro' ? C.warning : C.textMuted}
+            />
+            <Text style={{ color: C.navy, fontSize: 15, fontWeight: '800' }}>
+              {plan === 'pro' ? 'Pro · 파운딩 멤버' : '무료 요금제'}
+            </Text>
+          </View>
+          <Pressable
+            onPress={() =>
+              updateSettings({
+                ...settings,
+                entitlement: { plan: plan === 'pro' ? 'free' : 'pro' },
+              })
+            }
+            style={({ pressed }) => [
+              {
+                paddingHorizontal: 12,
+                minHeight: 34,
+                borderRadius: 10,
+                borderWidth: 1,
+                borderColor: C.outline,
+                alignItems: 'center',
+                justifyContent: 'center',
+              },
+              pressed && { opacity: 0.6 },
+            ]}
+          >
+            <Text style={{ color: C.primary, fontWeight: '700', fontSize: 12 }}>
+              {plan === 'pro' ? '무료 체험 미리보기' : 'Pro로 전환'}
+            </Text>
+          </Pressable>
+        </View>
+        {plan === 'free' && (
+          <View
+            style={{
+              padding: 10,
+              borderRadius: 10,
+              backgroundColor: C.surfaceAlt,
+              marginBottom: 12,
+            }}
+          >
+            <Text style={{ color: C.textMuted, fontSize: 12, fontWeight: '600' }}>
+              오늘 무료 스캔 {remainingFreeScans('free', scanToday)}/
+              {FREE_DAILY_SCAN_LIMIT}건 남음
+            </Text>
+          </View>
+        )}
+        {PRO_FEATURES.map((feature) => (
+          <View
+            key={feature.id}
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              gap: 10,
+              paddingVertical: 8,
+            }}
+          >
+            <Ionicons
+              name={plan === 'pro' ? 'checkmark-circle' : 'lock-closed'}
+              size={18}
+              color={plan === 'pro' ? C.success : C.textMuted}
+            />
+            <View style={{ flex: 1 }}>
+              <Text style={{ color: C.text, fontSize: 13, fontWeight: '700' }}>
+                {feature.label}
+              </Text>
+              <Text style={{ color: C.textMuted, fontSize: 11, marginTop: 2 }}>
+                {feature.desc}
+              </Text>
+            </View>
+          </View>
+        ))}
+        {plan === 'free' && (
+          <Pressable
+            onPress={() =>
+              Alert.alert(
+                'Pro 곧 출시',
+                'Pro 구독은 준비 중입니다. 관심 감사합니다! 베타 파운딩 멤버에게는 특별 혜택을 드립니다.',
+              )
+            }
+            style={({ pressed }) => [
+              {
+                marginTop: 10,
+                minHeight: 44,
+                borderRadius: 12,
+                backgroundColor: C.primary,
+                alignItems: 'center',
+                justifyContent: 'center',
+                flexDirection: 'row',
+                gap: 6,
+              },
+              pressed && { opacity: 0.85 },
+            ]}
+          >
+            <Ionicons name="star" size={16} color="#FFFFFF" />
+            <Text style={{ color: '#FFFFFF', fontWeight: '800', fontSize: 13 }}>
+              Pro 알아보기
+            </Text>
+          </Pressable>
+        )}
       </View>
 
       <SectionHeader title="알림 설정" />
@@ -4263,6 +4394,26 @@ export default function RouteloApp() {
   const [settings, setSettings] = useState<RouteloSettings>(
     DEFAULT_ROUTELO_SETTINGS,
   );
+  // 무료 티어는 하루 스캔 한도를 넘으면 스캐너 대신 업그레이드 안내를 띄운다.
+  const openScanner = () => {
+    if (resolvePlan(settings.entitlement) === 'pro') {
+      setScannerVisible(true);
+      return;
+    }
+    getTodayScanCount(AsyncStorage, new Date())
+      .then((used) => {
+        if (used >= FREE_DAILY_SCAN_LIMIT) {
+          Alert.alert(
+            '무료 스캔 소진',
+            `무료 요금제는 하루 ${FREE_DAILY_SCAN_LIMIT}건까지 스캔할 수 있어요. Pro로 올리면 무제한입니다.`,
+            [{ text: '확인' }],
+          );
+        } else {
+          setScannerVisible(true);
+        }
+      })
+      .catch(() => setScannerVisible(true));
+  };
   const [fuelLogs, setFuelLogs] = useState<FuelLog[]>([]);
   const [fuelFormVisible, setFuelFormVisible] = useState(false);
   const [fuelFormLog, setFuelFormLog] = useState<FuelLog | undefined>(undefined);
@@ -4811,7 +4962,7 @@ export default function RouteloApp() {
       <Pressable
         testID="open-ocr-scanner"
         style={[styles.scanFab, { bottom: 78 + insets.bottom }]}
-        onPress={() => setScannerVisible(true)}
+        onPress={openScanner}
       >
         <Ionicons name="scan-outline" size={23} color="#FFFFFF" />
         <Text style={styles.scanFabText}>인수증 스캔</Text>
@@ -4962,6 +5113,8 @@ export default function RouteloApp() {
           setOrders((current) => [order, ...current]);
           deliveryRepository.save(order).catch(() => undefined);
           setActiveTab('deliveries');
+          // 무료 티어 한도 계산용 오늘 스캔 횟수 누적(Pro는 한도 무의미).
+          incrementScanCount(AsyncStorage, new Date()).catch(() => undefined);
           // 인수증 원본 이미지를 문서 디렉터리로 복사해 캘린더/기록에서 다시 볼 수 있게 보존.
           if (receiptImageUri) {
             void persistReceiptImage(order, receiptImageUri);
