@@ -88,4 +88,7 @@ export const DEFAULT_ROUTELO_SETTINGS: RouteloSettings = {
     backupEnabled: false,
     syncEnabled: false,
   },
+  telemetry: {
+    enabled: false,
+  },
 };

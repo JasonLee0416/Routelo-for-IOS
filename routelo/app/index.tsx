@@ -4,6 +4,7 @@ import {
   ActivityIndicator,
   Alert,
   Animated,
+  AppState,
   Easing,
   Image,
   KeyboardAvoidingView,
@@ -120,6 +121,7 @@ import {
   optimizeByNearestNeighbor,
 } from './services/maps';
 import { NAV_APP_LABEL, openNavigation } from './services/navigation';
+import { flush as flushTelemetry, pendingReportCount, recordScanReview } from './telemetry';
 import {
   bucketProfit,
   DailyProfitSummary,
@@ -2774,6 +2776,12 @@ function SettingsScreen({
 }) {
   const { C, styles } = useTheme();
   const [districtQuery, setDistrictQuery] = useState('');
+  const [pendingReports, setPendingReports] = useState(0);
+  useEffect(() => {
+    pendingReportCount()
+      .then(setPendingReports)
+      .catch(() => undefined);
+  }, []);
   const [openRegions, setOpenRegions] = useState<{
     Seoul: boolean;
     Gyeonggi: boolean;
@@ -3189,6 +3197,73 @@ function SettingsScreen({
           }
         />
       </View>
+
+      <SectionHeader title="품질 개선" />
+      <View style={styles.settingsGroup}>
+        <SettingRow
+          icon="shield-checkmark-outline"
+          title="익명 품질 리포트 제공"
+          caption="OCR 인식 정확도 개선에 익명 데이터를 제공합니다 (선택)"
+          trailing={
+            <Switch
+              value={!!settings.telemetry?.enabled}
+              onValueChange={(enabled) => {
+                updateSettings({ ...settings, telemetry: { enabled } });
+                if (enabled) {
+                  flushTelemetry({ enabled: true })
+                    .then(() => pendingReportCount())
+                    .then(setPendingReports)
+                    .catch(() => undefined);
+                }
+              }}
+              trackColor={{ true: C.primary }}
+            />
+          }
+        />
+      </View>
+      <Text
+        style={{
+          color: C.textMuted,
+          fontSize: 11,
+          lineHeight: 17,
+          marginTop: 8,
+          paddingHorizontal: 4,
+        }}
+      >
+        켜면 인식 결과와 사용자가 고친 값의 차이를 익명으로 수집해 정확도 개선에
+        사용합니다. 이름·전화·주소 같은 개인정보는 형태만 남기고 마스킹하며(예:
+        홍길동→○○○, 010-…→NNN-…), 영수증 사진은 전송하지 않습니다. 언제든 끌 수
+        있습니다.
+      </Text>
+      {!!settings.telemetry?.enabled && (
+        <Pressable
+          onPress={() => {
+            flushTelemetry({ enabled: true })
+              .then(() => pendingReportCount())
+              .then(setPendingReports)
+              .catch(() => undefined);
+          }}
+          style={({ pressed }) => [
+            {
+              marginTop: 10,
+              minHeight: 42,
+              borderRadius: 12,
+              borderWidth: 1,
+              borderColor: C.outline,
+              alignItems: 'center',
+              justifyContent: 'center',
+              flexDirection: 'row',
+              gap: 6,
+            },
+            pressed && { opacity: 0.6 },
+          ]}
+        >
+          <Ionicons name="cloud-upload-outline" size={16} color={C.primary} />
+          <Text style={{ color: C.primary, fontWeight: '700', fontSize: 13 }}>
+            지금 보내기{pendingReports > 0 ? ` (대기 ${pendingReports}건)` : ''}
+          </Text>
+        </Pressable>
+      )}
 
       <SectionHeader title="앱 설정" />
       <View style={styles.settingsGroup}>
@@ -4289,6 +4364,12 @@ function OcrScannerModal({
       longitude: 0,
     };
     onRegister(delivery, imageUri);
+    // 품질 리포트(옵트인): OCR 원본↔사용자 확정 교정쌍을 익명·비식별로 수집.
+    if (result) {
+      recordScanReview(result, fields, {
+        enabled: !!settings.telemetry?.enabled,
+      }).catch(() => undefined);
+    }
     Alert.alert('등록 완료', '검수된 OCR 정보가 오늘의 배달 목록에 추가되었습니다.');
     onClose();
   };
@@ -4643,6 +4724,17 @@ export default function RouteloApp() {
   const [settings, setSettings] = useState<RouteloSettings>(
     DEFAULT_ROUTELO_SETTINGS,
   );
+  // 품질 리포트(옵트인): 앱이 포그라운드로 돌아올 때 밀린 리포트를 전송 시도.
+  useEffect(() => {
+    if (!settings.telemetry?.enabled) return;
+    flushTelemetry({ enabled: true }).catch(() => undefined);
+    const sub = AppState.addEventListener('change', (state) => {
+      if (state === 'active') {
+        flushTelemetry({ enabled: true }).catch(() => undefined);
+      }
+    });
+    return () => sub.remove();
+  }, [settings.telemetry?.enabled]);
   const [fuelLogs, setFuelLogs] = useState<FuelLog[]>([]);
   const [fuelFormVisible, setFuelFormVisible] = useState(false);
   const [fuelFormLog, setFuelFormLog] = useState<FuelLog | undefined>(undefined);

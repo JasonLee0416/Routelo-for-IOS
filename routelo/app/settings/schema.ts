@@ -100,6 +100,11 @@ export type AccountSettings = {
   syncEnabled: boolean;
 };
 
+// 품질 개선용 익명 리포트 제공 동의(옵트인, 기본 OFF). 기존 저장본 호환 위해 optional.
+export type TelemetrySettings = {
+  enabled: boolean;
+};
+
 export type RouteloSettings = {
   schemaVersion: typeof SETTINGS_SCHEMA_VERSION;
   business: BusinessRuleSettings;
@@ -112,6 +117,7 @@ export type RouteloSettings = {
   appearance: AppearanceSettings;
   route: RoutePreferenceSettings;
   account: AccountSettings;
+  telemetry?: TelemetrySettings;
 };
 
 export type LegacyFeeSettings = {
