@@ -60,7 +60,12 @@ export function SettingRow({
 }) {
   const { C, styles } = useTheme();
   return (
-    <Pressable style={styles.settingRow} onPress={onPress}>
+    <Pressable
+      style={styles.settingRow}
+      onPress={onPress}
+      accessibilityRole={onPress ? 'button' : undefined}
+      accessibilityLabel={`${title}. ${caption}`}
+    >
       <View style={styles.settingIcon}>
         <Ionicons name={icon} size={21} color={C.primary} />
       </View>

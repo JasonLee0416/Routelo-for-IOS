@@ -129,6 +129,11 @@ import {
   resolvePlan,
 } from './entitlements/plan';
 import { getTodayScanCount, incrementScanCount } from './entitlements/usage';
+import { ErrorBoundary } from './reliability/ErrorBoundary';
+import { installGlobalErrorHandler } from './reliability/errorReporting';
+import { LockGate } from './security/LockGate';
+import { clearPin, isValidPin, setPin } from './security/appLock';
+import { toCsv } from './export/csv';
 import {
   bucketProfit,
   DailyProfitSummary,
@@ -2404,11 +2409,13 @@ function SettingsScreen({
   settings,
   onSettingsChange,
   onEditAccount,
+  onExportCsv,
 }: {
   account?: AccountState;
   settings: RouteloSettings;
   onSettingsChange: (settings: RouteloSettings) => void;
   onEditAccount: () => void;
+  onExportCsv?: () => void;
 }) {
   const { C, styles } = useTheme();
   const [districtQuery, setDistrictQuery] = useState('');
@@ -2621,6 +2628,82 @@ function SettingsScreen({
             </Text>
           </Pressable>
         )}
+      </View>
+
+      <SectionHeader title="보안" />
+      <View style={styles.settingsGroup}>
+        <SettingRow
+          icon="lock-closed-outline"
+          title="앱 잠금 (PIN)"
+          caption="앱을 열 때 PIN을 요구해 민감한 배송 정보를 보호합니다"
+          trailing={
+            <Switch
+              value={settings.security.appLockEnabled}
+              onValueChange={(on) => {
+                if (on) {
+                  Alert.prompt(
+                    '앱 잠금 PIN 설정',
+                    '4~6자리 숫자를 입력하세요',
+                    (pin?: string) => {
+                      if (pin && isValidPin(pin)) {
+                        setPin(pin).catch(() => undefined);
+                        updateSettings({
+                          ...settings,
+                          security: {
+                            ...settings.security,
+                            appLockEnabled: true,
+                          },
+                        });
+                      } else {
+                        Alert.alert('PIN 오류', '4~6자리 숫자를 입력해주세요.');
+                      }
+                    },
+                    'secure-text',
+                  );
+                } else {
+                  clearPin().catch(() => undefined);
+                  updateSettings({
+                    ...settings,
+                    security: { ...settings.security, appLockEnabled: false },
+                  });
+                }
+              }}
+              trackColor={{ true: C.primary }}
+            />
+          }
+        />
+      </View>
+
+      <SectionHeader title="데이터" />
+      <View style={styles.settingsGroup}>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="배달 기록 CSV 내보내기"
+          style={styles.settingRow}
+          onPress={() => {
+            if (plan === 'pro') onExportCsv?.();
+            else
+              Alert.alert(
+                'Pro 기능',
+                'CSV 내보내기는 Pro에서 사용할 수 있어요.',
+              );
+          }}
+        >
+          <View style={styles.settingIcon}>
+            <Ionicons name="download-outline" size={21} color={C.primary} />
+          </View>
+          <View style={styles.flex}>
+            <Text style={styles.settingTitle}>배달 기록 CSV 내보내기</Text>
+            <Text style={styles.settingCaption}>
+              {plan === 'pro' ? '엑셀에서 열 수 있는 CSV로 공유' : 'Pro 전용'}
+            </Text>
+          </View>
+          <Ionicons
+            name={plan === 'pro' ? 'chevron-forward' : 'lock-closed'}
+            size={18}
+            color={C.textMuted}
+          />
+        </Pressable>
       </View>
 
       <SectionHeader title="알림 설정" />
@@ -4414,6 +4497,45 @@ export default function RouteloApp() {
       })
       .catch(() => setScannerVisible(true));
   };
+  // Pro 기능: 배달 기록을 CSV로 내보내 공유(엑셀/한글 호환 BOM). 본인 데이터 export.
+  const exportDeliveriesCsv = async () => {
+    const headers = [
+      '배송일',
+      '상품',
+      '수량',
+      '배송지',
+      '발주처',
+      '수령인 연락처',
+      '예식시간',
+      '금액(원)',
+      '상태',
+    ];
+    const rows = orders.map((o) => {
+      const d = orderToLegacyDelivery(o);
+      return [
+        d.deliveryDt,
+        d.productName,
+        d.productQuantity,
+        d.deliveryAddress,
+        d.orderVendor,
+        d.recipientTel,
+        d.eventTime,
+        d.fee,
+        d.status === 'completed' ? '완료' : '대기',
+      ];
+    });
+    try {
+      const dir = `${FileSystem.documentDirectory ?? ''}exports/`;
+      await FileSystem.makeDirectoryAsync(dir, { intermediates: true }).catch(
+        () => undefined,
+      );
+      const uri = `${dir}routelo-deliveries.csv`;
+      await FileSystem.writeAsStringAsync(uri, toCsv(headers, rows, { bom: true }));
+      await Share.share({ url: uri });
+    } catch {
+      Alert.alert('내보내기 실패', '파일을 만드는 중 문제가 발생했습니다.');
+    }
+  };
   const [fuelLogs, setFuelLogs] = useState<FuelLog[]>([]);
   const [fuelFormVisible, setFuelFormVisible] = useState(false);
   const [fuelFormLog, setFuelFormLog] = useState<FuelLog | undefined>(undefined);
@@ -4889,6 +5011,7 @@ export default function RouteloApp() {
           settings={settings}
           onSettingsChange={setSettings}
           onEditAccount={() => setOnboardingVisible(true)}
+          onExportCsv={exportDeliveriesCsv}
         />
       );
     }
@@ -4915,7 +5038,12 @@ export default function RouteloApp() {
   const C = darkMode ? DARK : LIGHT;
   const styles = useMemo(() => makeStyles(C), [C]);
 
+  useEffect(() => {
+    installGlobalErrorHandler();
+  }, []);
+
   return (
+    <ErrorBoundary>
     <ThemeContext.Provider value={{ C, styles, dark: darkMode }}>
     <PrivacyContext.Provider
       value={{
@@ -4923,6 +5051,7 @@ export default function RouteloApp() {
         showFullAddressInList: settings.privacy.showFullAddressInList,
       }}
     >
+    <LockGate enabled={settings.security.appLockEnabled}>
     <SafeAreaView
       style={styles.app}
       edges={['top', 'left', 'right']}
@@ -4961,6 +5090,8 @@ export default function RouteloApp() {
       </GlassSurface>
       <Pressable
         testID="open-ocr-scanner"
+        accessibilityRole="button"
+        accessibilityLabel="인수증 스캔"
         style={[styles.scanFab, { bottom: 78 + insets.bottom }]}
         onPress={openScanner}
       >
@@ -4990,6 +5121,9 @@ export default function RouteloApp() {
               <Pressable
                 key={tab.key}
                 testID={`nav-${tab.key}`}
+                accessibilityRole="tab"
+                accessibilityState={{ selected }}
+                accessibilityLabel={tab.label}
                 style={styles.navItem}
                 onPress={() => {
                   setActiveTab(tab.key);
@@ -5131,8 +5265,10 @@ export default function RouteloApp() {
         }}
       />
     </SafeAreaView>
+    </LockGate>
     </PrivacyContext.Provider>
     </ThemeContext.Provider>
+    </ErrorBoundary>
   );
 }
 
