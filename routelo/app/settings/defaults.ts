@@ -91,4 +91,8 @@ export const DEFAULT_ROUTELO_SETTINGS: RouteloSettings = {
   telemetry: {
     enabled: false,
   },
+  // 베타 파운딩 멤버: 결제 없이 Pro 전 기능 오픈. 정식 유료화 시 'free'로 전환.
+  entitlement: {
+    plan: 'pro',
+  },
 };

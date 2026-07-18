@@ -122,6 +122,20 @@ import {
 } from './services/maps';
 import { NAV_APP_LABEL, openNavigation } from './services/navigation';
 import { flush as flushTelemetry, pendingReportCount, recordScanReview } from './telemetry';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import {
+  AppPlan,
+  FREE_DAILY_SCAN_LIMIT,
+  PRO_FEATURES,
+  remainingFreeScans,
+  resolvePlan,
+} from './entitlements/plan';
+import { getTodayScanCount, incrementScanCount } from './entitlements/usage';
+import { ErrorBoundary } from './reliability/ErrorBoundary';
+import { installGlobalErrorHandler } from './reliability/errorReporting';
+import { LockGate } from './security/LockGate';
+import { clearPin, isValidPin, setPin } from './security/appLock';
+import { toCsv } from './export/csv';
 import {
   bucketProfit,
   DailyProfitSummary,
@@ -2768,18 +2782,25 @@ function SettingsScreen({
   settings,
   onSettingsChange,
   onEditAccount,
+  onExportCsv,
 }: {
   account?: AccountState;
   settings: RouteloSettings;
   onSettingsChange: (settings: RouteloSettings) => void;
   onEditAccount: () => void;
+  onExportCsv?: () => void;
 }) {
   const { C, styles } = useTheme();
   const [districtQuery, setDistrictQuery] = useState('');
   const [pendingReports, setPendingReports] = useState(0);
+  const plan: AppPlan = resolvePlan(settings.entitlement);
+  const [scanToday, setScanToday] = useState(0);
   useEffect(() => {
     pendingReportCount()
       .then(setPendingReports)
+      .catch(() => undefined);
+    getTodayScanCount(AsyncStorage, new Date())
+      .then(setScanToday)
       .catch(() => undefined);
   }, []);
   const [openRegions, setOpenRegions] = useState<{
@@ -2868,6 +2889,197 @@ function SettingsScreen({
         </View>
         <Pressable style={styles.iconButton} onPress={onEditAccount}>
           <Ionicons name="pencil-outline" size={19} color={C.primary} />
+        </Pressable>
+      </View>
+
+      <SectionHeader title="멤버십" />
+      <View style={[styles.settingsGroup, { padding: 14 }]}>
+        <View
+          style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            marginBottom: 12,
+          }}
+        >
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+            <Ionicons
+              name={plan === 'pro' ? 'star' : 'star-outline'}
+              size={18}
+              color={plan === 'pro' ? C.warning : C.textMuted}
+            />
+            <Text style={{ color: C.navy, fontSize: 15, fontWeight: '800' }}>
+              {plan === 'pro' ? 'Pro · 파운딩 멤버' : '무료 요금제'}
+            </Text>
+          </View>
+          <Pressable
+            onPress={() =>
+              updateSettings({
+                ...settings,
+                entitlement: { plan: plan === 'pro' ? 'free' : 'pro' },
+              })
+            }
+            style={({ pressed }) => [
+              {
+                paddingHorizontal: 12,
+                minHeight: 34,
+                borderRadius: 10,
+                borderWidth: 1,
+                borderColor: C.outline,
+                alignItems: 'center',
+                justifyContent: 'center',
+              },
+              pressed && { opacity: 0.6 },
+            ]}
+          >
+            <Text style={{ color: C.primary, fontWeight: '700', fontSize: 12 }}>
+              {plan === 'pro' ? '무료 체험 미리보기' : 'Pro로 전환'}
+            </Text>
+          </Pressable>
+        </View>
+        {plan === 'free' && (
+          <View
+            style={{
+              padding: 10,
+              borderRadius: 10,
+              backgroundColor: C.surfaceAlt,
+              marginBottom: 12,
+            }}
+          >
+            <Text style={{ color: C.textMuted, fontSize: 12, fontWeight: '600' }}>
+              오늘 무료 스캔 {remainingFreeScans('free', scanToday)}/
+              {FREE_DAILY_SCAN_LIMIT}건 남음
+            </Text>
+          </View>
+        )}
+        {PRO_FEATURES.map((feature) => (
+          <View
+            key={feature.id}
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              gap: 10,
+              paddingVertical: 8,
+            }}
+          >
+            <Ionicons
+              name={plan === 'pro' ? 'checkmark-circle' : 'lock-closed'}
+              size={18}
+              color={plan === 'pro' ? C.success : C.textMuted}
+            />
+            <View style={{ flex: 1 }}>
+              <Text style={{ color: C.text, fontSize: 13, fontWeight: '700' }}>
+                {feature.label}
+              </Text>
+              <Text style={{ color: C.textMuted, fontSize: 11, marginTop: 2 }}>
+                {feature.desc}
+              </Text>
+            </View>
+          </View>
+        ))}
+        {plan === 'free' && (
+          <Pressable
+            onPress={() =>
+              Alert.alert(
+                'Pro 곧 출시',
+                'Pro 구독은 준비 중입니다. 관심 감사합니다! 베타 파운딩 멤버에게는 특별 혜택을 드립니다.',
+              )
+            }
+            style={({ pressed }) => [
+              {
+                marginTop: 10,
+                minHeight: 44,
+                borderRadius: 12,
+                backgroundColor: C.primary,
+                alignItems: 'center',
+                justifyContent: 'center',
+                flexDirection: 'row',
+                gap: 6,
+              },
+              pressed && { opacity: 0.85 },
+            ]}
+          >
+            <Ionicons name="star" size={16} color="#FFFFFF" />
+            <Text style={{ color: '#FFFFFF', fontWeight: '800', fontSize: 13 }}>
+              Pro 알아보기
+            </Text>
+          </Pressable>
+        )}
+      </View>
+
+      <SectionHeader title="보안" />
+      <View style={styles.settingsGroup}>
+        <SettingRow
+          icon="lock-closed-outline"
+          title="앱 잠금 (PIN)"
+          caption="앱을 열 때 PIN을 요구해 민감한 배송 정보를 보호합니다"
+          trailing={
+            <Switch
+              value={settings.security.appLockEnabled}
+              onValueChange={(on) => {
+                if (on) {
+                  Alert.prompt(
+                    '앱 잠금 PIN 설정',
+                    '4~6자리 숫자를 입력하세요',
+                    (pin?: string) => {
+                      if (pin && isValidPin(pin)) {
+                        setPin(pin).catch(() => undefined);
+                        updateSettings({
+                          ...settings,
+                          security: {
+                            ...settings.security,
+                            appLockEnabled: true,
+                          },
+                        });
+                      } else {
+                        Alert.alert('PIN 오류', '4~6자리 숫자를 입력해주세요.');
+                      }
+                    },
+                    'secure-text',
+                  );
+                } else {
+                  clearPin().catch(() => undefined);
+                  updateSettings({
+                    ...settings,
+                    security: { ...settings.security, appLockEnabled: false },
+                  });
+                }
+              }}
+              trackColor={{ true: C.primary }}
+            />
+          }
+        />
+      </View>
+
+      <SectionHeader title="데이터" />
+      <View style={styles.settingsGroup}>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="배달 기록 CSV 내보내기"
+          style={styles.settingRow}
+          onPress={() => {
+            if (plan === 'pro') onExportCsv?.();
+            else
+              Alert.alert(
+                'Pro 기능',
+                'CSV 내보내기는 Pro에서 사용할 수 있어요.',
+              );
+          }}
+        >
+          <View style={styles.settingIcon}>
+            <Ionicons name="download-outline" size={21} color={C.primary} />
+          </View>
+          <View style={styles.flex}>
+            <Text style={styles.settingTitle}>배달 기록 CSV 내보내기</Text>
+            <Text style={styles.settingCaption}>
+              {plan === 'pro' ? '엑셀에서 열 수 있는 CSV로 공유' : 'Pro 전용'}
+            </Text>
+          </View>
+          <Ionicons
+            name={plan === 'pro' ? 'chevron-forward' : 'lock-closed'}
+            size={18}
+            color={C.textMuted}
+          />
         </Pressable>
       </View>
 
@@ -4735,6 +4947,65 @@ export default function RouteloApp() {
     });
     return () => sub.remove();
   }, [settings.telemetry?.enabled]);
+  // 무료 티어는 하루 스캔 한도를 넘으면 스캐너 대신 업그레이드 안내를 띄운다.
+  const openScanner = () => {
+    if (resolvePlan(settings.entitlement) === 'pro') {
+      setScannerVisible(true);
+      return;
+    }
+    getTodayScanCount(AsyncStorage, new Date())
+      .then((used) => {
+        if (used >= FREE_DAILY_SCAN_LIMIT) {
+          Alert.alert(
+            '무료 스캔 소진',
+            `무료 요금제는 하루 ${FREE_DAILY_SCAN_LIMIT}건까지 스캔할 수 있어요. Pro로 올리면 무제한입니다.`,
+            [{ text: '확인' }],
+          );
+        } else {
+          setScannerVisible(true);
+        }
+      })
+      .catch(() => setScannerVisible(true));
+  };
+  // Pro 기능: 배달 기록을 CSV로 내보내 공유(엑셀/한글 호환 BOM). 본인 데이터 export.
+  const exportDeliveriesCsv = async () => {
+    const headers = [
+      '배송일',
+      '상품',
+      '수량',
+      '배송지',
+      '발주처',
+      '수령인 연락처',
+      '예식시간',
+      '금액(원)',
+      '상태',
+    ];
+    const rows = orders.map((o) => {
+      const d = orderToLegacyDelivery(o);
+      return [
+        d.deliveryDt,
+        d.productName,
+        d.productQuantity,
+        d.deliveryAddress,
+        d.orderVendor,
+        d.recipientTel,
+        d.eventTime,
+        d.fee,
+        d.status === 'completed' ? '완료' : '대기',
+      ];
+    });
+    try {
+      const dir = `${FileSystem.documentDirectory ?? ''}exports/`;
+      await FileSystem.makeDirectoryAsync(dir, { intermediates: true }).catch(
+        () => undefined,
+      );
+      const uri = `${dir}routelo-deliveries.csv`;
+      await FileSystem.writeAsStringAsync(uri, toCsv(headers, rows, { bom: true }));
+      await Share.share({ url: uri });
+    } catch {
+      Alert.alert('내보내기 실패', '파일을 만드는 중 문제가 발생했습니다.');
+    }
+  };
   const [fuelLogs, setFuelLogs] = useState<FuelLog[]>([]);
   const [fuelFormVisible, setFuelFormVisible] = useState(false);
   const [fuelFormLog, setFuelFormLog] = useState<FuelLog | undefined>(undefined);
@@ -5232,6 +5503,7 @@ export default function RouteloApp() {
           settings={settings}
           onSettingsChange={setSettings}
           onEditAccount={() => setOnboardingVisible(true)}
+          onExportCsv={exportDeliveriesCsv}
         />
       );
     }
@@ -5259,7 +5531,12 @@ export default function RouteloApp() {
   const C = darkMode ? DARK : LIGHT;
   const styles = useMemo(() => makeStyles(C), [C]);
 
+  useEffect(() => {
+    installGlobalErrorHandler();
+  }, []);
+
   return (
+    <ErrorBoundary>
     <ThemeContext.Provider value={{ C, styles, dark: darkMode }}>
     <PrivacyContext.Provider
       value={{
@@ -5267,6 +5544,7 @@ export default function RouteloApp() {
         showFullAddressInList: settings.privacy.showFullAddressInList,
       }}
     >
+    <LockGate enabled={settings.security.appLockEnabled}>
     <SafeAreaView
       style={styles.app}
       edges={['top', 'left', 'right']}
@@ -5305,8 +5583,10 @@ export default function RouteloApp() {
       </GlassSurface>
       <Pressable
         testID="open-ocr-scanner"
+        accessibilityRole="button"
+        accessibilityLabel="인수증 스캔"
         style={[styles.scanFab, { bottom: 78 + insets.bottom }]}
-        onPress={() => setScannerVisible(true)}
+        onPress={openScanner}
       >
         <Ionicons name="scan-outline" size={23} color="#FFFFFF" />
         <Text style={styles.scanFabText}>인수증 스캔</Text>
@@ -5334,6 +5614,9 @@ export default function RouteloApp() {
               <Pressable
                 key={tab.key}
                 testID={`nav-${tab.key}`}
+                accessibilityRole="tab"
+                accessibilityState={{ selected }}
+                accessibilityLabel={tab.label}
                 style={styles.navItem}
                 onPress={() => {
                   setActiveTab(tab.key);
@@ -5457,6 +5740,8 @@ export default function RouteloApp() {
           setOrders((current) => [order, ...current]);
           deliveryRepository.save(order).catch(() => undefined);
           setActiveTab('deliveries');
+          // 무료 티어 한도 계산용 오늘 스캔 횟수 누적(Pro는 한도 무의미).
+          incrementScanCount(AsyncStorage, new Date()).catch(() => undefined);
           // 인수증 원본 이미지를 문서 디렉터리로 복사해 캘린더/기록에서 다시 볼 수 있게 보존.
           if (receiptImageUri) {
             void persistReceiptImage(order, receiptImageUri);
@@ -5473,8 +5758,10 @@ export default function RouteloApp() {
         }}
       />
     </SafeAreaView>
+    </LockGate>
     </PrivacyContext.Provider>
     </ThemeContext.Provider>
+    </ErrorBoundary>
   );
 }
 

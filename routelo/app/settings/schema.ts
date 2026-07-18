@@ -105,6 +105,11 @@ export type TelemetrySettings = {
   enabled: boolean;
 };
 
+// 요금제 자격. 베타에는 결제 없이 게이팅만 두고, 미지정은 파운딩 멤버(Pro)로 본다.
+export type EntitlementSettings = {
+  plan?: 'free' | 'pro';
+};
+
 export type RouteloSettings = {
   schemaVersion: typeof SETTINGS_SCHEMA_VERSION;
   business: BusinessRuleSettings;
@@ -118,6 +123,7 @@ export type RouteloSettings = {
   route: RoutePreferenceSettings;
   account: AccountSettings;
   telemetry?: TelemetrySettings;
+  entitlement?: EntitlementSettings;
 };
 
 export type LegacyFeeSettings = {
