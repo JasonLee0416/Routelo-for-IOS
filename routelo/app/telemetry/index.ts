@@ -1,5 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
+import { getInstallId, uuid } from '../device/installId';
 import { OcrFieldResult, OcrPipelineResult } from '../models';
 import { TELEMETRY_CONFIG, isTelemetryConfigured } from './config';
 import { buildScanEvent } from './events';
@@ -9,29 +10,10 @@ import { TelemetryQueue } from './queue';
 // 품질 리포트 오케스트레이터. 동의(enabled)와 설정(config)이 모두 있을 때만 동작하며,
 // 이벤트를 로컬 큐에 쌓고 온라인일 때 Firestore로 비운다.
 
-const DEVICE_ID_KEY = 'routelo.telemetry.deviceId';
 const APP_VERSION = '1.0.0'; // 리포트에 찍히는 버전(릴리스 시 함께 갱신)
 const BATCH = 25;
 
-function uuid(): string {
-  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
-    const r = (Math.random() * 16) | 0;
-    const v = c === 'x' ? r : (r & 0x3) | 0x8;
-    return v.toString(16);
-  });
-}
-
-let deviceIdCache: string | undefined;
-async function getDeviceId(): Promise<string> {
-  if (deviceIdCache) return deviceIdCache;
-  let id = await AsyncStorage.getItem(DEVICE_ID_KEY);
-  if (!id) {
-    id = uuid(); // 익명 설치 ID — 개인 식별과 무관
-    await AsyncStorage.setItem(DEVICE_ID_KEY, id);
-  }
-  deviceIdCache = id;
-  return id;
-}
+const getDeviceId = () => getInstallId(AsyncStorage);
 
 const queue = new TelemetryQueue(AsyncStorage);
 
