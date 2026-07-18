@@ -28,6 +28,9 @@ export type RevenueCostSettings = {
   fuelTankCapacity: number;
   fuelType: 'gasoline' | 'diesel' | 'lpg' | 'hybrid' | 'electric' | 'other';
   profitBasis: 'daily' | 'monthly';
+  // 다중 차량 관리(Pro): 주유·주행 기록에 일관된 라벨을 붙이기 위한 등록 차량 목록.
+  // 기존 저장본 호환 위해 optional.
+  vehicleRegistry?: string[];
 };
 
 export type PrivacySettings = {

@@ -38,6 +38,7 @@ export const DEFAULT_ROUTELO_SETTINGS: RouteloSettings = {
     fuelTankCapacity: 65,
     fuelType: 'diesel',
     profitBasis: 'daily',
+    vehicleRegistry: [],
   },
   privacy: {
     preserveOriginalReceiptImage: true,

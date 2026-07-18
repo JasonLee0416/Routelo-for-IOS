@@ -132,6 +132,14 @@ import {
   resolvePlan,
 } from './entitlements/plan';
 import { buildRevenueReport, ReportRange } from './reports/revenueReport';
+import {
+  addVehicle,
+  buildFleetSummary,
+  dedupeVehicles,
+  isValidVehicleLabel,
+  MAX_VEHICLES,
+  removeVehicle,
+} from './vehicles/registry';
 import { getTodayScanCount, incrementScanCount } from './entitlements/usage';
 import { ErrorBoundary } from './reliability/ErrorBoundary';
 import { installGlobalErrorHandler } from './reliability/errorReporting';
@@ -1334,12 +1342,14 @@ function FuelFormModal({
   visible,
   initial,
   defaultVehicle,
+  vehicleRegistry = [],
   onClose,
   onSubmit,
 }: {
   visible: boolean;
   initial?: FuelLog;
   defaultVehicle?: string;
+  vehicleRegistry?: string[];
   onClose: () => void;
   onSubmit: (log: FuelLog) => void;
 }) {
@@ -1467,6 +1477,52 @@ function FuelFormModal({
                     color: C.text,
                   }}
                 />
+                {field.key === 'vehicle' && vehicleRegistry.length > 0 && (
+                  <View
+                    style={{
+                      flexDirection: 'row',
+                      flexWrap: 'wrap',
+                      gap: 6,
+                      marginTop: 8,
+                    }}
+                  >
+                    {vehicleRegistry.map((label) => {
+                      const active =
+                        (values.vehicle ?? '').trim() === label;
+                      return (
+                        <Pressable
+                          key={label}
+                          onPress={() =>
+                            setValues((current) => ({
+                              ...current,
+                              vehicle: active ? '' : label,
+                            }))
+                          }
+                          accessibilityRole="button"
+                          accessibilityState={{ selected: active }}
+                          style={{
+                            paddingHorizontal: 12,
+                            paddingVertical: 6,
+                            borderRadius: 16,
+                            borderWidth: 1,
+                            borderColor: active ? C.primary : C.outline,
+                            backgroundColor: active ? C.primary : C.surfaceAlt,
+                          }}
+                        >
+                          <Text
+                            style={{
+                              fontSize: 12,
+                              fontWeight: '700',
+                              color: active ? '#FFFFFF' : C.textMuted,
+                            }}
+                          >
+                            {label}
+                          </Text>
+                        </Pressable>
+                      );
+                    })}
+                  </View>
+                )}
               </View>
             ))}
             <Text style={{ fontSize: 11, color: C.textMuted, marginTop: 2 }}>
@@ -1519,12 +1575,14 @@ function MileageFormModal({
   visible,
   initial,
   defaultVehicle,
+  vehicleRegistry = [],
   onClose,
   onSubmit,
 }: {
   visible: boolean;
   initial?: MileageLog;
   defaultVehicle?: string;
+  vehicleRegistry?: string[];
   onClose: () => void;
   onSubmit: (log: MileageLog) => void;
 }) {
@@ -1650,6 +1708,51 @@ function MileageFormModal({
                     color: C.text,
                   }}
                 />
+                {field.key === 'vehicle' && vehicleRegistry.length > 0 && (
+                  <View
+                    style={{
+                      flexDirection: 'row',
+                      flexWrap: 'wrap',
+                      gap: 6,
+                      marginTop: 8,
+                    }}
+                  >
+                    {vehicleRegistry.map((label) => {
+                      const active = (values.vehicle ?? '').trim() === label;
+                      return (
+                        <Pressable
+                          key={label}
+                          onPress={() =>
+                            setValues((current) => ({
+                              ...current,
+                              vehicle: active ? '' : label,
+                            }))
+                          }
+                          accessibilityRole="button"
+                          accessibilityState={{ selected: active }}
+                          style={{
+                            paddingHorizontal: 12,
+                            paddingVertical: 6,
+                            borderRadius: 16,
+                            borderWidth: 1,
+                            borderColor: active ? C.primary : C.outline,
+                            backgroundColor: active ? C.primary : C.surfaceAlt,
+                          }}
+                        >
+                          <Text
+                            style={{
+                              fontSize: 12,
+                              fontWeight: '700',
+                              color: active ? '#FFFFFF' : C.textMuted,
+                            }}
+                          >
+                            {label}
+                          </Text>
+                        </Pressable>
+                      );
+                    })}
+                  </View>
+                )}
               </View>
             ))}
           </ScrollView>
@@ -2702,9 +2805,20 @@ function CalendarScreen({
       {(fuelLogs.length > 0 || mileageLogs.length > 0) &&
         (() => {
           const eff = summarizeEfficiency(fuelLogs, mileageLogs);
+          const defaultVehicleLabel =
+            settings.costs.vehicleModel?.trim() || '기본 차량';
           const byVehicle = summarizeEfficiencyByVehicle(fuelLogs, mileageLogs, {
-            defaultLabel: settings.costs.vehicleModel?.trim() || '기본 차량',
+            defaultLabel: defaultVehicleLabel,
           });
+          const isPro = reportPlan === 'pro';
+          const fleet = isPro
+            ? buildFleetSummary(
+                settings.costs.vehicleRegistry ?? [],
+                fuelLogs,
+                mileageLogs,
+                defaultVehicleLabel,
+              )
+            : [];
           const metrics: Array<[string, string]> = [
             ['연비', eff.kmPerLiter != null ? `${eff.kmPerLiter} km/L` : '-'],
             [
@@ -2756,7 +2870,77 @@ function CalendarScreen({
                   </View>
                 ))}
               </View>
-              {byVehicle.length > 1 && (
+              {isPro && fleet.length > 1 ? (
+                <View
+                  style={{
+                    marginTop: 12,
+                    borderTopWidth: 1,
+                    borderTopColor: C.outline,
+                    paddingTop: 10,
+                    gap: 8,
+                  }}
+                >
+                  <View
+                    style={{
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      gap: 5,
+                      marginBottom: 2,
+                    }}
+                  >
+                    <Text style={{ fontSize: 11, color: C.textMuted }}>
+                      차량별 비용
+                    </Text>
+                    <Ionicons name="star" size={9} color={C.warning} />
+                  </View>
+                  {fleet.map((row) => (
+                    <View key={row.label} style={{ gap: 3 }}>
+                      <View
+                        style={{
+                          flexDirection: 'row',
+                          justifyContent: 'space-between',
+                          alignItems: 'center',
+                        }}
+                      >
+                        <Text
+                          style={{
+                            fontSize: 12,
+                            fontWeight: '700',
+                            color: row.hasLogs ? C.text : C.textMuted,
+                          }}
+                          numberOfLines={1}
+                        >
+                          {row.label}
+                          {!row.hasLogs ? ' · 기록 없음' : ''}
+                        </Text>
+                        <Text style={{ fontSize: 12, color: C.textMuted }}>
+                          {formatWon(row.fuelCost)}원
+                          {row.kmPerLiter != null
+                            ? ` · ${row.kmPerLiter} km/L`
+                            : ''}
+                        </Text>
+                      </View>
+                      <View
+                        style={{
+                          height: 4,
+                          borderRadius: 2,
+                          backgroundColor: C.surfaceAlt,
+                          overflow: 'hidden',
+                        }}
+                      >
+                        <View
+                          style={{
+                            width: `${Math.max(2, Math.round(row.share * 100))}%`,
+                            height: 4,
+                            borderRadius: 2,
+                            backgroundColor: C.primary,
+                          }}
+                        />
+                      </View>
+                    </View>
+                  ))}
+                </View>
+              ) : byVehicle.length > 1 ? (
                 <View
                   style={{
                     marginTop: 12,
@@ -2795,7 +2979,7 @@ function CalendarScreen({
                     </View>
                   ))}
                 </View>
-              )}
+              ) : null}
             </View>
           );
         })()}
@@ -3172,6 +3356,38 @@ function SettingsScreen({
   const [pendingReports, setPendingReports] = useState(0);
   const plan: AppPlan = resolvePlan(settings.entitlement);
   const [scanToday, setScanToday] = useState(0);
+  const [newVehicle, setNewVehicle] = useState('');
+  const vehicleRegistry = dedupeVehicles(settings.costs.vehicleRegistry ?? []);
+  const addFleetVehicle = () => {
+    if (!isValidVehicleLabel(newVehicle)) {
+      Alert.alert('차량 이름 확인', '1~24자 이내로 입력해주세요.');
+      return;
+    }
+    const next = addVehicle(vehicleRegistry, newVehicle);
+    if (next.length === vehicleRegistry.length) {
+      Alert.alert(
+        '추가할 수 없음',
+        vehicleRegistry.length >= MAX_VEHICLES
+          ? `차량은 최대 ${MAX_VEHICLES}대까지 등록할 수 있어요.`
+          : '이미 등록된 차량입니다.',
+      );
+      return;
+    }
+    updateSettings({
+      ...settings,
+      costs: { ...settings.costs, vehicleRegistry: next },
+    });
+    setNewVehicle('');
+  };
+  const removeFleetVehicle = (label: string) => {
+    updateSettings({
+      ...settings,
+      costs: {
+        ...settings.costs,
+        vehicleRegistry: removeVehicle(vehicleRegistry, label),
+      },
+    });
+  };
   useEffect(() => {
     pendingReportCount()
       .then(setPendingReports)
@@ -3458,6 +3674,139 @@ function SettingsScreen({
             color={C.textMuted}
           />
         </Pressable>
+      </View>
+
+      <SectionHeader title="차량 관리" />
+      <View style={styles.settingsGroup}>
+        {plan !== 'pro' ? (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="다중 차량 관리 · Pro 전용"
+            style={styles.settingRow}
+            onPress={() =>
+              Alert.alert(
+                'Pro 기능',
+                '다중 차량 관리는 Pro에서 사용할 수 있어요.\n차량별 주유·연비·비용을 분리해서 볼 수 있습니다.',
+              )
+            }
+          >
+            <View style={styles.settingIcon}>
+              <Ionicons name="car-sport-outline" size={21} color={C.primary} />
+            </View>
+            <View style={styles.flex}>
+              <Text style={styles.settingTitle}>다중 차량 관리</Text>
+              <Text style={styles.settingCaption}>Pro 전용 · 차량별 비용 분리</Text>
+            </View>
+            <Ionicons name="lock-closed" size={18} color={C.textMuted} />
+          </Pressable>
+        ) : (
+          <View style={{ padding: 14 }}>
+            <Text
+              style={{
+                color: C.textMuted,
+                fontSize: 12,
+                fontWeight: '700',
+                marginBottom: 8,
+              }}
+            >
+              등록 차량 ({vehicleRegistry.length}/{MAX_VEHICLES})
+            </Text>
+            {vehicleRegistry.length === 0 ? (
+              <Text style={{ fontSize: 12, color: C.textMuted, marginBottom: 10 }}>
+                차량을 등록하면 주유·주행 기록에서 칩으로 빠르게 선택할 수 있어요.
+              </Text>
+            ) : (
+              <View
+                style={{
+                  flexDirection: 'row',
+                  flexWrap: 'wrap',
+                  gap: 8,
+                  marginBottom: 10,
+                }}
+              >
+                {vehicleRegistry.map((label) => (
+                  <View
+                    key={label}
+                    style={{
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      gap: 6,
+                      paddingLeft: 12,
+                      paddingRight: 8,
+                      paddingVertical: 6,
+                      borderRadius: 16,
+                      borderWidth: 1,
+                      borderColor: C.outline,
+                      backgroundColor: C.surfaceAlt,
+                    }}
+                  >
+                    <Text
+                      style={{ fontSize: 13, fontWeight: '700', color: C.text }}
+                    >
+                      {label}
+                    </Text>
+                    <Pressable
+                      onPress={() =>
+                        Alert.alert('차량 삭제', `'${label}'을(를) 목록에서 뺄까요?\n(기존 기록은 유지됩니다)`, [
+                          { text: '취소', style: 'cancel' },
+                          {
+                            text: '삭제',
+                            style: 'destructive',
+                            onPress: () => removeFleetVehicle(label),
+                          },
+                        ])
+                      }
+                      hitSlop={6}
+                      accessibilityRole="button"
+                      accessibilityLabel={`${label} 삭제`}
+                    >
+                      <Ionicons name="close-circle" size={18} color={C.textMuted} />
+                    </Pressable>
+                  </View>
+                ))}
+              </View>
+            )}
+            <View style={{ flexDirection: 'row', gap: 8 }}>
+              <TextInput
+                value={newVehicle}
+                onChangeText={setNewVehicle}
+                placeholder="예: 포터2 · 봉고3 · 전기트럭"
+                placeholderTextColor={C.textMuted}
+                onSubmitEditing={addFleetVehicle}
+                returnKeyType="done"
+                style={{
+                  flex: 1,
+                  backgroundColor: C.surfaceAlt,
+                  borderWidth: 1,
+                  borderColor: C.outline,
+                  borderRadius: 12,
+                  paddingHorizontal: 14,
+                  paddingVertical: 10,
+                  fontSize: 14,
+                  color: C.text,
+                }}
+              />
+              <Pressable
+                onPress={addFleetVehicle}
+                accessibilityRole="button"
+                accessibilityLabel="차량 추가"
+                style={({ pressed }) => [
+                  {
+                    paddingHorizontal: 16,
+                    justifyContent: 'center',
+                    borderRadius: 12,
+                    backgroundColor: C.primary,
+                  },
+                  pressed && { opacity: 0.85 },
+                ]}
+              >
+                <Text style={{ color: '#FFFFFF', fontSize: 14, fontWeight: '800' }}>
+                  추가
+                </Text>
+              </Pressable>
+            </View>
+          </View>
+        )}
       </View>
 
       <SectionHeader title="알림 설정" />
@@ -5345,6 +5694,13 @@ export default function RouteloApp() {
       .catch(() => setScannerVisible(true));
   };
   // Pro 기능: 배달 기록을 CSV로 내보내 공유(엑셀/한글 호환 BOM). 본인 데이터 export.
+  // 다중 차량 관리(Pro)에서만 등록 차량 칩을 노출한다. 무료는 빈 목록 →
+  // 기존처럼 기본 차량/자유 입력으로 동작.
+  const fleetRegistry =
+    resolvePlan(settings.entitlement) === 'pro'
+      ? dedupeVehicles(settings.costs.vehicleRegistry ?? [])
+      : [];
+
   const exportDeliveriesCsv = async () => {
     const headers = [
       '배송일',
@@ -6091,6 +6447,7 @@ export default function RouteloApp() {
         visible={fuelFormVisible}
         initial={fuelFormLog}
         defaultVehicle={settings.costs.vehicleModel}
+        vehicleRegistry={fleetRegistry}
         onClose={() => setFuelFormVisible(false)}
         onSubmit={submitFuel}
       />
@@ -6098,6 +6455,7 @@ export default function RouteloApp() {
         visible={mileageFormVisible}
         initial={mileageFormLog}
         defaultVehicle={settings.costs.vehicleModel}
+        vehicleRegistry={fleetRegistry}
         onClose={() => setMileageFormVisible(false)}
         onSubmit={submitMileage}
       />
