@@ -114,13 +114,13 @@ export function LockGate({
         alignItems: 'center',
         justifyContent: 'center',
         padding: 28,
-        backgroundColor: '#0F1B2E',
+        backgroundColor: '#171717', // Dark Gray
       }}
     >
       <Text style={{ color: '#FFFFFF', fontSize: 20, fontWeight: '800' }}>
         잠금 해제
       </Text>
-      <Text style={{ color: '#9EADC7', fontSize: 13, marginTop: 8 }}>
+      <Text style={{ color: '#A6A39C', fontSize: 13, marginTop: 8 }}>
         PIN을 입력하세요
       </Text>
       <TextInput
@@ -136,13 +136,13 @@ export function LockGate({
         maxLength={6}
         accessibilityLabel="PIN 입력"
         placeholder="••••"
-        placeholderTextColor="#5A6B86"
+        placeholderTextColor="#7C7A73"
         style={{
           marginTop: 22,
           width: 180,
           minHeight: 52,
           borderRadius: 14,
-          backgroundColor: '#1C2A44',
+          backgroundColor: '#292928',
           color: '#FFFFFF',
           fontSize: 22,
           textAlign: 'center',
@@ -151,11 +151,11 @@ export function LockGate({
         }}
       />
       {lockedOut ? (
-        <Text style={{ color: '#FFC46B', fontSize: 12, marginTop: 10 }}>
+        <Text style={{ color: '#FFC24D', fontSize: 12, marginTop: 10 }}>
           시도가 많습니다 · {lockMsg}
         </Text>
       ) : error ? (
-        <Text style={{ color: '#FF8A8A', fontSize: 12, marginTop: 10 }}>
+        <Text style={{ color: '#FF5A4F', fontSize: 12, marginTop: 10 }}>
           PIN이 올바르지 않습니다
         </Text>
       ) : null}
@@ -170,12 +170,12 @@ export function LockGate({
           minHeight: 48,
           paddingHorizontal: 40,
           borderRadius: 14,
-          backgroundColor: lockedOut ? '#37476A' : '#2C7CEF',
+          backgroundColor: lockedOut ? '#3A3A38' : '#21F1A8', // Spring Green
           alignItems: 'center',
           justifyContent: 'center',
         }}
       >
-        <Text style={{ color: '#FFFFFF', fontWeight: '800', fontSize: 15 }}>
+        <Text style={{ color: '#05231A', fontWeight: '800', fontSize: 15 }}>
           확인
         </Text>
       </Pressable>

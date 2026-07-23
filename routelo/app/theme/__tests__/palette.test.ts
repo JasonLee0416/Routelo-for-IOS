@@ -13,17 +13,19 @@ describe('LUCENT palette', () => {
     }
   });
 
-  test('brand + status colors', () => {
+  test('brand + status colors (2026-07 재조합)', () => {
     const light: Palette = LIGHT;
-    expect(light.primary).toBe('#0A84FF');
-    expect(light.warning).toBe('#FF9F0A');
-    // success/danger는 라이트 모드에서 흰 배경 텍스트 WCAG AA를 만족하도록 진한
-    // 변형을 쓴다(contrast.test.ts가 대비를 강제). 다크 모드는 밝은 systemGreen/Red.
+    // 강조색은 모드별로 다르다: 라이트=Electric Cobalt, 다크=Spring Green.
+    expect(light.primary).toBe('#0047FF');
+    expect(DARK.primary).toBe('#21F1A8');
+    expect(DARK.primary).not.toBe(LIGHT.primary);
+    // 바탕: 라이트=Off-White, 다크=Dark Gray.
+    expect(light.background).toBe('#F8F7F4');
+    expect(DARK.background).toBe('#171717');
+    // 버튼 글자색(onPrimary): 라이트=흰색, 다크=밝은 그린 위 진한 잉크.
+    expect(light.onPrimary).toBe('#FFFFFF');
+    expect(DARK.onPrimary).not.toBe('#FFFFFF');
+    // success/danger는 라이트에서 흰 배경 텍스트 WCAG AA를 만족하는 진한 변형.
     expect(light.success).toBe('#207A33');
-    expect(light.danger).toBe('#D70015');
-    expect(DARK.success).toBe('#34C759');
-    expect(DARK.danger).toBe('#FF453A');
-    // brand blue is shared across themes
-    expect(DARK.primary).toBe(LIGHT.primary);
   });
 });

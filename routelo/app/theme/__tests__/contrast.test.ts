@@ -48,8 +48,9 @@ const TEXT_COMBOS: Combo[] = [
   { name: 'success/background', fg: 'success', bg: 'background' },
   { name: 'danger/surface', fg: 'danger', bg: 'surface' },
   { name: 'danger/background', fg: 'danger', bg: 'background' },
-  // 굵은 버튼 라벨(흰 글자/파란 버튼)은 large 기준.
-  { name: 'white/primary(button)', fg: 'surface', bg: 'primary', large: true },
+  // 굵은 버튼 라벨(onPrimary/강조색 버튼)은 large 기준. 다크의 밝은 그린 위엔
+  // 흰 글자 대신 진한 잉크(onPrimary)를 쓴다.
+  { name: 'onPrimary/primary(button)', fg: 'onPrimary', bg: 'primary', large: true },
 ];
 
 for (const [themeName, palette] of [
@@ -58,8 +59,7 @@ for (const [themeName, palette] of [
 ] as const) {
   describe(`${themeName} palette meets WCAG AA`, () => {
     for (const combo of TEXT_COMBOS) {
-      const fg =
-        combo.name === 'white/primary(button)' ? '#FFFFFF' : palette[combo.fg];
+      const fg = palette[combo.fg];
       it(`${combo.name} (${combo.large ? 'AA-large' : 'AA-normal'})`, () => {
         const ratio = contrastRatio(fg, palette[combo.bg]);
         const threshold = combo.large ? WCAG_AA_LARGE : WCAG_AA_NORMAL;

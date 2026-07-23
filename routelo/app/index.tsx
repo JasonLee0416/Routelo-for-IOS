@@ -1262,7 +1262,7 @@ function RouteScreen({
               <Text style={styles.secondaryButtonText}>배송 상세</Text>
             </Pressable>
             <Pressable style={styles.primaryButton} onPress={startNavigation}>
-              <Ionicons name="navigate-outline" size={18} color="#FFFFFF" />
+              <Ionicons name="navigate-outline" size={18} color={C.onPrimary} />
               <Text style={styles.primaryButtonText}>
                 {NAV_APP_LABEL[navApp]}(으)로 안내 시작
               </Text>
@@ -1556,7 +1556,7 @@ function FuelFormModal({
               pressed && { opacity: 0.85 },
             ]}
           >
-            <Text style={{ color: '#FFFFFF', fontSize: 15, fontWeight: '800' }}>
+            <Text style={{ color: C.onPrimary, fontSize: 15, fontWeight: '800' }}>
               {editing ? '수정 저장' : '주유 추가'}
             </Text>
           </Pressable>
@@ -1783,7 +1783,7 @@ function MileageFormModal({
               pressed && { opacity: 0.85 },
             ]}
           >
-            <Text style={{ color: '#FFFFFF', fontSize: 15, fontWeight: '800' }}>
+            <Text style={{ color: C.onPrimary, fontSize: 15, fontWeight: '800' }}>
               {editing ? '수정 저장' : '기록 추가'}
             </Text>
           </Pressable>
@@ -3147,7 +3147,7 @@ function CalendarScreen({
                   pressed && { opacity: 0.7 },
                 ]}
               >
-                <Text style={{ color: '#FFFFFF', fontSize: 14, fontWeight: '800' }}>
+                <Text style={{ color: C.onPrimary, fontSize: 14, fontWeight: '800' }}>
                   복원
                 </Text>
               </Pressable>
@@ -3598,8 +3598,8 @@ function SettingsScreen({
               pressed && { opacity: 0.85 },
             ]}
           >
-            <Ionicons name="star" size={16} color="#FFFFFF" />
-            <Text style={{ color: '#FFFFFF', fontWeight: '800', fontSize: 13 }}>
+            <Ionicons name="star" size={16} color={C.onPrimary} />
+            <Text style={{ color: C.onPrimary, fontWeight: '800', fontSize: 13 }}>
               Pro 알아보기
             </Text>
           </Pressable>
@@ -3808,7 +3808,7 @@ function SettingsScreen({
                   pressed && { opacity: 0.85 },
                 ]}
               >
-                <Text style={{ color: '#FFFFFF', fontSize: 14, fontWeight: '800' }}>
+                <Text style={{ color: C.onPrimary, fontSize: 14, fontWeight: '800' }}>
                   추가
                 </Text>
               </Pressable>
@@ -4435,7 +4435,7 @@ function OnboardingModal({
         <ScrollView contentContainerStyle={styles.onboardingContent}>
           <View style={styles.onboardingBrand}>
             <View style={styles.onboardingLogo}>
-              <Ionicons name="navigate" size={30} color="#FFFFFF" />
+              <Ionicons name="navigate" size={30} color={C.onPrimary} />
             </View>
             <Text style={styles.onboardingTitle}>RouteLO 시작하기</Text>
             <Text style={styles.onboardingSubtitle}>
@@ -5097,7 +5097,7 @@ function DeliveryFormModal({
               pressed && { opacity: 0.85 },
             ]}
           >
-            <Text style={{ color: '#FFFFFF', fontSize: 15, fontWeight: '800' }}>
+            <Text style={{ color: C.onPrimary, fontSize: 15, fontWeight: '800' }}>
               {editing ? '수정 저장' : '배달 추가'}
             </Text>
           </Pressable>
@@ -5383,7 +5383,7 @@ function OcrScannerModal({
               </View>
             </View>
             <Pressable style={styles.scanPrimaryButton} onPress={() => selectImage(true)}>
-              <Ionicons name="camera" size={21} color="#FFFFFF" />
+              <Ionicons name="camera" size={21} color={C.onPrimary} />
               <Text style={styles.scanPrimaryButtonText}>카메라로 촬영</Text>
             </Pressable>
             <Pressable style={styles.scanSecondaryButton} onPress={() => selectImage(false)}>
@@ -5445,7 +5445,7 @@ function OcrScannerModal({
               </Pressable>
               <Pressable style={styles.scanPrimaryFlex} onPress={analyze}>
                 <Text style={styles.scanPrimaryButtonText}>OCR 분석 시작</Text>
-                <Ionicons name="arrow-forward" size={18} color="#FFFFFF" />
+                <Ionicons name="arrow-forward" size={18} color={C.onPrimary} />
               </Pressable>
             </View>
           </ScrollView>
@@ -5626,7 +5626,7 @@ function OcrScannerModal({
                 </Text>
               </View>
               <Pressable style={styles.scanPrimaryButton} onPress={register}>
-                <Ionicons name="checkmark-circle-outline" size={20} color="#FFFFFF" />
+                <Ionicons name="checkmark-circle-outline" size={20} color={C.onPrimary} />
                 <Text style={styles.scanPrimaryButtonText}>검수 완료 · 배달 목록에 등록</Text>
               </Pressable>
               <Pressable style={styles.scanSecondaryButton} onPress={reset}>
@@ -6335,7 +6335,7 @@ export default function RouteloApp() {
         style={[styles.scanFab, { bottom: 78 + insets.bottom }]}
         onPress={openScanner}
       >
-        <Ionicons name="scan-outline" size={23} color="#FFFFFF" />
+        <Ionicons name="scan-outline" size={23} color={C.onPrimary} />
         <Text
           style={styles.scanFabText}
           numberOfLines={1}
